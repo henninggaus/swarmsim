@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"os"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"swarmsim/domain/bot"
@@ -77,7 +79,21 @@ func NewGame() *Game {
 }
 
 // Update handles input and advances simulation.
-func (g *Game) Update() error {
+func (g *Game) Update() (retErr error) {
+	defer func() {
+		if r := recover(); r != nil {
+			logger.Error("PANIC", "Update panic: %v", r)
+			g.panicMsg = fmt.Sprintf("Error in Update: %v", r)
+			g.panicTimer = 300
+			retErr = nil // don't crash
+		}
+	}()
+
+	// Panic overlay timer
+	if g.panicTimer > 0 {
+		g.panicTimer--
+	}
+
 	// ESC to quit
 	if inpututil.IsKeyJustPressed(ebiten.KeyEscape) {
 		if g.showWelcome {
@@ -179,11 +195,6 @@ func (g *Game) Update() error {
 			}
 		}
 		return nil
-	}
-
-	// Panic recovery timer
-	if g.panicTimer > 0 {
-		g.panicTimer--
 	}
 
 	// Global keys: SPACE, +/-, F1-F7 work in all modes
@@ -1051,6 +1062,11 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	if g.showHelp {
 		render.DrawHelpOverlay(screen, g.sim.SwarmMode, g.helpScrollY)
 	}
+
+	// Panic error banner
+	if g.panicTimer > 0 && g.panicMsg != "" {
+		render.DrawPanicBanner(screen, g.panicMsg, g.panicTimer)
+	}
 }
 
 // Layou returns the logical screen size.
@@ -1060,6 +1076,13 @@ func (g *Game) Layout(outsideWidth, outsideHeight int) (int, int) {
 
 func main() {
 	defer logger.CloseLog()
+	defer func() {
+		if r := recover(); r != nil {
+			stack := string(debug.Stack())
+			logger.Error("CRASH", "Panic: %v\n%s", r, stack)
+			fmt.Fprintf(os.Stderr, "FATAL: %v\n", r)
+		}
+	}()
 
 	logger.Info("INIT", "SwarmSim starting")
 
