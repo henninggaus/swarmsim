@@ -76,9 +76,9 @@ func DrawHUD(screen *ebiten.Image, s *simulation.Simulation, fps float64, r *Ren
 	ebitenutil.DebugPrintAt(screen, pherModes[s.PheromoneVizMode], 10, sh-30)
 
 	if s.TruckMode {
-		ebitenutil.DebugPrintAt(screen, "SPACE:Pause N:NewTruck F:Comm G:Sensor D:Debug P:Pher V:Genome S:Sound +/-:Speed F1-F5:Scenario F6:Truck", 10, sh-15)
+		ebitenutil.DebugPrintAt(screen, "SPACE:Pause N:NewTruck F:Comm G:Sensor D:Debug P:Pher V:Genome S:Sound +/-:Speed H:Hilfe F1-F5:Scenario F6:Truck", 10, sh-15)
 	} else {
-		ebitenutil.DebugPrintAt(screen, "SPACE:Pause 1-5:Bot R:Res H:Obs F:Comm G:Sensor D:Debug P:Pher E:Evolve V:Genome S:Sound +/-:Speed F1-F6:Scenario", 10, sh-15)
+		ebitenutil.DebugPrintAt(screen, "SPACE:Pause 1-5:Bot R:Res O:Obs F:Comm G:Sensor D:Debug P:Pher E:Evolve V:Genome S:Sound +/-:Speed H:Hilfe", 10, sh-15)
 	}
 
 	// Selected bot info panel

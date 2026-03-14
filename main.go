@@ -49,7 +49,8 @@ type Game struct {
 	welcomeReady bool // set after first frame (init bots needs screen size)
 
 	// Help overlay
-	showHelp bool
+	showHelp   bool
+	helpScrollY int
 
 	// In-game console
 	showConsole bool
@@ -141,10 +142,40 @@ func (g *Game) Update() error {
 		return nil
 	}
 
-	// Help overlay: only H dismisses
+	// Help overlay: only H dismisses, arrow keys scroll
 	if g.showHelp {
 		if inpututil.IsKeyJustPressed(ebiten.KeyH) {
 			g.showHelp = false
+			g.helpScrollY = 0
+		}
+		// Scroll with arrow keys / page up/down
+		if ebiten.IsKeyPressed(ebiten.KeyDown) || ebiten.IsKeyPressed(ebiten.KeyJ) {
+			g.helpScrollY += 4
+		}
+		if ebiten.IsKeyPressed(ebiten.KeyUp) || ebiten.IsKeyPressed(ebiten.KeyK) {
+			g.helpScrollY -= 4
+			if g.helpScrollY < 0 {
+				g.helpScrollY = 0
+			}
+		}
+		if inpututil.IsKeyJustPressed(ebiten.KeyPageDown) {
+			g.helpScrollY += 200
+		}
+		if inpututil.IsKeyJustPressed(ebiten.KeyPageUp) {
+			g.helpScrollY -= 200
+			if g.helpScrollY < 0 {
+				g.helpScrollY = 0
+			}
+		}
+		// Mouse wheel scrolling
+		_, wy := ebiten.Wheel()
+		if wy < 0 {
+			g.helpScrollY += 48
+		} else if wy > 0 {
+			g.helpScrollY -= 48
+			if g.helpScrollY < 0 {
+				g.helpScrollY = 0
+			}
 		}
 		return nil
 	}
@@ -1000,6 +1031,11 @@ func (g *Game) Draw(screen *ebiten.Image) {
 			// Max frames reached — auto-stop
 			render.StopRecording(g.renderer) // async: encodes in goroutine
 		}
+	}
+
+	// Help overlay (drawn on top of everything)
+	if g.showHelp {
+		render.DrawHelpOverlay(screen, g.sim.SwarmMode, g.helpScrollY)
 	}
 }
 
