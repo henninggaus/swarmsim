@@ -41,6 +41,12 @@ func DrawHUD(screen *ebiten.Image, s *simulation.Simulation, fps float64, r *Ren
 		drawWaveHUD(screen, s, sw)
 	}
 
+	// Classic Mode scenario indicator (top-left, line 2)
+	if !s.TruckMode {
+		scenLabel := fmt.Sprintf("Classic: %s [N:Next]", s.ScenarioTitle)
+		printColoredAt(screen, scenLabel, 10, 26, color.RGBA{180, 200, 220, 200})
+	}
+
 	// Top-center: Generation info (shift down if wave/truck HUD active)
 	genY := 10
 	if s.Cfg.WaveEnabled || s.TruckMode {
@@ -77,11 +83,7 @@ func DrawHUD(screen *ebiten.Image, s *simulation.Simulation, fps float64, r *Ren
 	pherModes := []string{"Pher:OFF", "Pher:FOUND", "Pher:ALL"}
 	ebitenutil.DebugPrintAt(screen, pherModes[s.PheromoneVizMode], 10, sh-30)
 
-	if s.TruckMode {
-		ebitenutil.DebugPrintAt(screen, "SPACE:Pause N:NewTruck F:Comm G:Sensor D:Debug P:Pher V:Genome S:Sound +/-:Speed H:Hilfe F1-F5:Scenario F6:Truck", 10, sh-15)
-	} else {
-		ebitenutil.DebugPrintAt(screen, "SPACE:Pause 1-5:Bot R:Res O:Obs F:Comm G:Sensor D:Debug P:Pher E:Evolve V:Genome S:Sound +/-:Speed H:Hilfe", 10, sh-15)
-	}
+	ebitenutil.DebugPrintAt(screen, "SPACE:Pause 1-5:Bot R:Res O:Obs N:Next D:Debug P:Pher E:Evolve V:Genome S:Sound +/-:Speed H:Hilfe", 10, sh-15)
 
 	// Selected bot info panel
 	if s.SelectedBotID >= 0 {

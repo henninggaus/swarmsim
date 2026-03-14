@@ -18,6 +18,18 @@ func GetScenarios() []Scenario {
 	}
 }
 
+// GetClassicScenarios returns the 5 classic scenarios for the Classic Mode dropdown.
+// Order: Sandbox (default), Foraging, Labyrinth, Energy Crisis, Evolution.
+func GetClassicScenarios() []Scenario {
+	return []Scenario{
+		scenarioSandbox(),
+		scenarioForaging(),
+		scenarioLabyrinth(),
+		scenarioEnergy(),
+		scenarioEvolution(),
+	}
+}
+
 func scenarioForaging() Scenario {
 	cfg := DefaultConfig()
 	cfg.ArenaWidth = 2000

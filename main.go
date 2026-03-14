@@ -59,6 +59,12 @@ type Game struct {
 	showConsole    bool
 	consoleFilterBot int // -1 = all logs, >= 0 = filter for this bot
 
+	// Classic Mode scenario dropdown
+	classicDropdownOpen  bool
+	classicDropdownHover int
+	classicScenarioIdx   int // 0-4 index into classicScenarios
+	classicScenarios     []simulation.Scenario
+
 	// Panic recovery overlay
 	panicMsg   string
 	panicTimer int
@@ -71,10 +77,11 @@ func NewGame() *Game {
 	cam := render.NewCamera(cfg.ArenaWidth, cfg.ArenaHeight)
 	r := render.NewRenderer(cam)
 	return &Game{
-		sim:         s,
-		renderer:    r,
-		camera:      cam,
-		scenarios:   simulation.GetScenarios(),
+		sim:              s,
+		renderer:         r,
+		camera:           cam,
+		scenarios:        simulation.GetScenarios(),
+		classicScenarios: simulation.GetClassicScenarios(),
 		showWelcome:      true,
 		showConsole:      true,
 		consoleFilterBot: -1,
@@ -119,21 +126,13 @@ func (g *Game) Update() (retErr error) {
 		g.welcomeTick++
 		g.renderer.UpdateWelcomeBots(screenW, screenH)
 
-		// F1-F7 load scenario AND dismiss welcome
-		scenarioKeys := []ebiten.Key{ebiten.KeyF1, ebiten.KeyF2, ebiten.KeyF3, ebiten.KeyF4, ebiten.KeyF5}
-		for i, key := range scenarioKeys {
-			if inpututil.IsKeyJustPressed(key) && i < len(g.scenarios) {
-				g.sim.LoadScenario(g.scenarios[i])
-				g.camera.X = g.sim.Cfg.ArenaWidth / 2
-				g.camera.Y = g.sim.Cfg.ArenaHeight / 2
-				g.camera.Zoom = 0.7
-				g.tickAcc = 0
-				g.showWelcome = false
-				return nil
+		// F1: Classic Mode, F2/F7: Swarm Lab
+		if inpututil.IsKeyJustPressed(ebiten.KeyF1) {
+			idx := g.classicScenarioIdx
+			if idx < 0 || idx >= len(g.classicScenarios) {
+				idx = 0
 			}
-		}
-		if inpututil.IsKeyJustPressed(ebiten.KeyF6) {
-			g.sim.LoadTruckScenario()
+			g.sim.LoadScenario(g.classicScenarios[idx])
 			g.camera.X = g.sim.Cfg.ArenaWidth / 2
 			g.camera.Y = g.sim.Cfg.ArenaHeight / 2
 			g.camera.Zoom = 0.7
@@ -141,14 +140,14 @@ func (g *Game) Update() (retErr error) {
 			g.showWelcome = false
 			return nil
 		}
-		if inpututil.IsKeyJustPressed(ebiten.KeyF7) {
+		if inpututil.IsKeyJustPressed(ebiten.KeyF2) || inpututil.IsKeyJustPressed(ebiten.KeyF7) {
 			g.sim.LoadSwarmScenario()
 			g.tickAcc = 0
 			g.showWelcome = false
 			return nil
 		}
 
-		// Any other key or mouse click → load F7 (default) and dismiss
+		// Any other key or mouse click → load Swarm Lab (default) and dismiss
 		if inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) {
 			g.sim.LoadSwarmScenario()
 			g.tickAcc = 0
@@ -282,31 +281,17 @@ func (g *Game) handleGlobalInput() {
 		}
 	}
 
-	// F1-F5: load scenarios (with fade transition)
-	scenarioKeys := []ebiten.Key{ebiten.KeyF1, ebiten.KeyF2, ebiten.KeyF3, ebiten.KeyF4, ebiten.KeyF5}
-	for i, key := range scenarioKeys {
-		if inpututil.IsKeyJustPressed(key) && i < len(g.scenarios) && g.renderer.FadeDir == 0 {
-			idx := i // capture for closure
-			logger.Info("KEY", "F%d pressed -> Loading scenario: %s", idx+1, g.scenarios[idx].Name)
-			g.renderer.FadeDir = -1
-			g.renderer.FadeAlpha = 0
-			g.renderer.FadeLoad = func() {
-				g.sim.LoadScenario(g.scenarios[idx])
-				g.camera.X = g.sim.Cfg.ArenaWidth / 2
-				g.camera.Y = g.sim.Cfg.ArenaHeight / 2
-				g.camera.Zoom = 0.7
-				g.tickAcc = 0
-			}
+	// F1: load Classic Mode (with fade transition)
+	if inpututil.IsKeyJustPressed(ebiten.KeyF1) && g.renderer.FadeDir == 0 {
+		idx := g.classicScenarioIdx
+		if idx < 0 || idx >= len(g.classicScenarios) {
+			idx = 0
 		}
-	}
-
-	// F6: load truck scenario (with fade)
-	if inpututil.IsKeyJustPressed(ebiten.KeyF6) && g.renderer.FadeDir == 0 {
-		logger.Info("KEY", "F6 pressed -> Loading truck scenario: LKW-ENTLADUNG")
+		logger.Info("KEY", "F1 pressed -> Loading Classic Mode: %s", g.classicScenarios[idx].Name)
 		g.renderer.FadeDir = -1
 		g.renderer.FadeAlpha = 0
 		g.renderer.FadeLoad = func() {
-			g.sim.LoadTruckScenario()
+			g.sim.LoadScenario(g.classicScenarios[idx])
 			g.camera.X = g.sim.Cfg.ArenaWidth / 2
 			g.camera.Y = g.sim.Cfg.ArenaHeight / 2
 			g.camera.Zoom = 0.7
@@ -314,9 +299,20 @@ func (g *Game) handleGlobalInput() {
 		}
 	}
 
-	// F7: load swarm scenario (with fade)
+	// F2: load Swarm Lab (with fade)
+	if inpututil.IsKeyJustPressed(ebiten.KeyF2) && g.renderer.FadeDir == 0 {
+		logger.Info("KEY", "F2 pressed -> Loading Swarm Lab")
+		g.renderer.FadeDir = -1
+		g.renderer.FadeAlpha = 0
+		g.renderer.FadeLoad = func() {
+			g.sim.LoadSwarmScenario()
+			g.tickAcc = 0
+		}
+	}
+
+	// F7: alias for F2 (legacy Swarm Lab key)
 	if inpututil.IsKeyJustPressed(ebiten.KeyF7) && g.renderer.FadeDir == 0 {
-		logger.Info("KEY", "F7 pressed -> Loading swarm scenario: PROGRAMMABLE SWARM")
+		logger.Info("KEY", "F7 pressed -> Loading Swarm Lab (legacy)")
 		g.renderer.FadeDir = -1
 		g.renderer.FadeAlpha = 0
 		g.renderer.FadeLoad = func() {
@@ -454,10 +450,25 @@ func (g *Game) handleInput() {
 		logger.Info("KEY", "V pressed -> ShowGenomeOverlay=%v (SelectedBot=%d)", g.sim.ShowGenomeOverlay, g.sim.SelectedBotID)
 	}
 
-	// N: regenerate truck (only in truck mode)
-	if inpututil.IsKeyJustPressed(ebiten.KeyN) && g.sim.TruckMode {
-		logger.Info("KEY", "N pressed -> Generating new truck")
-		g.sim.RegenerateTruck()
+	// N: switch scenario in Classic Mode (cycle through dropdown)
+	if inpututil.IsKeyJustPressed(ebiten.KeyN) {
+		if g.sim.TruckMode {
+			logger.Info("KEY", "N pressed -> Generating new truck")
+			g.sim.RegenerateTruck()
+		} else if len(g.classicScenarios) > 0 && g.renderer.FadeDir == 0 {
+			g.classicScenarioIdx = (g.classicScenarioIdx + 1) % len(g.classicScenarios)
+			idx := g.classicScenarioIdx
+			logger.Info("KEY", "N pressed -> Switching to scenario: %s", g.classicScenarios[idx].Name)
+			g.renderer.FadeDir = -1
+			g.renderer.FadeAlpha = 0
+			g.renderer.FadeLoad = func() {
+				g.sim.LoadScenario(g.classicScenarios[idx])
+				g.camera.X = g.sim.Cfg.ArenaWidth / 2
+				g.camera.Y = g.sim.Cfg.ArenaHeight / 2
+				g.camera.Zoom = 0.7
+				g.tickAcc = 0
+			}
+		}
 	}
 }
 
