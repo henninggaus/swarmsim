@@ -224,14 +224,19 @@ func DrawSwarmEditor(screen *ebiten.Image, ss *swarm.SwarmState) {
 	}
 	drawSwarmButton(screen, 175, editorToggle2Y, toggleBtnW, toggleBtnH, wallLabel, wallColor)
 
-	// Toggle buttons row 3: [Delivery: OFF]
-	delivLabel := "Delivery: OFF"
-	delivColor := ColorSwarmBtnToggleOff
-	if ss.DeliveryOn {
-		delivLabel = "Delivery: ON"
-		delivColor = color.RGBA{200, 120, 40, 255} // orange
+	// Toggle buttons row 3: [Delivery: OFF/ON/—]
+	if ss.ProgramName != "Custom" && !ss.IsDeliveryProgram {
+		// Non-delivery preset: grayed out
+		drawSwarmButton(screen, 5, editorToggle3Y, toggleBtnW, toggleBtnH, "Delivery: \u2014", color.RGBA{60, 60, 70, 128})
+	} else {
+		delivLabel := "Delivery: OFF"
+		delivColor := ColorSwarmBtnToggleOff
+		if ss.DeliveryOn {
+			delivLabel = "Delivery: ON"
+			delivColor = color.RGBA{200, 120, 40, 255} // orange
+		}
+		drawSwarmButton(screen, 5, editorToggle3Y, toggleBtnW, toggleBtnH, delivLabel, delivColor)
 	}
-	drawSwarmButton(screen, 5, editorToggle3Y, toggleBtnW, toggleBtnH, delivLabel, delivColor)
 
 	// Separator 2
 	vector.StrokeLine(screen, 5, float32(editorSep2Y), float32(editorPanelW-5), float32(editorSep2Y), 1, ColorSwarmEditorSep, false)

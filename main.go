@@ -685,6 +685,15 @@ func (g *Game) handleSwarmClick(mx, my int) {
 		ss.BotCountEdit = false
 
 	case "delivery":
+		// Non-delivery preset: button is grayed, ignore clicks
+		if ss.ProgramName != "Custom" && !ss.IsDeliveryProgram {
+			break
+		}
+		// Delivery preset: cannot disable delivery
+		if ss.IsDeliveryProgram && ss.DeliveryOn {
+			logger.Info("SWARM", "Cannot disable delivery while a delivery program is active")
+			break
+		}
 		ss.DeliveryOn = !ss.DeliveryOn
 		if ss.DeliveryOn {
 			// Force maze on
@@ -770,6 +779,7 @@ func (g *Game) handleSwarmEditorKeys() {
 		ed.CursorCol = 0
 		g.editorEnsureCursorVisible()
 		ss.ProgramName = "Custom"
+		ss.IsDeliveryProgram = false
 	}
 
 	// Backspace
@@ -779,6 +789,7 @@ func (g *Game) handleSwarmEditorKeys() {
 			ed.Lines[ed.CursorLine] = line[:ed.CursorCol-1] + line[ed.CursorCol:]
 			ed.CursorCol--
 			ss.ProgramName = "Custom"
+		ss.IsDeliveryProgram = false
 		} else if ed.CursorLine > 0 {
 			// Merge with previous line
 			prevLine := ed.Lines[ed.CursorLine-1]
@@ -789,6 +800,7 @@ func (g *Game) handleSwarmEditorKeys() {
 			ed.CursorCol = len(prevLine)
 			g.editorEnsureCursorVisible()
 			ss.ProgramName = "Custom"
+		ss.IsDeliveryProgram = false
 		}
 	}
 
@@ -798,12 +810,14 @@ func (g *Game) handleSwarmEditorKeys() {
 		if ed.CursorCol < len(line) {
 			ed.Lines[ed.CursorLine] = line[:ed.CursorCol] + line[ed.CursorCol+1:]
 			ss.ProgramName = "Custom"
+		ss.IsDeliveryProgram = false
 		} else if ed.CursorLine < len(ed.Lines)-1 {
 			// Merge with next line
 			nextLine := ed.Lines[ed.CursorLine+1]
 			ed.Lines[ed.CursorLine] = line + nextLine
 			ed.Lines = append(ed.Lines[:ed.CursorLine+1], ed.Lines[ed.CursorLine+2:]...)
 			ss.ProgramName = "Custom"
+		ss.IsDeliveryProgram = false
 		}
 	}
 
@@ -881,6 +895,7 @@ func (g *Game) editorInsertChar(ch rune) {
 	ed.CursorCol++
 	ed.BlinkTick = 0
 	ss.ProgramName = "Custom"
+	ss.IsDeliveryProgram = false
 }
 
 func (g *Game) editorEnsureCursorVisible() {
@@ -981,6 +996,33 @@ func (g *Game) loadSwarmPreset(idx int) {
 	ss.Editor.ScrollX = 0
 	ss.ErrorMsg = ""
 	ss.ErrorLine = 0
+
+	// Delivery-program coupling
+	if swarm.IsDeliveryPresetIdx(idx) {
+		ss.IsDeliveryProgram = true
+		// Force delivery ON, maze ON, obstacles OFF
+		ss.DeliveryOn = true
+		ss.MazeOn = true
+		ss.ObstaclesOn = false
+		ss.Obstacles = nil
+		swarm.GenerateSwarmMaze(ss)
+		swarm.GenerateDeliveryStations(ss)
+		for i := range ss.Bots {
+			ss.Bots[i].CarryingPkg = -1
+		}
+	} else {
+		ss.IsDeliveryProgram = false
+		// Force delivery OFF for non-delivery presets
+		if ss.DeliveryOn {
+			ss.DeliveryOn = false
+			ss.Stations = nil
+			ss.Packages = nil
+			ss.DeliveryStats = swarm.DeliveryStats{}
+			for i := range ss.Bots {
+				ss.Bots[i].CarryingPkg = -1
+			}
+		}
+	}
 
 	// Auto-deploy the preset
 	prog, err := swarmscript.ParseSwarmScript(presetText)

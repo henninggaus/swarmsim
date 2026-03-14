@@ -415,6 +415,11 @@ func DeliveryColorName(c int) string {
 	return "?"
 }
 
+// IsDeliveryPresetIdx returns true if the preset index is a delivery program (10-12).
+func IsDeliveryPresetIdx(idx int) bool {
+	return idx >= 10 && idx <= 12
+}
+
 // NeighborDelta computes dx, dy from (ax,ay) to (bx,by) with optional wrap-mode.
 func NeighborDelta(ax, ay, bx, by float64, ss *SwarmState) (float64, float64) {
 	dx := bx - ax

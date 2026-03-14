@@ -211,7 +211,8 @@ type SwarmState struct {
 	SelectedBot int // -1 = none
 
 	// Delivery system
-	DeliveryOn     bool
+	DeliveryOn        bool
+	IsDeliveryProgram bool // true when a delivery preset (idx 10-12) is active
 	Stations       []DeliveryStation
 	Packages       []DeliveryPackage
 	DeliveryStats  DeliveryStats
