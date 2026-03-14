@@ -1069,7 +1069,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	// In-game log console
 	if g.showConsole {
-		render.DrawConsole(screen, logger.Entries())
+		render.DrawConsole(screen, logger.Entries(), g.sim.SwarmMode)
 	}
 
 	// Help overlay (drawn on top of everything, including console)

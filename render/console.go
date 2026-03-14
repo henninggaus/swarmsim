@@ -9,8 +9,8 @@ import (
 )
 
 const (
-	consoleMaxLines = 15
-	consolePadding  = 6
+	consoleMaxLines = 6
+	consolePadding  = 4
 )
 
 // Console colors by level
@@ -23,27 +23,37 @@ var (
 )
 
 // DrawConsole renders the in-game log console at the bottom of the screen.
-func DrawConsole(screen *ebiten.Image, entries []logger.LogEntry) {
+// In swarm mode it draws only in the arena area (right of editor panel).
+func DrawConsole(screen *ebiten.Image, entries []logger.LogEntry, isSwarmMode bool) {
 	sw := screen.Bounds().Dx()
 	sh := screen.Bounds().Dy()
+
+	// In swarm mode, offset to avoid covering editor buttons
+	panelX := 0
+	panelW := sw
+	if isSwarmMode {
+		panelX = editorPanelW + 2
+		panelW = sw - panelX
+	}
 
 	panelH := consoleMaxLines*lineH + consolePadding*2 + 4
 	panelY := sh - panelH
 
 	// Background
-	vector.DrawFilledRect(screen, 0, float32(panelY), float32(sw), float32(panelH), colorConsoleBg, false)
+	vector.DrawFilledRect(screen, float32(panelX), float32(panelY), float32(panelW), float32(panelH), colorConsoleBg, false)
 
 	// Top border
-	vector.StrokeLine(screen, 0, float32(panelY), float32(sw), float32(panelY), 1, colorConsoleLine, false)
+	vector.StrokeLine(screen, float32(panelX), float32(panelY), float32(panelX+panelW), float32(panelY), 1, colorConsoleLine, false)
 
 	// Title
-	printColoredAt(screen, "~ Log Console", consolePadding, panelY+2, color.RGBA{100, 100, 120, 255})
+	printColoredAt(screen, "~ Log", panelX+consolePadding, panelY+2, color.RGBA{100, 100, 120, 255})
 
 	// Show last N entries
+	maxVisible := consoleMaxLines - 1 // -1 for title line
 	n := len(entries)
 	start := 0
-	if n > consoleMaxLines-1 { // -1 for title line
-		start = n - (consoleMaxLines - 1)
+	if n > maxVisible {
+		start = n - maxVisible
 	}
 	visible := entries[start:]
 
@@ -52,11 +62,11 @@ func DrawConsole(screen *ebiten.Image, entries []logger.LogEntry) {
 		col := consoleColorForLevel(e.Level)
 		line := "[" + e.Tag + "] " + e.Message
 		// Truncate long lines
-		maxChars := (sw - consolePadding*2) / charW
+		maxChars := (panelW - consolePadding*2) / charW
 		if len(line) > maxChars {
 			line = line[:maxChars-3] + "..."
 		}
-		printColoredAt(screen, line, consolePadding, y, col)
+		printColoredAt(screen, line, panelX+consolePadding, y, col)
 		y += lineH
 	}
 }
