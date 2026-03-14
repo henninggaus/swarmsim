@@ -64,6 +64,7 @@ func DrawHelpOverlay(screen *ebiten.Image, isSwarmMode bool, scrollY int) {
 		{"F12", "CPU Profiling (Build-Tag: profile)"},
 		{"H", "Hilfe ein-/ausblenden"},
 		{"S", "Sound ein-/ausschalten"},
+		{"`/Oe", "Log-Konsole ein-/ausblenden"},
 		{"F/Tab/T/M", "Comm-Radius / Bot-Info / Trails / Minimap"},
 		{"ESC", "Beenden"},
 	}

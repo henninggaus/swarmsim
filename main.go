@@ -354,11 +354,13 @@ func (g *Game) handleGlobalInput() {
 		}
 	}
 
-	// Backquote (`): toggle in-game log console
-	if inpututil.IsKeyJustPressed(ebiten.KeyGraveAccent) {
+	// Backquote (`) or Semicolon (Ö on German keyboards): toggle in-game log console
+	if inpututil.IsKeyJustPressed(ebiten.KeyGraveAccent) ||
+		inpututil.IsKeyJustPressed(ebiten.KeySemicolon) {
 		if !(g.sim.SwarmMode && g.sim.SwarmState != nil && g.sim.SwarmState.Editor != nil && g.sim.SwarmState.Editor.Focused) &&
 			!(g.sim.SwarmMode && g.sim.SwarmState != nil && g.sim.SwarmState.BotCountEdit) {
 			g.showConsole = !g.showConsole
+			logger.Info("KEY", "Console toggled: %v", g.showConsole)
 		}
 	}
 
