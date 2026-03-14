@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SwarmSim &mdash; Schwarm-Robotik-Simulator</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #1a1a2e;
+            color: #ccc;
+            font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+        h1 {
+            margin-top: 18px;
+            font-size: 1.4em;
+            color: #88ccff;
+            letter-spacing: 1px;
+        }
+        .subtitle {
+            margin-top: 4px;
+            font-size: 0.85em;
+            color: #668;
+        }
+        #game-container {
+            margin-top: 12px;
+            position: relative;
+        }
+        #loading {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 1.2em;
+            color: #88ccff;
+        }
+        #loading .spinner {
+            display: inline-block;
+            width: 22px; height: 22px;
+            border: 3px solid #334;
+            border-top: 3px solid #88ccff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            vertical-align: middle;
+            margin-right: 8px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        canvas { display: block; border: 1px solid #333; }
+        .info {
+            margin-top: 14px;
+            font-size: 0.82em;
+            color: #556;
+            text-align: center;
+            max-width: 1280px;
+            line-height: 1.7;
+        }
+        .info strong { color: #88ccff; }
+        .info kbd {
+            background: #222;
+            border: 1px solid #444;
+            border-radius: 3px;
+            padding: 1px 5px;
+            font-family: monospace;
+            color: #aaa;
+            font-size: 0.95em;
+        }
+        .shortcuts {
+            margin-top: 10px;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 6px 18px;
+            font-size: 0.78em;
+            color: #556;
+            max-width: 1280px;
+            padding-bottom: 20px;
+        }
+        .shortcuts span { white-space: nowrap; }
+        a { color: #88ccff; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <h1>SwarmSim &mdash; Schwarm-Robotik-Simulator</h1>
+    <p class="subtitle">Emergentes Verhalten durch einfache Regeln</p>
+
+    <div id="game-container">
+        <div id="loading"><span class="spinner"></span>Loading WASM&hellip;</div>
+    </div>
+
+    <div class="info">
+        <strong>F7</strong> = Programmable Swarm &nbsp;&bull;&nbsp;
+        <strong>Delivery ON</strong> = Pakete liefern &nbsp;&bull;&nbsp;
+        <strong>Space</strong> = Pause
+    </div>
+
+    <div class="shortcuts">
+        <span><kbd>F1</kbd>&ndash;<kbd>F5</kbd> Szenarien</span>
+        <span><kbd>F6</kbd> LKW</span>
+        <span><kbd>F7</kbd> Swarm-Editor</span>
+        <span><kbd>Space</kbd> Pause</span>
+        <span><kbd>+</kbd>/<kbd>-</kbd> Speed</span>
+        <span><kbd>1</kbd>&ndash;<kbd>5</kbd> Bot spawnen</span>
+        <span><kbd>M</kbd> Minimap</span>
+        <span><kbd>T</kbd> Trails</span>
+        <span><kbd>P</kbd> Pheromone</span>
+        <span><kbd>S</kbd> Sound</span>
+        <span><kbd>G</kbd> Genetik</span>
+        <span><kbd>L</kbd> Licht</span>
+        <span><kbd>O</kbd> Obstacles</span>
+        <span><kbd>F10</kbd> Screenshot</span>
+        <span><kbd>F11</kbd> GIF</span>
+        <span><kbd>ESC</kbd> Beenden</span>
+    </div>
+
+    <p style="margin-top: 8px; font-size: 0.75em; color: #445; padding-bottom: 20px;">
+        <a href="https://github.com/henning-heisenberg/swarmsim" target="_blank">GitHub Repository</a>
+    </p>
+
+    <script src="wasm_exec.js"></script>
+    <script>
+        const go = new Go();
+        WebAssembly.instantiateStreaming(fetch("swarmsim.wasm"), go.importObject)
+            .then(result => {
+                document.getElementById("loading").style.display = "none";
+                go.run(result.instance);
+            })
+            .catch(err => {
+                document.getElementById("loading").innerHTML =
+                    '<span style="color:#f66">Fehler beim Laden: ' + err.message + '</span>';
+            });
+    </script>
+</body>
+</html>
