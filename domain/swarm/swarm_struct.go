@@ -220,7 +220,8 @@ type SwarmState struct {
 	ScorePopups    []ScorePopup         // floating score text on delivery
 	DeliveryEvents []SwarmDeliveryEvent // consumed by renderer for particle effects
 
-	CollisionCount int // obstacle collisions this tick (reset per tick)
+	CollisionCount  int // obstacle collisions this tick (reset per tick)
+	ResetFlashTimer int // counts down from 30 for "RESET" flash
 }
 
 // AllObstacles returns combined obstacles and maze walls.

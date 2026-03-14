@@ -212,6 +212,10 @@ func (g *Game) Update() (retErr error) {
 	if g.sim.ScenarioTimer > 0 {
 		g.sim.ScenarioTimer--
 	}
+	// Reset flash timer
+	if g.sim.SwarmMode && g.sim.SwarmState != nil && g.sim.SwarmState.ResetFlashTimer > 0 {
+		g.sim.SwarmState.ResetFlashTimer--
+	}
 
 	// Fixed timestep for simulation
 	dt := 1.0 / 60.0 * g.sim.Speed
@@ -644,6 +648,7 @@ func (g *Game) handleSwarmClick(mx, my int) {
 			ss.Obstacles = nil
 			logger.Info("SWARM", "Obstacles OFF")
 		}
+		g.autoReset("Obstacles toggled")
 		ed.Focused = false
 		ss.BotCountEdit = false
 
@@ -658,6 +663,7 @@ func (g *Game) handleSwarmClick(mx, my int) {
 			ss.MazeWalls = nil
 			logger.Info("SWARM", "Maze OFF")
 		}
+		g.autoReset("Maze toggled")
 		ed.Focused = false
 		ss.BotCountEdit = false
 
@@ -680,7 +686,14 @@ func (g *Game) handleSwarmClick(mx, my int) {
 		if ss.WrapMode {
 			mode = "WRAP"
 		}
-		logger.Info("SWARM", "Walls mode: %s", mode)
+		// Scatter bot positions only (no full reset)
+		for i := range ss.Bots {
+			margin := 30.0
+			ss.Bots[i].X = margin + ss.Rng.Float64()*(ss.ArenaW-2*margin)
+			ss.Bots[i].Y = margin + ss.Rng.Float64()*(ss.ArenaH-2*margin)
+		}
+		ss.ResetFlashTimer = 30
+		logger.Info("SWARM", "Walls mode: %s (positions reset)", mode)
 		ed.Focused = false
 		ss.BotCountEdit = false
 
@@ -720,6 +733,7 @@ func (g *Game) handleSwarmClick(mx, my int) {
 			}
 			logger.Info("SWARM", "Delivery OFF")
 		}
+		g.autoReset("Delivery toggled")
 		ed.Focused = false
 		ss.BotCountEdit = false
 
@@ -942,6 +956,7 @@ func (g *Game) handleBotCountInput() {
 		count, err := strconv.Atoi(ss.BotCountText)
 		if err == nil && count >= swarm.SwarmMinBots && count <= swarm.SwarmMaxBots {
 			ss.RespawnBots(count)
+			ss.ResetFlashTimer = 30
 			logger.Info("SWARM", "Bot count changed to %d", count)
 		} else {
 			// Reset to current count
@@ -979,6 +994,20 @@ func (g *Game) deploySwarmProgram() {
 	}
 
 	logger.Info("SWARM", "Program deployed: %d rules", len(prog.Rules))
+}
+
+// autoReset resets bots and regenerates delivery state on toggle changes.
+func (g *Game) autoReset(reason string) {
+	ss := g.sim.SwarmState
+	if ss == nil {
+		return
+	}
+	ss.ResetBots()
+	if ss.DeliveryOn {
+		swarm.GenerateDeliveryStations(ss)
+	}
+	ss.ResetFlashTimer = 30
+	logger.Info("SWARM", "Auto-reset: %s", reason)
 }
 
 func (g *Game) loadSwarmPreset(idx int) {

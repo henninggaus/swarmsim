@@ -382,6 +382,15 @@ func DrawSwarmHUD(screen *ebiten.Image, s *simulation.Simulation, fps float64) {
 			ss.BotCount, ss.ProgramName, ss.Tick)
 		ebitenutil.DebugPrintAt(screen, arenaInfo, 420, 35)
 
+		// Reset flash indicator
+		if ss.ResetFlashTimer > 0 {
+			flashAlpha := uint8(255)
+			if ss.ResetFlashTimer < 10 {
+				flashAlpha = uint8(ss.ResetFlashTimer * 25)
+			}
+			printColoredAt(screen, "RESET", 700, 35, color.RGBA{255, 255, 50, flashAlpha})
+		}
+
 		// Delivery HUD line
 		if ss.DeliveryOn {
 			ds := &ss.DeliveryStats
