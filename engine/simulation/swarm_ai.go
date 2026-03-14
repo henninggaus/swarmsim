@@ -7,6 +7,7 @@ import (
 	"swarmsim/domain/physics"
 	"swarmsim/domain/swarm"
 	"swarmsim/engine/swarmscript"
+	"swarmsim/logger"
 )
 
 // updateSwarmMode is the main update loop for programmable swarm mode.
@@ -42,15 +43,42 @@ func (s *Simulation) updateSwarmMode() {
 		buildSwarmEnvironment(ss, i)
 	}
 
-	// Phase 2: Execute program on each bot
+	// Phase 2: Execute program on each bot (skip if anti-stuck breakout active)
 	if ss.Program != nil {
 		for i := range ss.Bots {
+			bot := &ss.Bots[i]
+			if bot.AntiStuckTimer > 0 {
+				// Breakout mode: forced random movement, ignore program
+				bot.Angle = bot.AntiStuckAngle
+				bot.Speed = swarm.SwarmBotSpeed
+				bot.LEDColor = [3]uint8{255, 255, 255} // white LED
+				bot.AntiStuckTimer--
+				continue
+			}
 			executeSwarmProgram(ss, i)
+		}
+	}
+
+	// Phase 2.3: Max neighbors cap — force scatter when too crowded
+	for i := range ss.Bots {
+		bot := &ss.Bots[i]
+		if bot.AntiStuckTimer > 0 {
+			continue // already in breakout
+		}
+		if bot.CloseNeighbors > 4 && bot.NearestIdx >= 0 {
+			// Force turn away from nearest + full speed
+			other := &ss.Bots[bot.NearestIdx]
+			dx, dy := swarm.NeighborDelta(bot.X, bot.Y, other.X, other.Y, ss)
+			bot.Angle = math.Atan2(-dy, -dx) + (ss.Rng.Float64()-0.5)*0.6
+			bot.Speed = swarm.SwarmBotSpeed
 		}
 	}
 
 	// Phase 2.5: Follow behavior override
 	for i := range ss.Bots {
+		if ss.Bots[i].AntiStuckTimer > 0 {
+			continue // breakout overrides follow
+		}
 		applyFollowBehavior(ss, i)
 	}
 
@@ -82,6 +110,9 @@ func (s *Simulation) updateSwarmMode() {
 	// Phase 4.1: Hard separation — symmetric rigid-body push for all pairs
 	applyHardSeparation(ss)
 
+	// Phase 4.2: Repulsion force — active push when bots are closer than 30px
+	applyRepulsionForce(ss)
+
 	// Phase 4.5: Delivery system updates (pickup/drop, respawn, carried package position)
 	if ss.DeliveryOn {
 		swarm.UpdateDeliverySystem(ss)
@@ -108,22 +139,33 @@ func (s *Simulation) updateSwarmMode() {
 			bot.StuckCooldown--
 		}
 
+		// Skip stuck detection if already in breakout
+		if bot.AntiStuckTimer > 0 {
+			bot.StuckTicks = 0
+			bot.StuckPrevX = bot.X
+			bot.StuckPrevY = bot.Y
+			continue
+		}
+
 		// Measure movement since last tick
 		dx := bot.X - bot.StuckPrevX
 		dy := bot.Y - bot.StuckPrevY
 		moved := math.Sqrt(dx*dx + dy*dy)
 
-		// Only count as stuck if bot is TRYING to move (Speed > 0) but barely moves.
-		// Threshold must be BELOW SwarmBotSpeed (1.5) so normal movement isn't flagged.
-		// A follower intentionally stopped near its leader is NOT stuck.
+		// Count as stuck if bot moved < 3px cumulative over many ticks
 		if moved < 0.5 && bot.Speed > 0 {
 			bot.StuckTicks++
 		} else {
-			bot.StuckTicks = 0
+			if bot.StuckTicks > 0 {
+				bot.StuckTicks -= 2 // slow decay when moving
+				if bot.StuckTicks < 0 {
+					bot.StuckTicks = 0
+				}
+			}
 		}
 
-		// Auto-unfollow after 60 ticks stuck
-		if bot.StuckTicks >= 60 {
+		// Anti-stuck breakout after 90 ticks stuck
+		if bot.StuckTicks >= 90 {
 			// Break follow link
 			if bot.FollowTargetIdx >= 0 && bot.FollowTargetIdx < len(ss.Bots) {
 				ss.Bots[bot.FollowTargetIdx].FollowerIdx = -1
@@ -134,11 +176,25 @@ func (s *Simulation) updateSwarmMode() {
 			}
 			bot.FollowerIdx = -1
 
-			// Random direction + forced solo movement
+			// Activate breakout: random direction, full speed for 45 ticks
+			bot.AntiStuckAngle = ss.Rng.Float64() * 2 * math.Pi
+			bot.AntiStuckTimer = 45
+			bot.StuckCooldown = 30
+			bot.StuckTicks = 0
+			logger.Warn("STUCK", "Bot #%d anti-stuck triggered at (%.0f, %.0f)", i, bot.X, bot.Y)
+		} else if bot.StuckTicks >= 60 {
+			// Legacy: auto-unfollow at 60 ticks (before full breakout at 90)
+			if bot.FollowTargetIdx >= 0 && bot.FollowTargetIdx < len(ss.Bots) {
+				ss.Bots[bot.FollowTargetIdx].FollowerIdx = -1
+			}
+			bot.FollowTargetIdx = -1
+			if bot.FollowerIdx >= 0 && bot.FollowerIdx < len(ss.Bots) {
+				ss.Bots[bot.FollowerIdx].FollowTargetIdx = -1
+			}
+			bot.FollowerIdx = -1
 			bot.Angle = ss.Rng.Float64() * 2 * math.Pi
 			bot.Speed = swarm.SwarmBotSpeed
-			bot.StuckCooldown = 30 // can't rejoin for 30 ticks
-			bot.StuckTicks = 0
+			bot.StuckCooldown = 30
 		}
 
 		// Save position for next tick
@@ -153,6 +209,7 @@ func buildSwarmEnvironment(ss *swarm.SwarmState, i int) {
 
 	// Reset sensor values
 	bot.NeighborCount = 0
+	bot.CloseNeighbors = 0
 	bot.NearestDist = 1e9
 	bot.NearestAngle = 0
 	bot.AvgNeighborX = 0
@@ -185,6 +242,9 @@ func buildSwarmEnvironment(ss *swarm.SwarmState, i int) {
 			continue
 		}
 		count++
+		if dist < 30 {
+			bot.CloseNeighbors++
+		}
 		sumX += dx
 		sumY += dy
 		if dist < bot.NearestDist {
@@ -1235,6 +1295,44 @@ func applyHardSeparation(ss *swarm.SwarmState) {
 					b.Angle = math.Atan2(-ny, -nx) + (ss.Rng.Float64()-0.5)*0.3
 				}
 			}
+		}
+	}
+}
+
+// applyRepulsionForce adds a continuous push between bots closer than 30px.
+// Unlike hard separation (which resolves overlap), this creates an active
+// force field that prevents clustering before contact.
+func applyRepulsionForce(ss *swarm.SwarmState) {
+	const repulsionRange = 30.0
+	const repulsionStrength = 0.15
+
+	for i := range ss.Bots {
+		a := &ss.Bots[i]
+		nearIDs := ss.Hash.Query(a.X, a.Y, repulsionRange+1)
+		for _, j := range nearIDs {
+			if j <= i || j >= len(ss.Bots) {
+				continue
+			}
+			// Skip linked pairs
+			if a.FollowTargetIdx == j || a.FollowerIdx == j {
+				continue
+			}
+			b := &ss.Bots[j]
+			dx := a.X - b.X
+			dy := a.Y - b.Y
+			dist := math.Sqrt(dx*dx + dy*dy)
+			if dist >= repulsionRange || dist < 0.001 {
+				continue
+			}
+			// Force = (30 - dist) * 0.15, applied symmetrically
+			force := (repulsionRange - dist) * repulsionStrength
+			nx := dx / dist
+			ny := dy / dist
+			halfForce := force * 0.5
+			a.X += nx * halfForce
+			a.Y += ny * halfForce
+			b.X -= nx * halfForce
+			b.Y -= ny * halfForce
 		}
 	}
 }

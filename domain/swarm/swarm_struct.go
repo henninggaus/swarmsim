@@ -61,10 +61,13 @@ type SwarmBot struct {
 	NearestIdx    int     // index of nearest neighbor (-1 if none)
 
 	// Anti-stuck tracking
-	StuckTicks    int     // how many ticks bot barely moved
-	StuckPrevX    float64 // position last tick for stuck detection
-	StuckPrevY    float64
-	StuckCooldown int // cooldown: forced solo movement after unfollow (counts down)
+	StuckTicks      int     // how many ticks bot barely moved
+	StuckPrevX      float64 // position last tick for stuck detection
+	StuckPrevY      float64
+	StuckCooldown   int // cooldown: forced solo movement after unfollow (counts down)
+	AntiStuckTimer  int // >0 = breakout mode active (counts down)
+	AntiStuckAngle  float64
+	CloseNeighbors  int // neighbors within 30px (rebuilt per tick)
 
 	// Trail history (ring buffer)
 	Trail    [10][2]float64
