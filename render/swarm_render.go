@@ -189,9 +189,12 @@ func (r *Renderer) DrawSwarmMode(screen *ebiten.Image, s *simulation.Simulation,
 			vector.DrawFilledCircle(screen, bx, by, radius+2, blinkCol, false)
 		}
 
-		// Selected bot highlight
+		// Selected bot highlight (pulsing ring)
 		if i == ss.SelectedBot {
-			vector.StrokeCircle(screen, bx, by, radius+4, 2, ColorSwarmSelected, false)
+			pulse := float32(2.0 + 2.0*math.Sin(float64(ss.Tick)*0.12))
+			pulseAlpha := uint8(150 + int(50*math.Sin(float64(ss.Tick)*0.08)))
+			selCol := color.RGBA{ColorSwarmSelected.R, ColorSwarmSelected.G, ColorSwarmSelected.B, pulseAlpha}
+			vector.StrokeCircle(screen, bx, by, radius+pulse+2, 2, selCol, false)
 		}
 	}
 
