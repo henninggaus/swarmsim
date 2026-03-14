@@ -14,39 +14,39 @@ GOOS=windows GOARCH=amd64 go build -o swarmsim.exe .
 
 ## Controls
 
-| Key                  | Action                                            |
-|----------------------|---------------------------------------------------|
-| **Space**            | Pause / Resume                                    |
-| **Left Click**       | Select bot (shows info panel)                     |
-| **Right Click Drag** | Pan camera                                        |
-| **Mouse Wheel**      | Zoom in/out                                       |
-| **WASD**             | Pan camera                                        |
-| **1-5**              | Spawn Scout/Worker/Leader/Tank/Healer at cursor   |
-| **R**                | Spawn resource at cursor                          |
-| **H**                | Place obstacle at cursor                          |
-| **F**                | Toggle communication radius visualization         |
-| **G**                | Toggle sensor radius visualization                |
-| **D**                | Toggle debug comm lines                           |
-| **P**                | Cycle pheromone visualization (OFF / FOUND / ALL) |
-| **E**                | Force end generation (evolve now)                 |
-| **V**                | Toggle genome overlay for selected bot            |
-| **F1**               | Scenario: Foraging Paradise                       |
-| **F2**               | Scenario: Labyrinth                               |
-| **F3**               | Scenario: Energy Crisis                           |
-| **F4**               | Scenario: Sandbox                                 |
-| **F5**               | Scenario: Evolution Arena                         |
-| **+/-**              | Increase/decrease simulation speed                |
-| **ESC**              | Quit                                              |
+| Key | Action |
+|-----|--------|
+| **Space** | Pause / Resume |
+| **Left Click** | Select bot (shows info panel) |
+| **Right Click Drag** | Pan camera |
+| **Mouse Wheel** | Zoom in/out |
+| **WASD** | Pan camera |
+| **1-5** | Spawn Scout/Worker/Leader/Tank/Healer at cursor |
+| **R** | Spawn resource at cursor |
+| **H** | Place obstacle at cursor |
+| **F** | Toggle communication radius visualization |
+| **G** | Toggle sensor radius visualization |
+| **D** | Toggle debug comm lines |
+| **P** | Cycle pheromone visualization (OFF / FOUND / ALL) |
+| **E** | Force end generation (evolve now) |
+| **V** | Toggle genome overlay for selected bot |
+| **F1** | Scenario: Foraging Paradise |
+| **F2** | Scenario: Labyrinth |
+| **F3** | Scenario: Energy Crisis |
+| **F4** | Scenario: Sandbox |
+| **F5** | Scenario: Evolution Arena |
+| **+/-** | Increase/decrease simulation speed |
+| **ESC** | Quit |
 
 ## Bot Types
 
-| Type                  | Speed | Sensor | Comm Range | Carry | Special                                                 |
-|-----------------------|-------|--------|------------|-------|---------------------------------------------------------|
-| **Scout** (Cyan)      | 3.0   | 150px  | 80px       | 0     | Explores, marks resources, deposits search pheromone    |
-| **Worker** (Orange)   | 1.5   | 60px   | 60px       | 2     | Collects & transports, follows found-resource pheromone |
-| **Leader** (Gold)     | 1.0   | 100px  | 200px      | 0     | Coordinates workers, relays messages                    |
-| **Tank** (Dark Green) | 0.8   | 50px   | 50px       | 0     | Pushes obstacles, responds to help requests             |
-| **Healer** (Pink)     | 1.2   | 80px   | 80px       | 0     | Heals bots and recharges energy                         |
+| Type | Speed | Sensor | Comm Range | Carry | Special |
+|------|-------|--------|------------|-------|---------|
+| **Scout** (Cyan) | 3.0 | 150px | 80px | 0 | Explores, marks resources, deposits search pheromone |
+| **Worker** (Orange) | 1.5 | 60px | 60px | 2 | Collects & transports, follows found-resource pheromone |
+| **Leader** (Gold) | 1.0 | 100px | 200px | 0 | Coordinates workers, relays messages |
+| **Tank** (Dark Green) | 0.8 | 50px | 50px | 0 | Pushes obstacles, responds to help requests |
+| **Healer** (Pink) | 1.2 | 80px | 80px | 0 | Heals bots and recharges energy |
 
 ## Systems
 

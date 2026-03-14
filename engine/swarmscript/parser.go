@@ -50,6 +50,10 @@ func parseLine(line string, lineNo int) (Rule, error) {
 		return Rule{}, fmt.Errorf("line %d: missing THEN keyword", lineNo)
 	}
 
+	if thenIdx < 3 {
+		return Rule{}, fmt.Errorf("line %d: missing condition after IF", lineNo)
+	}
+
 	condPart := strings.TrimSpace(line[3:thenIdx]) // after "IF ", before " THEN "
 	actPart := strings.TrimSpace(line[thenIdx+6:]) // after " THEN "
 
