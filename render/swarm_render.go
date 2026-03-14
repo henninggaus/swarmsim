@@ -260,14 +260,16 @@ func (r *Renderer) DrawSwarmMode(screen *ebiten.Image, s *simulation.Simulation,
 	vector.StrokeLine(screen, 350, 0, 350, float32(sh), 2, ColorSwarmEditorSep, false)
 }
 
-// drawSelectedBotInfo draws an info panel for the selected bot.
+// drawSelectedBotInfo draws an enhanced info panel for the selected bot.
 func drawSelectedBotInfo(screen *ebiten.Image, ss *swarm.SwarmState) {
 	bot := &ss.Bots[ss.SelectedBot]
 	x := 1050
 	y := 60
-	w := 210
-	h := 200
-	col := color.RGBA{200, 200, 220, 255}
+	w := 220
+	h := 380
+	valCol := color.RGBA{200, 200, 220, 255}
+	dimCol := color.RGBA{140, 140, 160, 255}
+	headerCol := color.RGBA{0, 220, 255, 255}
 
 	// Background
 	vector.DrawFilledRect(screen, float32(x), float32(y), float32(w), float32(h), ColorSwarmInfoBg, false)
@@ -276,21 +278,82 @@ func drawSelectedBotInfo(screen *ebiten.Image, ss *swarm.SwarmState) {
 	lx := x + 5
 	ly := y + 5
 
+	// Title + LED swatch
 	printColoredAt(screen, fmt.Sprintf("Bot #%d", ss.SelectedBot), lx, ly, ColorSwarmSelected)
-	ly += lineH
-	printColoredAt(screen, fmt.Sprintf("Pos: %.0f, %.0f", bot.X, bot.Y), lx, ly, col)
-	ly += lineH
-	printColoredAt(screen, fmt.Sprintf("Angle: %.0f deg", bot.Angle*180/math.Pi), lx, ly, col)
-	ly += lineH
-	printColoredAt(screen, fmt.Sprintf("State:%d Counter:%d", bot.State, bot.Counter), lx, ly, col)
-	ly += lineH
-	printColoredAt(screen, fmt.Sprintf("V1:%d V2:%d Timer:%d", bot.Value1, bot.Value2, bot.Timer), lx, ly, col)
-	ly += lineH
-	printColoredAt(screen, fmt.Sprintf("LED: %d,%d,%d", bot.LEDColor[0], bot.LEDColor[1], bot.LEDColor[2]), lx, ly, col)
-	ly += lineH
-	printColoredAt(screen, fmt.Sprintf("Neighbors: %d", bot.NeighborCount), lx, ly, col)
-	ly += lineH
+	ledCol := color.RGBA{bot.LEDColor[0], bot.LEDColor[1], bot.LEDColor[2], 255}
+	vector.DrawFilledRect(screen, float32(lx+70), float32(ly+2), 10, 10, ledCol, false)
+	vector.StrokeRect(screen, float32(lx+70), float32(ly+2), 10, 10, 1, color.RGBA{255, 255, 255, 120}, false)
+	ly += lineH + 2
 
+	// --- Position ---
+	printColoredAt(screen, "Position", lx, ly, headerCol)
+	ly += lineH
+	printColoredAt(screen, fmt.Sprintf("X:%.0f Y:%.0f", bot.X, bot.Y), lx, ly, valCol)
+	ly += lineH
+	printColoredAt(screen, fmt.Sprintf("Angle:%.0f Speed:%.1f", bot.Angle*180/math.Pi, bot.Speed), lx, ly, valCol)
+	ly += lineH + 2
+
+	// --- Status ---
+	printColoredAt(screen, "Status", lx, ly, headerCol)
+	ly += lineH
+	printColoredAt(screen, fmt.Sprintf("State:%d Cnt:%d T:%d", bot.State, bot.Counter, bot.Timer), lx, ly, valCol)
+	ly += lineH
+	printColoredAt(screen, fmt.Sprintf("V1:%d V2:%d", bot.Value1, bot.Value2), lx, ly, valCol)
+	ly += lineH
+	printColoredAt(screen, fmt.Sprintf("LED: %d,%d,%d", bot.LEDColor[0], bot.LEDColor[1], bot.LEDColor[2]), lx, ly, dimCol)
+	ly += lineH + 2
+
+	// --- Sensors ---
+	printColoredAt(screen, "Sensors", lx, ly, headerCol)
+	ly += lineH
+	nearStr := "---"
+	if bot.NearestIdx >= 0 {
+		nearStr = fmt.Sprintf("%.0fpx #%d", bot.NearestDist, bot.NearestIdx)
+	}
+	printColoredAt(screen, fmt.Sprintf("Neighbors:%d Near:%s", bot.NeighborCount, nearStr), lx, ly, valCol)
+	ly += lineH
+	obsStr := "No"
+	if bot.ObstacleAhead {
+		obsStr = fmt.Sprintf("%.0fpx", bot.ObstacleDist)
+	}
+	edgeStr := "-"
+	if bot.OnEdge {
+		edgeStr = "YES"
+	}
+	printColoredAt(screen, fmt.Sprintf("Obs:%s Edge:%s", obsStr, edgeStr), lx, ly, valCol)
+	ly += lineH
+	printColoredAt(screen, fmt.Sprintf("Light:%d Msg:%d", bot.LightValue, bot.ReceivedMsg), lx, ly, valCol)
+	ly += lineH + 2
+
+	// --- Delivery (conditional) ---
+	if ss.DeliveryOn {
+		printColoredAt(screen, "Delivery", lx, ly, headerCol)
+		ly += lineH
+		carryStr := "None"
+		if bot.CarryingPkg >= 0 && bot.CarryingPkg < len(ss.Packages) {
+			carryStr = swarm.DeliveryColorName(ss.Packages[bot.CarryingPkg].Color)
+		}
+		printColoredAt(screen, fmt.Sprintf("Carrying: %s", carryStr), lx, ly, valCol)
+		ly += lineH
+		pDist := "---"
+		if bot.NearestPickupDist < 999 {
+			pDist = fmt.Sprintf("%.0f", bot.NearestPickupDist)
+		}
+		dDist := "---"
+		if bot.NearestDropoffDist < 999 {
+			dDist = fmt.Sprintf("%.0f", bot.NearestDropoffDist)
+		}
+		matchStr := ""
+		if bot.DropoffMatch {
+			matchStr = " match!"
+		}
+		printColoredAt(screen, fmt.Sprintf("P:%s D:%s%s", pDist, dDist, matchStr), lx, ly, valCol)
+		ly += lineH + 2
+	}
+
+	// --- Social ---
+	printColoredAt(screen, "Social", lx, ly, headerCol)
+	ly += lineH
 	followStr := "None"
 	if bot.FollowTargetIdx >= 0 {
 		followStr = fmt.Sprintf("#%d", bot.FollowTargetIdx)
@@ -299,25 +362,21 @@ func drawSelectedBotInfo(screen *ebiten.Image, ss *swarm.SwarmState) {
 	if bot.FollowerIdx >= 0 {
 		followerStr = fmt.Sprintf("#%d", bot.FollowerIdx)
 	}
-	printColoredAt(screen, fmt.Sprintf("Follow:%s Follower:%s", followStr, followerStr), lx, ly, col)
-	ly += lineH
+	printColoredAt(screen, fmt.Sprintf("Follow:%s Follower:%s", followStr, followerStr), lx, ly, valCol)
+	ly += lineH + 2
 
-	obsStr := "No"
-	if bot.ObstacleAhead {
-		obsStr = fmt.Sprintf("Yes (%.0f)", bot.ObstacleDist)
-	}
-	printColoredAt(screen, fmt.Sprintf("Obstacle: %s", obsStr), lx, ly, col)
+	// --- Lifetime Stats ---
+	printColoredAt(screen, "Lifetime", lx, ly, headerCol)
 	ly += lineH
-	printColoredAt(screen, fmt.Sprintf("Speed: %.1f  Msg: %d", bot.Speed, bot.ReceivedMsg), lx, ly, col)
-
-	if ss.DeliveryOn {
-		ly += lineH
-		carryStr := "None"
-		if bot.CarryingPkg >= 0 && bot.CarryingPkg < len(ss.Packages) {
-			carryStr = swarm.DeliveryColorName(ss.Packages[bot.CarryingPkg].Color)
-		}
-		printColoredAt(screen, fmt.Sprintf("Carrying: %s", carryStr), lx, ly, col)
-	}
+	printColoredAt(screen, fmt.Sprintf("Dist:%.0f Alive:%d", bot.Stats.TotalDistance, bot.Stats.TicksAlive), lx, ly, dimCol)
+	ly += lineH
+	printColoredAt(screen, fmt.Sprintf("Pickups:%d Deliv:%d", bot.Stats.TotalPickups, bot.Stats.TotalDeliveries), lx, ly, dimCol)
+	ly += lineH
+	printColoredAt(screen, fmt.Sprintf("OK:%d Wrong:%d", bot.Stats.CorrectDeliveries, bot.Stats.WrongDeliveries), lx, ly, dimCol)
+	ly += lineH
+	printColoredAt(screen, fmt.Sprintf("Msg TX:%d RX:%d", bot.Stats.MessagesSent, bot.Stats.MessagesReceived), lx, ly, dimCol)
+	ly += lineH
+	printColoredAt(screen, fmt.Sprintf("Stuck:%d Idle:%d", bot.Stats.AntiStuckCount, bot.Stats.TicksIdle), lx, ly, dimCol)
 }
 
 // deliveryColor returns the RGBA color for a delivery color ID (1-4).
