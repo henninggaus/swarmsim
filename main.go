@@ -75,6 +75,7 @@ func NewGame() *Game {
 		camera:      cam,
 		scenarios:   simulation.GetScenarios(),
 		showWelcome: true,
+		showConsole: true,
 	}
 }
 

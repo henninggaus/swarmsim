@@ -75,9 +75,9 @@ func (r *Renderer) DrawSwarmMode(screen *ebiten.Image, s *simulation.Simulation,
 	if ss.Light.Active {
 		lx := float32(arenaOffX + ss.Light.X)
 		ly := float32(arenaOffY + ss.Light.Y)
-		for ri := 5; ri >= 1; ri-- {
-			radius := float32(ri) * 50.0
-			alpha := uint8(30 - ri*4)
+		for ri := 4; ri >= 1; ri-- {
+			radius := float32(ri) * 25.0
+			alpha := uint8(25 - ri*4)
 			if alpha < 5 {
 				alpha = 5
 			}
@@ -85,8 +85,8 @@ func (r *Renderer) DrawSwarmMode(screen *ebiten.Image, s *simulation.Simulation,
 			vector.DrawFilledCircle(screen, lx, ly, radius, lightCol, false)
 		}
 		// Bright center
-		vector.DrawFilledCircle(screen, lx, ly, 8, ColorSwarmLight, false)
-		vector.StrokeCircle(screen, lx, ly, 12, 1.5, color.RGBA{255, 255, 100, 150}, false)
+		vector.DrawFilledCircle(screen, lx, ly, 6, ColorSwarmLight, false)
+		vector.StrokeCircle(screen, lx, ly, 10, 1.5, color.RGBA{255, 255, 100, 150}, false)
 	}
 
 	// Delivery rendering
@@ -95,16 +95,18 @@ func (r *Renderer) DrawSwarmMode(screen *ebiten.Image, s *simulation.Simulation,
 		if ss.ShowRoutes {
 			drawPickupDropoffRoutes(screen, ss, arenaOffX, arenaOffY)
 		}
-		// Dashed lines from carrying bots to their matching dropoff (skip if none carrying)
-		hasCarrying := false
-		for i := range ss.Bots {
-			if ss.Bots[i].CarryingPkg >= 0 {
-				hasCarrying = true
-				break
+		// Dashed lines from carrying bots to their matching dropoff (only when routes toggled)
+		if ss.ShowRoutes {
+			hasCarrying := false
+			for i := range ss.Bots {
+				if ss.Bots[i].CarryingPkg >= 0 {
+					hasCarrying = true
+					break
+				}
 			}
-		}
-		if hasCarrying {
-			drawCarryRouteLines(screen, ss, arenaOffX, arenaOffY)
+			if hasCarrying {
+				drawCarryRouteLines(screen, ss, arenaOffX, arenaOffY)
+			}
 		}
 		// Stations with labels, timer bars, counters
 		drawDeliveryStations(screen, ss, arenaOffX, arenaOffY)
