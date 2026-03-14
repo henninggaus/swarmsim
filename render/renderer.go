@@ -47,6 +47,8 @@ type Renderer struct {
 	ShowTrails  bool // toggle with T key (default off for performance)
 	ShowMinimap bool // toggle with M key
 
+	arenaImg *ebiten.Image // offscreen 800x800 for swarm arena (follow-cam support)
+
 	botSprites [5]*ebiten.Image // pre-rendered triangle per BotType
 
 	// Screenshot & GIF recording

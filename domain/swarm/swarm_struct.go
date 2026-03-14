@@ -229,6 +229,12 @@ type SwarmState struct {
 	// Selected bot for info overlay
 	SelectedBot int // -1 = none
 
+	// Follow-cam
+	FollowCamBot int     // bot index being followed (-1 = off)
+	SwarmCamX    float64 // current camera center (arena coords)
+	SwarmCamY    float64
+	SwarmCamZoom float64 // current zoom level (1.0 = normal)
+
 	// Delivery system
 	DeliveryOn        bool
 	IsDeliveryProgram bool // true when a delivery preset (idx 10-12) is active

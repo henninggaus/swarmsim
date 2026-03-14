@@ -95,13 +95,18 @@ func (g *Game) Update() (retErr error) {
 		g.panicTimer--
 	}
 
-	// ESC to quit
+	// ESC to quit (or cancel follow-cam first)
 	if inpututil.IsKeyJustPressed(ebiten.KeyEscape) {
 		if g.showWelcome {
 			return ebiten.Termination
 		}
 		if g.showHelp {
 			g.showHelp = false
+			return nil
+		}
+		// Cancel follow-cam before quitting
+		if g.sim.SwarmMode && g.sim.SwarmState != nil && g.sim.SwarmState.FollowCamBot >= 0 {
+			g.sim.SwarmState.FollowCamBot = -1
 			return nil
 		}
 		return ebiten.Termination
@@ -215,6 +220,28 @@ func (g *Game) Update() (retErr error) {
 	// Reset flash timer
 	if g.sim.SwarmMode && g.sim.SwarmState != nil && g.sim.SwarmState.ResetFlashTimer > 0 {
 		g.sim.SwarmState.ResetFlashTimer--
+	}
+
+	// Follow-cam lerp update
+	if g.sim.SwarmMode && g.sim.SwarmState != nil {
+		ss := g.sim.SwarmState
+		if ss.FollowCamBot >= 0 && ss.FollowCamBot < len(ss.Bots) {
+			bot := &ss.Bots[ss.FollowCamBot]
+			ss.SwarmCamX += (bot.X - ss.SwarmCamX) * 0.10
+			ss.SwarmCamY += (bot.Y - ss.SwarmCamY) * 0.10
+			ss.SwarmCamZoom += (1.5 - ss.SwarmCamZoom) * 0.10
+		} else {
+			// Lerp back to center / zoom 1.0
+			center := swarm.SwarmArenaSize / 2
+			ss.SwarmCamX += (center - ss.SwarmCamX) * 0.10
+			ss.SwarmCamY += (center - ss.SwarmCamY) * 0.10
+			ss.SwarmCamZoom += (1.0 - ss.SwarmCamZoom) * 0.10
+			if math.Abs(ss.SwarmCamZoom-1.0) < 0.01 {
+				ss.SwarmCamZoom = 1.0
+				ss.SwarmCamX = center
+				ss.SwarmCamY = center
+			}
+		}
 	}
 
 	// Fixed timestep for simulation
@@ -575,7 +602,7 @@ func (g *Game) handleSwarmInput() {
 
 	// L key: toggle light source at mouse position (when editor not focused)
 	if inpututil.IsKeyJustPressed(ebiten.KeyL) && !ed.Focused && !ss.BotCountEdit {
-		awx, awy, inside := render.SwarmScreenToArena(mx, my)
+		awx, awy, inside := render.SwarmScreenToArena(mx, my, ss)
 		if inside {
 			if ss.Light.Active {
 				ss.Light.Active = false
@@ -605,6 +632,17 @@ func (g *Game) handleSwarmInput() {
 	if inpututil.IsKeyJustPressed(ebiten.KeyM) && !ed.Focused && !ss.BotCountEdit {
 		g.renderer.ShowMinimap = !g.renderer.ShowMinimap
 		logger.Info("SWARM", "Minimap: %v", g.renderer.ShowMinimap)
+	}
+
+	// F key: toggle follow-cam (when editor not focused)
+	if inpututil.IsKeyJustPressed(ebiten.KeyF) && !ed.Focused && !ss.BotCountEdit {
+		if ss.FollowCamBot >= 0 {
+			ss.FollowCamBot = -1
+			logger.Info("SWARM", "Follow-cam OFF")
+		} else if ss.SelectedBot >= 0 {
+			ss.FollowCamBot = ss.SelectedBot
+			logger.Info("SWARM", "Follow-cam ON: Bot #%d", ss.FollowCamBot)
+		}
 	}
 
 	// Editor keyboard input (when editor is focused)
@@ -803,7 +841,7 @@ func (g *Game) handleSwarmClick(mx, my int) {
 		ss.DropdownOpen = false
 
 		// Try to select a bot in the arena
-		awx, awy, inside := render.SwarmScreenToArena(mx, my)
+		awx, awy, inside := render.SwarmScreenToArena(mx, my, ss)
 		if inside {
 			bestIdx := -1
 			bestDist := 15.0 // max click distance
@@ -817,6 +855,10 @@ func (g *Game) handleSwarmClick(mx, my int) {
 				}
 			}
 			ss.SelectedBot = bestIdx
+			// Cancel follow-cam if we selected a different bot
+			if ss.FollowCamBot >= 0 && bestIdx != ss.FollowCamBot {
+				ss.FollowCamBot = -1
+			}
 			if bestIdx >= 0 {
 				logger.Info("SWARM", "Selected bot #%d", bestIdx)
 			}

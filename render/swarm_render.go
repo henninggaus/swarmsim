@@ -2,6 +2,7 @@ package render
 
 import (
 	"fmt"
+	"image"
 	"image/color"
 	"math"
 	"swarmsim/domain/swarm"
@@ -21,60 +22,56 @@ func (r *Renderer) DrawSwarmMode(screen *ebiten.Image, s *simulation.Simulation,
 	// Fill entire screen with editor bg (left panel drawn by DrawSwarmEditor)
 	screen.Fill(ColorSwarmEditorBg)
 
-	// Arena viewport starts at x=350, arena is 800x800, centered in 930x900
-	arenaOffX := 415.0 // 350 + (930-800)/2
-	arenaOffY := 50.0  // (900-800)/2
+	// --- Offscreen arena image (supports follow-cam zoom/pan) ---
+	arenaW := int(ss.ArenaW)
+	arenaH := int(ss.ArenaH)
+	if r.arenaImg == nil || r.arenaImg.Bounds().Dx() != arenaW {
+		r.arenaImg = ebiten.NewImage(arenaW, arenaH)
+	}
+	r.arenaImg.Clear()
+
+	// All arena content is drawn to r.arenaImg at (0,0) coordinates
+	a := r.arenaImg
 
 	// Arena background
-	vector.DrawFilledRect(screen, float32(arenaOffX), float32(arenaOffY),
-		float32(ss.ArenaW), float32(ss.ArenaH), ColorSwarmArenaBg, false)
+	vector.DrawFilledRect(a, 0, 0, float32(ss.ArenaW), float32(ss.ArenaH), ColorSwarmArenaBg, false)
 
 	// Arena grid
 	gridStep := 50.0
 	for gx := gridStep; gx < ss.ArenaW; gx += gridStep {
-		sx := float32(arenaOffX + gx)
-		vector.StrokeLine(screen, sx, float32(arenaOffY), sx, float32(arenaOffY+ss.ArenaH), 1, ColorSwarmArenaGrid, false)
+		sx := float32(gx)
+		vector.StrokeLine(a, sx, 0, sx, float32(ss.ArenaH), 1, ColorSwarmArenaGrid, false)
 	}
 	for gy := gridStep; gy < ss.ArenaH; gy += gridStep {
-		sy := float32(arenaOffY + gy)
-		vector.StrokeLine(screen, float32(arenaOffX), sy, float32(arenaOffX+ss.ArenaW), sy, 1, ColorSwarmArenaGrid, false)
+		sy := float32(gy)
+		vector.StrokeLine(a, 0, sy, float32(ss.ArenaW), sy, 1, ColorSwarmArenaGrid, false)
 	}
 
 	// Arena border
-	vector.StrokeRect(screen, float32(arenaOffX), float32(arenaOffY),
-		float32(ss.ArenaW), float32(ss.ArenaH), 2, ColorSwarmArenaBorder, false)
+	vector.StrokeRect(a, 0, 0, float32(ss.ArenaW), float32(ss.ArenaH), 2, ColorSwarmArenaBorder, false)
 
 	// Obstacles (3D effect: lighter top-left edges, darker bottom-right)
 	for _, obs := range ss.Obstacles {
-		ox := float32(arenaOffX + obs.X)
-		oy := float32(arenaOffY + obs.Y)
+		ox := float32(obs.X)
+		oy := float32(obs.Y)
 		ow := float32(obs.W)
 		oh := float32(obs.H)
-		// Body
-		vector.DrawFilledRect(screen, ox, oy, ow, oh, ColorSwarmObstacle, false)
-		// Top edge highlight
-		vector.StrokeLine(screen, ox, oy, ox+ow, oy, 2, ColorSwarmObstacleHi, false)
-		// Left edge highlight
-		vector.StrokeLine(screen, ox, oy, ox, oy+oh, 2, ColorSwarmObstacleHi, false)
-		// Bottom edge shadow
-		vector.StrokeLine(screen, ox, oy+oh, ox+ow, oy+oh, 2, ColorSwarmObstacleLo, false)
-		// Right edge shadow
-		vector.StrokeLine(screen, ox+ow, oy, ox+ow, oy+oh, 2, ColorSwarmObstacleLo, false)
+		vector.DrawFilledRect(a, ox, oy, ow, oh, ColorSwarmObstacle, false)
+		vector.StrokeLine(a, ox, oy, ox+ow, oy, 2, ColorSwarmObstacleHi, false)
+		vector.StrokeLine(a, ox, oy, ox, oy+oh, 2, ColorSwarmObstacleHi, false)
+		vector.StrokeLine(a, ox, oy+oh, ox+ow, oy+oh, 2, ColorSwarmObstacleLo, false)
+		vector.StrokeLine(a, ox+ow, oy, ox+ow, oy+oh, 2, ColorSwarmObstacleLo, false)
 	}
 
 	// Maze walls (thin colored rects)
 	for _, wall := range ss.MazeWalls {
-		wx := float32(arenaOffX + wall.X)
-		wy := float32(arenaOffY + wall.Y)
-		ww := float32(wall.W)
-		wh := float32(wall.H)
-		vector.DrawFilledRect(screen, wx, wy, ww, wh, ColorSwarmMazeWall, false)
+		vector.DrawFilledRect(a, float32(wall.X), float32(wall.Y), float32(wall.W), float32(wall.H), ColorSwarmMazeWall, false)
 	}
 
 	// Light source (concentric circles with decreasing alpha)
 	if ss.Light.Active {
-		lx := float32(arenaOffX + ss.Light.X)
-		ly := float32(arenaOffY + ss.Light.Y)
+		lx := float32(ss.Light.X)
+		ly := float32(ss.Light.Y)
 		for ri := 4; ri >= 1; ri-- {
 			radius := float32(ri) * 25.0
 			alpha := uint8(25 - ri*4)
@@ -82,20 +79,17 @@ func (r *Renderer) DrawSwarmMode(screen *ebiten.Image, s *simulation.Simulation,
 				alpha = 5
 			}
 			lightCol := color.RGBA{ColorSwarmLight.R, ColorSwarmLight.G, ColorSwarmLight.B, alpha}
-			vector.DrawFilledCircle(screen, lx, ly, radius, lightCol, false)
+			vector.DrawFilledCircle(a, lx, ly, radius, lightCol, false)
 		}
-		// Bright center
-		vector.DrawFilledCircle(screen, lx, ly, 6, ColorSwarmLight, false)
-		vector.StrokeCircle(screen, lx, ly, 10, 1.5, color.RGBA{255, 255, 100, 150}, false)
+		vector.DrawFilledCircle(a, lx, ly, 6, ColorSwarmLight, false)
+		vector.StrokeCircle(a, lx, ly, 10, 1.5, color.RGBA{255, 255, 100, 150}, false)
 	}
 
 	// Delivery rendering
 	if ss.DeliveryOn {
-		// Route lines behind everything (toggle with 'C')
 		if ss.ShowRoutes {
-			drawPickupDropoffRoutes(screen, ss, arenaOffX, arenaOffY)
+			drawPickupDropoffRoutes(a, ss, 0, 0)
 		}
-		// Dashed lines from carrying bots to their matching dropoff (only when routes toggled)
 		if ss.ShowRoutes {
 			hasCarrying := false
 			for i := range ss.Bots {
@@ -105,17 +99,15 @@ func (r *Renderer) DrawSwarmMode(screen *ebiten.Image, s *simulation.Simulation,
 				}
 			}
 			if hasCarrying {
-				drawCarryRouteLines(screen, ss, arenaOffX, arenaOffY)
+				drawCarryRouteLines(a, ss, 0, 0)
 			}
 		}
-		// Stations with labels, timer bars, counters
-		drawDeliveryStations(screen, ss, arenaOffX, arenaOffY)
-		drawStationLabels(screen, ss, arenaOffX, arenaOffY)
-		// Ground packages with pulse and arrow
-		drawDeliveryPackages(screen, ss, arenaOffX, arenaOffY)
+		drawDeliveryStations(a, ss, 0, 0)
+		drawStationLabels(a, ss, 0, 0)
+		drawDeliveryPackages(a, ss, 0, 0)
 	}
 
-	// Trails (small circles with decreasing alpha for last 10 positions)
+	// Trails
 	if ss.ShowTrails {
 		for i := range ss.Bots {
 			bot := &ss.Bots[i]
@@ -123,84 +115,70 @@ func (r *Renderer) DrawSwarmMode(screen *ebiten.Image, s *simulation.Simulation,
 				tx := bot.Trail[t][0]
 				ty := bot.Trail[t][1]
 				if tx == 0 && ty == 0 {
-					continue // unused slot
+					continue
 				}
-				// Calculate age: newest trail point has highest alpha
 				age := (bot.TrailIdx - t - 1 + len(bot.Trail)) % len(bot.Trail)
 				alpha := uint8(60 - age*5)
 				if alpha < 10 {
 					alpha = 10
 				}
 				trailCol := color.RGBA{bot.LEDColor[0], bot.LEDColor[1], bot.LEDColor[2], alpha}
-				sx := float32(arenaOffX + tx)
-				sy := float32(arenaOffY + ty)
-				vector.DrawFilledCircle(screen, sx, sy, 2, trailCol, false)
+				vector.DrawFilledCircle(a, float32(tx), float32(ty), 2, trailCol, false)
 			}
 		}
 	}
 
-	// Follow lines (thin line from follower to leader in LED color)
+	// Follow lines
 	for i := range ss.Bots {
 		bot := &ss.Bots[i]
 		if bot.FollowTargetIdx >= 0 && bot.FollowTargetIdx < len(ss.Bots) {
 			target := &ss.Bots[bot.FollowTargetIdx]
-			bx := float32(arenaOffX + bot.X)
-			by := float32(arenaOffY + bot.Y)
-			tx := float32(arenaOffX + target.X)
-			ty := float32(arenaOffY + target.Y)
 			lineCol := color.RGBA{bot.LEDColor[0], bot.LEDColor[1], bot.LEDColor[2], 120}
-			vector.StrokeLine(screen, bx, by, tx, ty, 1, lineCol, false)
+			vector.StrokeLine(a, float32(bot.X), float32(bot.Y), float32(target.X), float32(target.Y), 1, lineCol, false)
 		}
 	}
 
 	// Draw bots
 	for i := range ss.Bots {
 		bot := &ss.Bots[i]
-		bx := float32(arenaOffX + bot.X)
-		by := float32(arenaOffY + bot.Y)
+		bx := float32(bot.X)
+		by := float32(bot.Y)
 		radius := float32(swarm.SwarmBotRadius)
 
-		// Bot body circle with LED color
 		botCol := color.RGBA{bot.LEDColor[0], bot.LEDColor[1], bot.LEDColor[2], 255}
-		vector.DrawFilledCircle(screen, bx, by, radius, botCol, false)
+		vector.DrawFilledCircle(a, bx, by, radius, botCol, false)
 
-		// Direction indicator line
 		dirLen := radius * 1.5
 		dx := float32(math.Cos(bot.Angle)) * dirLen
 		dy := float32(math.Sin(bot.Angle)) * dirLen
-		vector.StrokeLine(screen, bx, by, bx+dx, by+dy, 1.5, color.RGBA{255, 255, 255, 200}, false)
+		vector.StrokeLine(a, bx, by, bx+dx, by+dy, 1.5, color.RGBA{255, 255, 255, 200}, false)
 
-		// Carried package indicator: glow ring + small colored square
 		if ss.DeliveryOn && bot.CarryingPkg >= 0 && bot.CarryingPkg < len(ss.Packages) {
 			pkg := &ss.Packages[bot.CarryingPkg]
 			pkgCol := deliveryColor(pkg.Color)
-			// Pulsing glow ring
 			pulse := 0.6 + 0.4*math.Sin(float64(ss.Tick)*0.1)
 			glowAlpha := uint8(60 + 40*pulse)
 			glowCol := color.RGBA{pkgCol.R, pkgCol.G, pkgCol.B, glowAlpha}
-			vector.StrokeCircle(screen, bx, by, radius+5, 2, glowCol, false)
-			// Package square above bot
-			vector.DrawFilledRect(screen, bx-4, by-radius-8, 8, 8, pkgCol, false)
-			vector.StrokeRect(screen, bx-4, by-radius-8, 8, 8, 1, color.RGBA{255, 255, 255, 180}, false)
+			vector.StrokeCircle(a, bx, by, radius+5, 2, glowCol, false)
+			vector.DrawFilledRect(a, bx-4, by-radius-8, 8, 8, pkgCol, false)
+			vector.StrokeRect(a, bx-4, by-radius-8, 8, 8, 1, color.RGBA{255, 255, 255, 180}, false)
 		}
 
-		// Deploy blink overlay (green flash)
 		if bot.BlinkTimer > 0 && (bot.BlinkTimer/4)%2 == 0 {
 			blinkCol := ColorSwarmBotBlink
 			blinkCol.A = 120
-			vector.DrawFilledCircle(screen, bx, by, radius+2, blinkCol, false)
+			vector.DrawFilledCircle(a, bx, by, radius+2, blinkCol, false)
 		}
 
-		// Selected bot highlight (pulsing ring)
 		if i == ss.SelectedBot {
 			pulse := float32(2.0 + 2.0*math.Sin(float64(ss.Tick)*0.12))
 			pulseAlpha := uint8(150 + int(50*math.Sin(float64(ss.Tick)*0.08)))
 			selCol := color.RGBA{ColorSwarmSelected.R, ColorSwarmSelected.G, ColorSwarmSelected.B, pulseAlpha}
-			vector.StrokeCircle(screen, bx, by, radius+pulse+2, 2, selCol, false)
+			vector.StrokeCircle(a, bx, by, radius+pulse+2, 2, selCol, false)
 		}
 	}
 
-	// Ghost bots (wrap mode only — draw 50% alpha copies near opposite edges)
+	// Ghost bots (wrap mode only)
 	if ss.WrapMode {
 		ghostMargin := 40.0
 		for i := range ss.Bots {
@@ -208,11 +186,8 @@ func (r *Renderer) DrawSwarmMode(screen *ebiten.Image, s *simulation.Simulation,
 			ghostCol := color.RGBA{bot.LEDColor[0], bot.LEDColor[1], bot.LEDColor[2], 128}
 			radius := float32(swarm.SwarmBotRadius)
 
-			// Check if near each edge and draw ghost on opposite side
 			drawGhost := func(gx, gy float64) {
-				sx := float32(arenaOffX + gx)
-				sy := float32(arenaOffY + gy)
-				vector.DrawFilledCircle(screen, sx, sy, radius, ghostCol, false)
+				vector.DrawFilledCircle(a, float32(gx), float32(gy), radius, ghostCol, false)
 			}
 
 			if bot.X < ghostMargin {
@@ -230,25 +205,53 @@ func (r *Renderer) DrawSwarmMode(screen *ebiten.Image, s *simulation.Simulation,
 		}
 	}
 
-	// Delivery overlays (on top of bots)
+	// Delivery overlays (on top of bots, on arena)
 	if ss.DeliveryOn {
-		// Score popups (floating text)
-		drawScorePopups(screen, ss, arenaOffX, arenaOffY)
-		// Delivery legend (top-right)
-		drawDeliveryLegend(screen, ss, sw)
-		// Process delivery events → particle effects
+		drawScorePopups(a, ss, 0, 0)
 		processDeliveryEvents(r, ss)
 	}
 
-	// Draw delivery particles (on top)
+	// Delivery particles (on arena)
 	if r.SwarmParticles != nil {
 		r.SwarmParticles.Update()
-		drawSwarmParticles(screen, r.SwarmParticles, arenaOffX, arenaOffY)
+		drawSwarmParticles(a, r.SwarmParticles, 0, 0)
+	}
+
+	// --- Blit arena image to screen with camera transform ---
+	viewportX := 415.0
+	viewportY := 50.0
+	viewportW := 800.0
+	viewportH := 800.0
+
+	camX := ss.SwarmCamX
+	camY := ss.SwarmCamY
+	zoom := ss.SwarmCamZoom
+
+	op := &ebiten.DrawImageOptions{}
+	op.GeoM.Translate(-camX, -camY)
+	op.GeoM.Scale(zoom, zoom)
+	op.GeoM.Translate(viewportX+viewportW/2, viewportY+viewportH/2)
+
+	// Clip to arena viewport
+	viewport := screen.SubImage(image.Rect(int(viewportX)-1, int(viewportY)-1, sw, sh)).(*ebiten.Image)
+	viewport.DrawImage(r.arenaImg, op)
+
+	// --- HUD elements (drawn directly to screen, NOT zoomed) ---
+
+	// Delivery legend
+	if ss.DeliveryOn {
+		drawDeliveryLegend(screen, ss, sw)
 	}
 
 	// Selected bot info overlay
 	if ss.SelectedBot >= 0 && ss.SelectedBot < len(ss.Bots) {
 		drawSelectedBotInfo(screen, ss)
+	}
+
+	// Follow-cam HUD indicator
+	if ss.FollowCamBot >= 0 && ss.FollowCamBot < len(ss.Bots) {
+		label := fmt.Sprintf("Following Bot #%d [F to stop]", ss.FollowCamBot)
+		printColoredAt(screen, label, 500, 855, color.RGBA{0, 255, 255, 220})
 	}
 
 	// Minimap
@@ -718,11 +721,24 @@ func drawSwarmParticles(screen *ebiten.Image, ps *ParticleSystem, offX, offY flo
 
 // SwarmScreenToArena converts screen coordinates to arena world coordinates.
 // Returns the arena position and whether the point is inside the arena.
-func SwarmScreenToArena(sx, sy int) (float64, float64, bool) {
-	arenaOffX := 415.0
-	arenaOffY := 50.0
-	wx := float64(sx) - arenaOffX
-	wy := float64(sy) - arenaOffY
+func SwarmScreenToArena(sx, sy int, ss *swarm.SwarmState) (float64, float64, bool) {
+	viewportX := 415.0
+	viewportY := 50.0
+	viewportW := 800.0
+	viewportH := 800.0
+
+	zoom := 1.0
+	camX := swarm.SwarmArenaSize / 2
+	camY := swarm.SwarmArenaSize / 2
+	if ss != nil {
+		zoom = ss.SwarmCamZoom
+		camX = ss.SwarmCamX
+		camY = ss.SwarmCamY
+	}
+
+	// Reverse camera transform
+	wx := (float64(sx) - viewportX - viewportW/2) / zoom + camX
+	wy := (float64(sy) - viewportY - viewportH/2) / zoom + camY
 	inside := wx >= 0 && wx <= swarm.SwarmArenaSize && wy >= 0 && wy <= swarm.SwarmArenaSize
 	return wx, wy, inside
 }
