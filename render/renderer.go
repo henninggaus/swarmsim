@@ -62,6 +62,9 @@ type Renderer struct {
 
 	// Sound system
 	Sound *SoundSystem
+
+	// Welcome screen
+	WelcomeBots []WelcomeBot
 }
 
 // NewRenderer creates a new renderer with a particle system.

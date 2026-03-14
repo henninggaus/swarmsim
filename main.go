@@ -42,6 +42,21 @@ type Game struct {
 	// Capture requests (set in Update, executed in Draw where screen is available)
 	screenshotRequested bool
 	gifToggleRequested  bool
+
+	// Welcome screen
+	showWelcome  bool
+	welcomeTick  int
+	welcomeReady bool // set after first frame (init bots needs screen size)
+
+	// Help overlay
+	showHelp bool
+
+	// In-game console
+	showConsole bool
+
+	// Panic recovery overlay
+	panicMsg   string
+	panicTimer int
 }
 
 // NewGame creates a new game instance.
@@ -51,10 +66,11 @@ func NewGame() *Game {
 	cam := render.NewCamera(cfg.ArenaWidth, cfg.ArenaHeight)
 	r := render.NewRenderer(cam)
 	return &Game{
-		sim:       s,
-		renderer:  r,
-		camera:    cam,
-		scenarios: simulation.GetScenarios(),
+		sim:         s,
+		renderer:    r,
+		camera:      cam,
+		scenarios:   simulation.GetScenarios(),
+		showWelcome: true,
 	}
 }
 
@@ -62,7 +78,80 @@ func NewGame() *Game {
 func (g *Game) Update() error {
 	// ESC to quit
 	if inpututil.IsKeyJustPressed(ebiten.KeyEscape) {
+		if g.showWelcome {
+			return ebiten.Termination
+		}
+		if g.showHelp {
+			g.showHelp = false
+			return nil
+		}
 		return ebiten.Termination
+	}
+
+	// Welcome screen: update bots, check for dismiss
+	if g.showWelcome {
+		g.welcomeTick++
+		g.renderer.UpdateWelcomeBots(screenW, screenH)
+
+		// F1-F7 load scenario AND dismiss welcome
+		scenarioKeys := []ebiten.Key{ebiten.KeyF1, ebiten.KeyF2, ebiten.KeyF3, ebiten.KeyF4, ebiten.KeyF5}
+		for i, key := range scenarioKeys {
+			if inpututil.IsKeyJustPressed(key) && i < len(g.scenarios) {
+				g.sim.LoadScenario(g.scenarios[i])
+				g.camera.X = g.sim.Cfg.ArenaWidth / 2
+				g.camera.Y = g.sim.Cfg.ArenaHeight / 2
+				g.camera.Zoom = 0.7
+				g.tickAcc = 0
+				g.showWelcome = false
+				return nil
+			}
+		}
+		if inpututil.IsKeyJustPressed(ebiten.KeyF6) {
+			g.sim.LoadTruckScenario()
+			g.camera.X = g.sim.Cfg.ArenaWidth / 2
+			g.camera.Y = g.sim.Cfg.ArenaHeight / 2
+			g.camera.Zoom = 0.7
+			g.tickAcc = 0
+			g.showWelcome = false
+			return nil
+		}
+		if inpututil.IsKeyJustPressed(ebiten.KeyF7) {
+			g.sim.LoadSwarmScenario()
+			g.tickAcc = 0
+			g.showWelcome = false
+			return nil
+		}
+
+		// Any other key or mouse click → load F7 (default) and dismiss
+		if inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) {
+			g.sim.LoadSwarmScenario()
+			g.tickAcc = 0
+			g.showWelcome = false
+			return nil
+		}
+		// Any key press (except ESC which is handled above)
+		for k := ebiten.Key(0); k <= ebiten.KeyMax; k++ {
+			if inpututil.IsKeyJustPressed(k) && k != ebiten.KeyEscape {
+				g.sim.LoadSwarmScenario()
+				g.tickAcc = 0
+				g.showWelcome = false
+				return nil
+			}
+		}
+		return nil
+	}
+
+	// Help overlay: only H dismisses
+	if g.showHelp {
+		if inpututil.IsKeyJustPressed(ebiten.KeyH) {
+			g.showHelp = false
+		}
+		return nil
+	}
+
+	// Panic recovery timer
+	if g.panicTimer > 0 {
+		g.panicTimer--
 	}
 
 	// Global keys: SPACE, +/-, F1-F7 work in all modes
@@ -171,6 +260,14 @@ func (g *Game) handleGlobalInput() {
 		}
 	}
 
+	// H: toggle help overlay (when not in editor text input)
+	if inpututil.IsKeyJustPressed(ebiten.KeyH) {
+		if !(g.sim.SwarmMode && g.sim.SwarmState != nil && g.sim.SwarmState.Editor != nil && g.sim.SwarmState.Editor.Focused) &&
+			!(g.sim.SwarmMode && g.sim.SwarmState != nil && g.sim.SwarmState.BotCountEdit) {
+			g.showHelp = !g.showHelp
+		}
+	}
+
 	// F12: toggle CPU profiling (requires: go build -tags profile)
 	if inpututil.IsKeyJustPressed(ebiten.KeyF12) {
 		ToggleProfile()
@@ -205,8 +302,8 @@ func (g *Game) handleInput() {
 		g.sim.SpawnResourceAt(wx, wy)
 	}
 
-	// H: add obstacle
-	if inpututil.IsKeyJustPressed(ebiten.KeyH) {
+	// O: add obstacle (was H, now H is help)
+	if inpututil.IsKeyJustPressed(ebiten.KeyO) {
 		g.sim.AddObstacleAt(wx, wy)
 	}
 
@@ -850,6 +947,16 @@ func isKeyRepeating(key ebiten.Key) bool {
 
 // Draw renders the simulation.
 func (g *Game) Draw(screen *ebiten.Image) {
+	// Welcome screen
+	if g.showWelcome {
+		if !g.welcomeReady {
+			g.renderer.InitWelcomeBots(screenW, screenH)
+			g.welcomeReady = true
+		}
+		g.renderer.DrawWelcomeScreen(screen, g.welcomeTick)
+		return
+	}
+
 	g.renderer.Draw(screen, g.sim)
 	render.DrawHUD(screen, g.sim, ebiten.ActualFPS(), g.renderer)
 
