@@ -132,14 +132,6 @@ func (r *Renderer) Draw(screen *ebiten.Image, s *simulation.Simulation) {
 	for range s.DeliveryEvents {
 		r.HomeBaseGlowAlpha = 1.0
 	}
-	// Truck delivery events → particle effects
-	for _, ev := range s.TruckDeliveryEvents {
-		if ev.Correct {
-			r.Particles.Emit(ev.X, ev.Y, 25, ColorCorrectDelivery, 2.0, 2.5, 35)
-		} else {
-			r.Particles.Emit(ev.X, ev.Y, 15, ColorWrongDelivery, 1.5, 2.0, 30)
-		}
-	}
 	// Sound effects for standard mode events
 	if r.Sound != nil && r.Sound.Enabled {
 		for range s.CoopPickupEvents {
@@ -148,24 +140,13 @@ func (r *Renderer) Draw(screen *ebiten.Image, s *simulation.Simulation) {
 		for range s.DeliveryEvents {
 			r.Sound.PlayDropOK()
 		}
-		for _, ev := range s.TruckDeliveryEvents {
-			if ev.Correct {
-				r.Sound.PlayDropOK()
-			} else {
-				r.Sound.PlayDropFail()
-			}
-		}
 	}
 
 	r.Particles.Update()
 
 	r.drawGrid(screen, s, sw, sh)
 
-	if s.TruckMode && s.TruckState != nil {
-		r.DrawTruckMode(screen, s, sw, sh)
-	} else {
-		r.drawHomeBase(screen, s, sw, sh)
-	}
+	r.drawHomeBase(screen, s, sw, sh)
 
 	r.drawObstacles(screen, s, sw, sh)
 
@@ -173,9 +154,7 @@ func (r *Renderer) Draw(screen *ebiten.Image, s *simulation.Simulation) {
 		r.drawPheromones(screen, s, sw, sh)
 	}
 
-	if !s.TruckMode {
-		r.drawResources(screen, s, sw, sh)
-	}
+	r.drawResources(screen, s, sw, sh)
 
 	if s.ShowSensorRadius {
 		r.drawRadii(screen, s, sw, sh, false)

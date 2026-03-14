@@ -35,21 +35,15 @@ func DrawHUD(screen *ebiten.Image, s *simulation.Simulation, fps float64, r *Ren
 	ebitenutil.DebugPrintAt(screen, info, 10, 10)
 
 	// Mode-specific top HUD
-	if s.TruckMode && s.TruckState != nil {
-		drawTruckHUD(screen, s, sw, sh)
-	} else {
-		drawWaveHUD(screen, s, sw)
-	}
+	drawWaveHUD(screen, s, sw)
 
 	// Classic Mode scenario indicator (top-left, line 2)
-	if !s.TruckMode {
-		scenLabel := fmt.Sprintf("Classic: %s [N:Next]", s.ScenarioTitle)
-		printColoredAt(screen, scenLabel, 10, 26, color.RGBA{180, 200, 220, 200})
-	}
+	scenLabel := fmt.Sprintf("Classic: %s [N:Next]", s.ScenarioTitle)
+	printColoredAt(screen, scenLabel, 10, 26, color.RGBA{180, 200, 220, 200})
 
-	// Top-center: Generation info (shift down if wave/truck HUD active)
+	// Top-center: Generation info (shift down if wave HUD active)
 	genY := 10
-	if s.Cfg.WaveEnabled || s.TruckMode {
+	if s.Cfg.WaveEnabled {
 		genY = 95
 	}
 	genInfo := fmt.Sprintf("Gen: %d  Tick: %d/%d  Best: %.0f  Avg: %.0f",
@@ -288,75 +282,6 @@ func drawWaveHUD(screen *ebiten.Image, s *simulation.Simulation, sw int) {
 	waveInfo := fmt.Sprintf("Wave %d  |  Next wave in: %d ticks", s.WaveNumber, s.WaveTicksLeft)
 	waveW := len(waveInfo) * 6
 	ebitenutil.DebugPrintAt(screen, waveInfo, sw/2-waveW/2, 75)
-}
-
-func drawTruckHUD(screen *ebiten.Image, s *simulation.Simulation, sw, sh int) {
-	ts := s.TruckState
-	if ts == nil {
-		return
-	}
-
-	// Large centered score
-	scoreText := fmt.Sprintf("Score: %d", s.Score)
-	scoreImg := cachedTextImage(scoreText)
-	textW := scoreImg.Bounds().Dx()
-
-	scale := 2.5
-	totalW := float64(textW) * scale
-	op := &ebiten.DrawImageOptions{}
-	op.GeoM.Scale(scale, scale)
-	op.GeoM.Translate(float64(sw)/2-totalW/2, 25)
-	screen.DrawImage(scoreImg, op)
-
-	// Packages delivered
-	pkgText := fmt.Sprintf("Packages: %d/%d delivered", ts.DeliveredPkgs, ts.TotalPkgs)
-	pkgW := len(pkgText) * 6
-	ebitenutil.DebugPrintAt(screen, pkgText, sw/2-pkgW/2, 72)
-
-	// Sort accuracy
-	totalDelivered := ts.CorrectZone + ts.WrongZone
-	accuracy := 0.0
-	if totalDelivered > 0 {
-		accuracy = float64(ts.CorrectZone) / float64(totalDelivered) * 100
-	}
-	accText := fmt.Sprintf("Sort Accuracy: %.0f%%", accuracy)
-	accW := len(accText) * 6
-	ebitenutil.DebugPrintAt(screen, accText, sw/2-accW/2, 86)
-
-	// Timer
-	seconds := ts.Timer / 30
-	minutes := seconds / 60
-	secs := seconds % 60
-	timerText := fmt.Sprintf("Time: %02d:%02d", minutes, secs)
-	timerW := len(timerText) * 6
-	ebitenutil.DebugPrintAt(screen, timerText, sw-timerW-20, 10)
-
-	// Completion overlay
-	if ts.Completed {
-		completeText := "COMPLETED!"
-		ctImg := cachedTextImage(completeText)
-		ctW := ctImg.Bounds().Dx()
-		ctH := ctImg.Bounds().Dy()
-
-		ctScale := 3.0
-		ctTotalW := float64(ctW) * ctScale
-		ctTotalH := float64(ctH) * ctScale
-
-		bgX := float64(sw)/2 - ctTotalW/2 - 10
-		bgY := float64(sh)/2 - ctTotalH/2 - 5
-		vector.DrawFilledRect(screen, float32(bgX), float32(bgY), float32(ctTotalW+20), float32(ctTotalH+10),
-			color.RGBA{0, 60, 0, 200}, false)
-
-		ctOp := &ebiten.DrawImageOptions{}
-		ctOp.GeoM.Scale(ctScale, ctScale)
-		ctOp.GeoM.Translate(float64(sw)/2-ctTotalW/2, float64(sh)/2-ctTotalH/2)
-		screen.DrawImage(ctImg, ctOp)
-
-		// Final stats
-		finalText := fmt.Sprintf("Score: %d | Accuracy: %.0f%% | Time: %02d:%02d", s.Score, accuracy, minutes, secs)
-		finalW := len(finalText) * 6
-		ebitenutil.DebugPrintAt(screen, finalText, sw/2-finalW/2, sh/2+30)
-	}
 }
 
 func drawScenarioTitle(screen *ebiten.Image, title string, sw, sh, timer int) {

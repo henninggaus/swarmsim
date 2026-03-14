@@ -200,17 +200,10 @@ func (s *Simulation) Update() {
 	// Clear per-tick events
 	s.CoopPickupEvents = s.CoopPickupEvents[:0]
 	s.DeliveryEvents = s.DeliveryEvents[:0]
-	s.TruckDeliveryEvents = s.TruckDeliveryEvents[:0]
 
 	// Swarm mode uses its own update loop
 	if s.SwarmMode && s.SwarmState != nil {
 		s.updateSwarmMode()
-		return
-	}
-
-	// Truck mode uses its own update loop
-	if s.TruckMode && s.TruckState != nil {
-		s.updateTruckMode()
 		return
 	}
 
@@ -372,9 +365,6 @@ func (s *Simulation) LoadScenario(sc Scenario) {
 	s.WaveNumber = 0
 	s.CoopPickupEvents = nil
 	s.DeliveryEvents = nil
-	s.TruckDeliveryEvents = nil
-	s.TruckMode = false
-	s.TruckState = nil
 	s.SwarmMode = false
 	s.SwarmState = nil
 	s.SelectedBotID = -1
@@ -472,45 +462,6 @@ func (s *Simulation) FindBotAt(x, y, maxDist float64) bot.Bot {
 	return nearest
 }
 
-// LoadTruckScenario sets up the truck unloading scenario.
-func (s *Simulation) LoadTruckScenario() {
-	sc := scenarioTruckUnloading()
-	s.LoadScenario(sc)
-
-	s.TruckMode = true
-	s.SwarmMode = false
-	s.SwarmState = nil
-	ts := NewTruckState(s.Rng, 30)
-	s.TruckState = ts
-
-	// Set per-bot CarryCap and Radius
-	for _, b := range s.Bots {
-		base := b.GetBase()
-		switch b.Type() {
-		case bot.TypeScout:
-			ts.CarryCaps[b.ID()] = 0.5
-			base.CarryCap = 0.5
-			base.Radius = 12
-		case bot.TypeWorker:
-			ts.CarryCaps[b.ID()] = 3.0
-			base.CarryCap = 3.0
-			base.Radius = 20
-		case bot.TypeTank:
-			ts.CarryCaps[b.ID()] = 8.0
-			base.CarryCap = 8.0
-			base.Radius = 32
-		case bot.TypeLeader:
-			ts.CarryCaps[b.ID()] = 0.0
-			base.CarryCap = 0.0
-			base.Radius = 16
-		case bot.TypeHealer:
-			ts.CarryCaps[b.ID()] = 0.5
-			base.CarryCap = 0.5
-			base.Radius = 14
-		}
-	}
-}
-
 // LoadSwarmScenario sets up the programmable swarm scenario.
 func (s *Simulation) LoadSwarmScenario() {
 	cfg := DefaultConfig()
@@ -537,33 +488,6 @@ func (s *Simulation) LoadSwarmScenario() {
 	s.LoadScenario(sc)
 
 	s.SwarmMode = true
-	s.TruckMode = false
-	s.TruckState = nil
 	s.SwarmState = swarm.NewSwarmState(s.Rng, swarm.SwarmDefaultBots)
 }
 
-// RegenerateTruck creates a new truck with random packages.
-func (s *Simulation) RegenerateTruck() {
-	if !s.TruckMode || s.TruckState == nil {
-		return
-	}
-	oldCaps := s.TruckState.CarryCaps
-	ts := NewTruckState(s.Rng, 30)
-	ts.CarryCaps = oldCaps
-	s.TruckState = ts
-	s.Score = 0
-
-	// Reset bot positions to depot area and restore energy
-	for _, b := range s.Bots {
-		base := b.GetBase()
-		base.Pos.X = 1100 + s.Rng.Float64()*300
-		base.Pos.Y = 400 + s.Rng.Float64()*300
-		base.Energy = base.MaxEnergy
-		base.State = bot.StateIdle
-		base.Vel = bot.Vec2{}
-
-		// Recreate task entries
-		ts.BotTasks[b.ID()] = &BotTask{Type: TaskIdle, TargetPkgID: -1}
-		ts.CarryCaps[b.ID()] = base.CarryCap
-	}
-}

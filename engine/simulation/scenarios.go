@@ -2,7 +2,6 @@ package simulation
 
 import (
 	"math/rand"
-	"swarmsim/domain/bot"
 	"swarmsim/domain/physics"
 )
 
@@ -14,7 +13,6 @@ func GetScenarios() []Scenario {
 		scenarioEnergy(),
 		scenarioSandbox(),
 		scenarioEvolution(),
-		scenarioTruckUnloading(),
 	}
 }
 
@@ -186,41 +184,6 @@ func generateMaze(s *Simulation) {
 				s.SpawnResourceAt(rx, ry)
 			}
 		}
-	}
-}
-
-func scenarioTruckUnloading() Scenario {
-	cfg := DefaultConfig()
-	cfg.ArenaWidth = 1600
-	cfg.ArenaHeight = 900
-	cfg.InitObstacles = 0
-	cfg.InitResources = 0
-	cfg.ResourceRespawn = false
-	cfg.WaveEnabled = false
-	cfg.HomeBaseX = -100
-	cfg.HomeBaseY = -100
-	cfg.HomeBaseR = 0
-
-	// Bot composition for truck scenario
-	cfg.InitScouts = 4
-	cfg.InitWorkers = 12
-	cfg.InitLeaders = 2
-	cfg.InitTanks = 4
-	cfg.InitHealers = 3
-
-	return Scenario{
-		ID:   ScenarioTruck,
-		Name: "LKW-ENTLADUNG",
-		Cfg:  cfg,
-		CustomSetup: func(s *Simulation) {
-			// Position bots near depot/ramp area
-			for _, b := range s.Bots {
-				base := b.GetBase()
-				base.Pos.X = 1100 + s.Rng.Float64()*300
-				base.Pos.Y = 400 + s.Rng.Float64()*300
-				base.State = bot.StateIdle
-			}
-		},
 	}
 }
 

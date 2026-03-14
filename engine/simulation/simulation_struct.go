@@ -22,13 +22,6 @@ type DeliveryEvent struct {
 	PointValue int
 }
 
-// TruckDeliveryEvent is emitted when a package is delivered to a zone.
-type TruckDeliveryEvent struct {
-	X, Y    float64
-	Tick    int
-	Correct bool
-}
-
 // ScenarioID identifies a scenario.
 type ScenarioID int
 
@@ -38,7 +31,6 @@ const (
 	ScenarioEnergy
 	ScenarioSandbox
 	ScenarioEvolution
-	ScenarioTruck
 	ScenarioSwarm
 )
 
@@ -99,13 +91,8 @@ type Simulation struct {
 	Score         int
 
 	// Visual events (consumed by renderer)
-	CoopPickupEvents    []CoopPickupEvent
-	DeliveryEvents      []DeliveryEvent
-	TruckDeliveryEvents []TruckDeliveryEvent
-
-	// Truck unloading mode
-	TruckMode  bool
-	TruckState *TruckState
+	CoopPickupEvents []CoopPickupEvent
+	DeliveryEvents   []DeliveryEvent
 
 	// Programmable swarm mode
 	SwarmMode  bool

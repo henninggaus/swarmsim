@@ -452,10 +452,7 @@ func (g *Game) handleInput() {
 
 	// N: switch scenario in Classic Mode (cycle through dropdown)
 	if inpututil.IsKeyJustPressed(ebiten.KeyN) {
-		if g.sim.TruckMode {
-			logger.Info("KEY", "N pressed -> Generating new truck")
-			g.sim.RegenerateTruck()
-		} else if len(g.classicScenarios) > 0 && g.renderer.FadeDir == 0 {
+		if len(g.classicScenarios) > 0 && g.renderer.FadeDir == 0 {
 			g.classicScenarioIdx = (g.classicScenarioIdx + 1) % len(g.classicScenarios)
 			idx := g.classicScenarioIdx
 			logger.Info("KEY", "N pressed -> Switching to scenario: %s", g.classicScenarios[idx].Name)
