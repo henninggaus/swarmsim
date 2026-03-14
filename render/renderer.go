@@ -44,9 +44,22 @@ type Renderer struct {
 	SwarmParticles    *ParticleSystem // separate particle system for swarm delivery effects
 	HomeBaseGlowAlpha float64
 
-	ShowTrails bool // toggle with T key (default off for performance)
+	ShowTrails  bool // toggle with T key (default off for performance)
+	ShowMinimap bool // toggle with M key
 
 	botSprites [5]*ebiten.Image // pre-rendered triangle per BotType
+
+	// Screenshot & GIF recording
+	Recording      bool
+	RecFrames      []*image.Paletted
+	RecFrameCount  int
+	RecSkipCounter int
+	RecBlinkTick   int
+	OverlayText    string
+	OverlayTimer   int
+
+	// Sound system
+	Sound *SoundSystem
 }
 
 // NewRenderer creates a new renderer with a particle system.
@@ -55,6 +68,7 @@ func NewRenderer(cam *Camera) *Renderer {
 		Camera:         cam,
 		Particles:      NewParticleSystem(),
 		SwarmParticles: NewParticleSystem(),
+		Sound:          NewSoundSystem(),
 	}
 	r.initBotSprites()
 	return r
@@ -111,6 +125,22 @@ func (r *Renderer) Draw(screen *ebiten.Image, s *simulation.Simulation) {
 			r.Particles.Emit(ev.X, ev.Y, 15, ColorWrongDelivery, 1.5, 2.0, 30)
 		}
 	}
+	// Sound effects for standard mode events
+	if r.Sound != nil && r.Sound.Enabled {
+		for range s.CoopPickupEvents {
+			r.Sound.PlayPickup()
+		}
+		for range s.DeliveryEvents {
+			r.Sound.PlayDropOK()
+		}
+		for _, ev := range s.TruckDeliveryEvents {
+			if ev.Correct {
+				r.Sound.PlayDropOK()
+			} else {
+				r.Sound.PlayDropFail()
+			}
+		}
+	}
 
 	r.Particles.Update()
 
@@ -147,6 +177,11 @@ func (r *Renderer) Draw(screen *ebiten.Image, s *simulation.Simulation) {
 
 	if s.ShowDebugComm {
 		r.drawCommLines(screen, s, sw, sh)
+	}
+
+	// Minimap (only when zoomed in)
+	if r.ShowMinimap && r.Camera.Zoom > 1.0 {
+		r.drawMinimap(screen, s, sw, sh)
 	}
 }
 

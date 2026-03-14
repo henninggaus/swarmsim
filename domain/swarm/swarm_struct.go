@@ -215,6 +215,8 @@ type SwarmState struct {
 	ShowRoutes     bool                 // 'C' key toggle: show pickup→dropoff route lines
 	ScorePopups    []ScorePopup         // floating score text on delivery
 	DeliveryEvents []SwarmDeliveryEvent // consumed by renderer for particle effects
+
+	CollisionCount int // obstacle collisions this tick (reset per tick)
 }
 
 // AllObstacles returns combined obstacles and maze walls.

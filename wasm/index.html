@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SwarmSim - Schwarm-Robotik-Simulator</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background: #14141e;
+            color: #ccc;
+            font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+        h1 {
+            margin-top: 15px;
+            font-size: 1.3em;
+            color: #88ccff;
+            letter-spacing: 1px;
+        }
+        #game-container {
+            margin-top: 10px;
+            position: relative;
+        }
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 1.2em;
+            color: #88ccff;
+        }
+        #loading .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #334;
+            border-top: 3px solid #88ccff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            vertical-align: middle;
+            margin-right: 8px;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        canvas {
+            display: block;
+            border: 1px solid #333;
+        }
+        .controls {
+            margin-top: 12px;
+            font-size: 0.8em;
+            color: #666;
+            text-align: center;
+            max-width: 1280px;
+            line-height: 1.6;
+        }
+        .controls kbd {
+            background: #222;
+            border: 1px solid #444;
+            border-radius: 3px;
+            padding: 1px 5px;
+            font-family: monospace;
+            color: #aaa;
+        }
+    </style>
+</head>
+<body>
+    <h1>SwarmSim &mdash; Schwarm-Robotik-Simulator</h1>
+    <div id="game-container">
+        <div id="loading"><span class="spinner"></span>Loading WASM...</div>
+    </div>
+    <div class="controls">
+        <kbd>F1</kbd>-<kbd>F5</kbd> Szenarien &nbsp;
+        <kbd>F6</kbd> LKW &nbsp;
+        <kbd>F7</kbd> Swarm-Editor &nbsp;
+        <kbd>Space</kbd> Pause &nbsp;
+        <kbd>+/-</kbd> Speed &nbsp;
+        <kbd>1-5</kbd> Bot spawnen &nbsp;
+        <kbd>M</kbd> Minimap &nbsp;
+        <kbd>T</kbd> Trails &nbsp;
+        <kbd>P</kbd> Pheromone &nbsp;
+        <kbd>F10</kbd> Screenshot &nbsp;
+        <kbd>F11</kbd> GIF &nbsp;
+        <kbd>ESC</kbd> Beenden
+    </div>
+
+    <script src="../wasm_exec.js"></script>
+    <script>
+        const go = new Go();
+        WebAssembly.instantiateStreaming(fetch("../swarmsim.wasm"), go.importObject)
+            .then(result => {
+                document.getElementById("loading").style.display = "none";
+                go.run(result.instance);
+            })
+            .catch(err => {
+                document.getElementById("loading").innerHTML =
+                    '<span style="color:#f66">Fehler beim Laden: ' + err.message + '</span>';
+            });
+    </script>
+</body>
+</html>

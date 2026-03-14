@@ -38,6 +38,10 @@ type Game struct {
 
 	// Tick accumulator for fixed timestep
 	tickAcc float64
+
+	// Capture requests (set in Update, executed in Draw where screen is available)
+	screenshotRequested bool
+	gifToggleRequested  bool
 }
 
 // NewGame creates a new game instance.
@@ -142,6 +146,31 @@ func (g *Game) handleGlobalInput() {
 		g.tickAcc = 0
 	}
 
+	// F10: screenshot
+	if inpututil.IsKeyJustPressed(ebiten.KeyF10) {
+		g.screenshotRequested = true
+	}
+
+	// F11: toggle GIF recording
+	if inpututil.IsKeyJustPressed(ebiten.KeyF11) {
+		g.gifToggleRequested = true
+	}
+
+	// S: toggle sound
+	if inpututil.IsKeyJustPressed(ebiten.KeyS) {
+		// Only toggle if not in swarm editor text input
+		if !(g.sim.SwarmMode && g.sim.SwarmState != nil && g.sim.SwarmState.Editor != nil && g.sim.SwarmState.Editor.Focused) &&
+			!(g.sim.SwarmMode && g.sim.SwarmState != nil && g.sim.SwarmState.BotCountEdit) {
+			g.renderer.Sound.Enabled = !g.renderer.Sound.Enabled
+			if g.renderer.Sound.Enabled {
+				g.renderer.Sound.StartAmbient()
+			} else {
+				g.renderer.Sound.StopAmbient()
+			}
+			fmt.Printf("[KEY] S pressed -> Sound=%v\n", g.renderer.Sound.Enabled)
+		}
+	}
+
 	// F12: toggle CPU profiling (requires: go build -tags profile)
 	if inpututil.IsKeyJustPressed(ebiten.KeyF12) {
 		ToggleProfile()
@@ -203,6 +232,12 @@ func (g *Game) handleInput() {
 	if inpututil.IsKeyJustPressed(ebiten.KeyT) {
 		g.renderer.ShowTrails = !g.renderer.ShowTrails
 		fmt.Printf("[KEY] T pressed -> ShowTrails=%v\n", g.renderer.ShowTrails)
+	}
+
+	// M: toggle minimap
+	if inpututil.IsKeyJustPressed(ebiten.KeyM) {
+		g.renderer.ShowMinimap = !g.renderer.ShowMinimap
+		fmt.Printf("[KEY] M pressed -> ShowMinimap=%v\n", g.renderer.ShowMinimap)
 	}
 
 	// P: cycle pheromone visualization (OFF -> FOUND -> ALL -> OFF)
@@ -270,7 +305,7 @@ func (g *Game) handleCamera() {
 	if ebiten.IsKeyPressed(ebiten.KeyW) {
 		g.camera.Y -= panSpeed
 	}
-	if ebiten.IsKeyPressed(ebiten.KeyS) {
+	if ebiten.IsKeyPressed(ebiten.KeyS) && !inpututil.IsKeyJustPressed(ebiten.KeyS) {
 		g.camera.Y += panSpeed
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyA) {
@@ -381,6 +416,12 @@ func (g *Game) handleSwarmInput() {
 	if inpututil.IsKeyJustPressed(ebiten.KeyC) && !ed.Focused && !ss.BotCountEdit {
 		ss.ShowRoutes = !ss.ShowRoutes
 		fmt.Printf("[SWARM] Routes: %v\n", ss.ShowRoutes)
+	}
+
+	// M key: toggle minimap (when editor not focused)
+	if inpututil.IsKeyJustPressed(ebiten.KeyM) && !ed.Focused && !ss.BotCountEdit {
+		g.renderer.ShowMinimap = !g.renderer.ShowMinimap
+		fmt.Printf("[SWARM] Minimap: %v\n", g.renderer.ShowMinimap)
 	}
 
 	// Editor keyboard input (when editor is focused)
@@ -803,7 +844,57 @@ func isKeyRepeating(key ebiten.Key) bool {
 // Draw renders the simulation.
 func (g *Game) Draw(screen *ebiten.Image) {
 	g.renderer.Draw(screen, g.sim)
-	render.DrawHUD(screen, g.sim, ebiten.ActualFPS())
+	render.DrawHUD(screen, g.sim, ebiten.ActualFPS(), g.renderer)
+
+	// Sound: ambient volume + collision clicks
+	if g.renderer.Sound != nil && g.renderer.Sound.Enabled {
+		botCount := len(g.sim.Bots)
+		if g.sim.SwarmMode && g.sim.SwarmState != nil {
+			botCount = len(g.sim.SwarmState.Bots)
+		}
+		g.renderer.Sound.SetBotCount(botCount)
+
+		// Collision click (swarm mode, throttled inside PlayCollision)
+		if g.sim.SwarmMode && g.sim.SwarmState != nil && g.sim.SwarmState.CollisionCount > 0 {
+			g.renderer.Sound.PlayCollision()
+		}
+	}
+
+	// Screenshot (capture after full render including HUD)
+	if g.screenshotRequested {
+		g.screenshotRequested = false
+		fname := render.CaptureScreenshot(screen)
+		if fname != "" {
+			g.renderer.OverlayText = "Screenshot saved: " + fname
+			g.renderer.OverlayTimer = 60
+		}
+	}
+
+	// GIF recording toggle
+	if g.gifToggleRequested {
+		g.gifToggleRequested = false
+		if g.renderer.Recording {
+			fname := render.StopRecording(g.renderer)
+			if fname != "" {
+				g.renderer.OverlayText = "GIF saved: " + fname
+				g.renderer.OverlayTimer = 90
+			}
+		} else {
+			render.StartRecording(g.renderer)
+		}
+	}
+
+	// Capture GIF frame if recording
+	if g.renderer.Recording {
+		if render.CaptureGIFFrame(screen, g.renderer) {
+			// Max frames reached — auto-stop
+			fname := render.StopRecording(g.renderer)
+			if fname != "" {
+				g.renderer.OverlayText = "GIF saved (max): " + fname
+				g.renderer.OverlayTimer = 90
+			}
+		}
+	}
 }
 
 // Layout returns the logical screen size.

@@ -246,6 +246,11 @@ func (r *Renderer) DrawSwarmMode(screen *ebiten.Image, s *simulation.Simulation,
 		drawSelectedBotInfo(screen, ss)
 	}
 
+	// Minimap
+	if r.ShowMinimap {
+		r.drawSwarmMinimap(screen, ss)
+	}
+
 	// Separator line between editor and arena
 	vector.StrokeLine(screen, 350, 0, 350, float32(sh), 2, ColorSwarmEditorSep, false)
 }
@@ -606,12 +611,21 @@ func processDeliveryEvents(r *Renderer, ss *swarm.SwarmState) {
 		if ev.IsPickup {
 			// Small burst on pickup
 			r.SwarmParticles.Emit(ev.X, ev.Y, 8, col, 1.5, 3, 20)
+			if r.Sound != nil && r.Sound.Enabled {
+				r.Sound.PlayPickup()
+			}
 		} else if ev.Correct {
 			// Big green burst on correct delivery
 			r.SwarmParticles.Emit(ev.X, ev.Y, 20, color.RGBA{80, 255, 80, 255}, 2.0, 4, 30)
+			if r.Sound != nil && r.Sound.Enabled {
+				r.Sound.PlayDropOK()
+			}
 		} else {
 			// Red burst on wrong delivery
 			r.SwarmParticles.Emit(ev.X, ev.Y, 12, color.RGBA{255, 80, 80, 255}, 1.8, 3, 25)
+			if r.Sound != nil && r.Sound.Enabled {
+				r.Sound.PlayDropFail()
+			}
 		}
 	}
 	// Clear consumed events

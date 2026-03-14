@@ -392,7 +392,7 @@ func DrawSwarmHUD(screen *ebiten.Image, s *simulation.Simulation, fps float64) {
 	}
 
 	// Help text at very bottom
-	helpText := "F7:Swarm SPACE:Pause L:Light T:Trails C:Routes +/-:Speed"
+	helpText := "F7:Swarm SPACE:Pause L:Light T:Trails C:Routes S:Sound +/-:Speed"
 	ebitenutil.DebugPrintAt(screen, helpText, 10, sh-15)
 
 	// Scenario title overlay

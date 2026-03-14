@@ -13,11 +13,12 @@ import (
 )
 
 // DrawHUD renders the heads-up display overlay.
-func DrawHUD(screen *ebiten.Image, s *simulation.Simulation, fps float64) {
+func DrawHUD(screen *ebiten.Image, s *simulation.Simulation, fps float64, r *Renderer) {
 	// Swarm mode: separate editor panel + HUD
 	if s.SwarmMode && s.SwarmState != nil {
 		DrawSwarmEditor(screen, s.SwarmState)
 		DrawSwarmHUD(screen, s, fps)
+		DrawCaptureOverlay(screen, r)
 		return
 	}
 
@@ -75,9 +76,9 @@ func DrawHUD(screen *ebiten.Image, s *simulation.Simulation, fps float64) {
 	ebitenutil.DebugPrintAt(screen, pherModes[s.PheromoneVizMode], 10, sh-30)
 
 	if s.TruckMode {
-		ebitenutil.DebugPrintAt(screen, "SPACE:Pause N:NewTruck F:Comm G:Sensor D:Debug P:Pher V:Genome +/-:Speed F1-F5:Scenario F6:Truck", 10, sh-15)
+		ebitenutil.DebugPrintAt(screen, "SPACE:Pause N:NewTruck F:Comm G:Sensor D:Debug P:Pher V:Genome S:Sound +/-:Speed F1-F5:Scenario F6:Truck", 10, sh-15)
 	} else {
-		ebitenutil.DebugPrintAt(screen, "SPACE:Pause 1-5:Bot R:Res H:Obs F:Comm G:Sensor D:Debug P:Pher E:Evolve V:Genome +/-:Speed F1-F6:Scenario", 10, sh-15)
+		ebitenutil.DebugPrintAt(screen, "SPACE:Pause 1-5:Bot R:Res H:Obs F:Comm G:Sensor D:Debug P:Pher E:Evolve V:Genome S:Sound +/-:Speed F1-F6:Scenario", 10, sh-15)
 	}
 
 	// Selected bot info panel
@@ -100,6 +101,9 @@ func DrawHUD(screen *ebiten.Image, s *simulation.Simulation, fps float64) {
 	if s.ScenarioTimer > 0 {
 		drawScenarioTitle(screen, s.ScenarioTitle, sw, sh, s.ScenarioTimer)
 	}
+
+	// Screenshot / GIF overlay
+	DrawCaptureOverlay(screen, r)
 }
 
 func drawBotCount(screen *ebiten.Image, x, y int, name string, count int, col color.RGBA) {

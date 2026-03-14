@@ -14,6 +14,9 @@ func (s *Simulation) updateSwarmMode() {
 	ss := s.SwarmState
 	ss.Tick++
 
+	// Reset per-tick counters
+	ss.CollisionCount = 0
+
 	// Swap message buffers: this tick reads PrevMessages, writes to NextMessages
 	ss.PrevMessages = ss.NextMessages
 	ss.NextMessages = nil
@@ -1089,6 +1092,7 @@ func applySwarmPhysics(ss *swarm.SwarmState, i int) {
 	for _, obs := range allObs {
 		hit, _, _ := physics.CircleRectCollision(bot.X, bot.Y, swarm.SwarmBotRadius, obs.X, obs.Y, obs.W, obs.H)
 		if hit {
+			ss.CollisionCount++
 			newX, newY := physics.ResolveCircleRectOverlap(bot.X, bot.Y, swarm.SwarmBotRadius, obs.X, obs.Y, obs.W, obs.H)
 			pushDx := newX - bot.X
 			pushDy := newY - bot.Y
