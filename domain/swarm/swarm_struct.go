@@ -222,6 +222,41 @@ type SwarmState struct {
 
 	CollisionCount  int // obstacle collisions this tick (reset per tick)
 	ResetFlashTimer int // counts down from 30 for "RESET" flash
+
+	// Block editor
+	BlockEditorActive bool
+	BlockRules        []BlockRule
+	ActiveDropdown    *BlockDropdown
+	BlockScrollY      int
+	BlockValueEdit    bool // true when editing a value field
+	BlockValueRuleIdx int  // which rule's value is being edited
+	BlockValueCondIdx int  // which condition's value (-1 = action param)
+	BlockValueText    string
+}
+
+// BlockRule represents a single rule in the visual block editor.
+type BlockRule struct {
+	Conditions   []BlockCondition
+	ActionName   string
+	ActionParams [3]int // up to 3 params (e.g. SET_LED R G B)
+}
+
+// BlockCondition represents a single condition in a block rule.
+type BlockCondition struct {
+	SensorName string
+	OpStr      string
+	Value      int
+}
+
+// BlockDropdown tracks which dropdown is currently open in the block editor.
+type BlockDropdown struct {
+	RuleIdx   int    // which rule
+	CondIdx   int    // which condition (-1 = action dropdown)
+	FieldType string // "sensor", "op", "action"
+	X, Y      int    // screen position of dropdown
+	ScrollY   int    // scroll offset in dropdown
+	HoverIdx  int    // hovered item index (-1 = none)
+	Items     []string
 }
 
 // AllObstacles returns combined obstacles and maze walls.

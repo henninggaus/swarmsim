@@ -326,6 +326,209 @@ var highlightActions = map[string]bool{
 	"FWD": true, "FWD_SLOW": true, "GOTO_MATCH": true,
 }
 
+// --- Reverse mapping functions (for block editor / serialization) ---
+
+// ConditionTypeName returns the canonical short sensor name for a ConditionType.
+func ConditionTypeName(ct ConditionType) string {
+	switch ct {
+	case CondNeighborsCount:
+		return "neighbors"
+	case CondNearestDistance:
+		return "near_dist"
+	case CondState, CondMyState:
+		return "state"
+	case CondCounter:
+		return "counter"
+	case CondTimer:
+		return "timer"
+	case CondOnEdge:
+		return "edge"
+	case CondReceivedMessage:
+		return "msg"
+	case CondLightValue:
+		return "light"
+	case CondRandom:
+		return "rnd"
+	case CondTrue:
+		return "true"
+	case CondHasLeader:
+		return "leader"
+	case CondHasFollower:
+		return "follower"
+	case CondChainLength:
+		return "chain_len"
+	case CondNearestLEDR:
+		return "nearest_led_r"
+	case CondNearestLEDG:
+		return "nearest_led_g"
+	case CondNearestLEDB:
+		return "nearest_led_b"
+	case CondTick:
+		return "tick"
+	case CondObstacleAhead:
+		return "obs_ahead"
+	case CondObstacleDist:
+		return "obs_dist"
+	case CondValue1:
+		return "value1"
+	case CondValue2:
+		return "value2"
+	case CondCarrying:
+		return "carry"
+	case CondCarryingColor:
+		return "carrying_color"
+	case CondNearestPickupDist:
+		return "p_dist"
+	case CondNearestPickupColor:
+		return "pickup_color"
+	case CondNearestPickupHasPkg:
+		return "has_pkg"
+	case CondNearestDropoffDist:
+		return "d_dist"
+	case CondNearestDropoffColor:
+		return "dropoff_color"
+	case CondDropoffMatch:
+		return "match"
+	case CondHeardPickupColor:
+		return "heard_pickup"
+	case CondHeardDropoffColor:
+		return "heard_dropoff"
+	case CondNearestMatchLEDDist:
+		return "led_dist"
+	}
+	return "unknown"
+}
+
+// OpString returns the string representation of a ConditionOp.
+func OpString(op ConditionOp) string {
+	switch op {
+	case OpGT:
+		return ">"
+	case OpLT:
+		return "<"
+	case OpEQ:
+		return "=="
+	}
+	return "=="
+}
+
+// ActionTypeName returns the canonical short action name for an ActionType.
+func ActionTypeName(at ActionType) string {
+	switch at {
+	case ActMoveForward:
+		return "FWD"
+	case ActTurnLeft:
+		return "TURN_LEFT"
+	case ActTurnRight:
+		return "TURN_RIGHT"
+	case ActTurnToNearest:
+		return "TURN_TO_NEAREST"
+	case ActTurnFromNearest:
+		return "TURN_FROM_NEAREST"
+	case ActTurnToCenter:
+		return "TURN_TO_CENTER"
+	case ActTurnToLight:
+		return "TURN_TO_LIGHT"
+	case ActTurnRandom:
+		return "TURN_RANDOM"
+	case ActStop:
+		return "STOP"
+	case ActSetState:
+		return "SET_STATE"
+	case ActSetCounter:
+		return "SET_COUNTER"
+	case ActIncCounter:
+		return "INC_COUNTER"
+	case ActDecCounter:
+		return "DEC_COUNTER"
+	case ActSetLED:
+		return "SET_LED"
+	case ActSendMessage:
+		return "SEND_MESSAGE"
+	case ActSetTimer:
+		return "SET_TIMER"
+	case ActFollowNearest:
+		return "FOLLOW_NEAREST"
+	case ActUnfollow:
+		return "UNFOLLOW"
+	case ActTurnAwayObstacle:
+		return "AVOID_OBSTACLE"
+	case ActMoveForwardSlow:
+		return "FWD_SLOW"
+	case ActSetValue1:
+		return "SET_VALUE1"
+	case ActSetValue2:
+		return "SET_VALUE2"
+	case ActCopyNearestLED:
+		return "COPY_LED"
+	case ActPickup:
+		return "PICKUP"
+	case ActDrop:
+		return "DROP"
+	case ActTurnToPickup:
+		return "GOTO_PICKUP"
+	case ActTurnToDropoff:
+		return "TURN_TO_DROPOFF"
+	case ActTurnToMatchingDropoff:
+		return "GOTO_DROPOFF"
+	case ActSendPickup:
+		return "SEND_PICKUP"
+	case ActSendDropoff:
+		return "SEND_DROPOFF"
+	case ActTurnToHeardPickup:
+		return "GOTO_HEARD_PICKUP"
+	case ActTurnToHeardDropoff:
+		return "GOTO_HEARD_DROPOFF"
+	case ActTurnToMatchingLED:
+		return "GOTO_LED"
+	case ActSetLEDPickupColor:
+		return "LED_PICKUP"
+	case ActSetLEDDropoffColor:
+		return "LED_DROPOFF"
+	}
+	return "UNKNOWN"
+}
+
+// ActionParamCount returns the number of parameters an ActionType expects.
+func ActionParamCount(at ActionType) int {
+	for _, info := range actionNames {
+		if info.Type == at {
+			return info.ParamCount
+		}
+	}
+	return 0
+}
+
+// ActionParamCountByName returns the param count for a named action.
+func ActionParamCountByName(name string) int {
+	if info, ok := actionNames[name]; ok {
+		return info.ParamCount
+	}
+	return 0
+}
+
+// SensorGrouped returns sensor names organized in groups for dropdown display.
+var SensorGrouped = [][]string{
+	{"-- Nachbarn --", "neighbors", "near_dist", "leader", "follower", "chain_len"},
+	{"-- Navigation --", "edge", "obs_ahead", "obs_dist", "light"},
+	{"-- Zufall --", "rnd", "true"},
+	{"-- Delivery --", "carry", "match", "has_pkg", "p_dist", "d_dist", "pickup_color", "dropoff_color"},
+	{"-- Kommunikation --", "msg", "heard_pickup", "heard_dropoff", "led_dist"},
+	{"-- LED --", "nearest_led_r", "nearest_led_g", "nearest_led_b"},
+	{"-- Intern --", "state", "counter", "value1", "value2", "timer", "tick"},
+}
+
+// ActionGrouped returns action names organized in groups for dropdown display.
+var ActionGrouped = [][]string{
+	{"-- Bewegung --", "FWD", "FWD_SLOW", "STOP", "TURN_LEFT", "TURN_RIGHT", "TURN_RANDOM"},
+	{"-- Navigation --", "TURN_TO_NEAREST", "TURN_FROM_NEAREST", "TURN_TO_CENTER", "TURN_TO_LIGHT", "AVOID_OBSTACLE"},
+	{"-- Delivery --", "PICKUP", "DROP", "GOTO_PICKUP", "GOTO_DROPOFF", "GOTO_LED"},
+	{"-- Kommunikation --", "SEND_MESSAGE", "SEND_PICKUP", "SEND_DROPOFF", "GOTO_HEARD_PICKUP", "GOTO_HEARD_DROPOFF"},
+	{"-- LED --", "SET_LED", "LED_PICKUP", "LED_DROPOFF", "COPY_LED"},
+	{"-- Intern --", "SET_STATE", "SET_COUNTER", "INC_COUNTER", "DEC_COUNTER", "SET_TIMER", "SET_VALUE1", "SET_VALUE2"},
+	{"-- Follow --", "FOLLOW_NEAREST", "UNFOLLOW"},
+}
+
 // wordPos tracks a word and its column position in a line.
 type wordPos struct {
 	text string

@@ -495,7 +495,24 @@ func (g *Game) handleSwarmInput() {
 	// Mouse wheel: scroll editor if mouse is in editor area
 	// Hold Shift for horizontal scrolling
 	_, wy := ebiten.Wheel()
-	if mx < 350 && wy != 0 {
+	if mx < 350 && wy != 0 && ss.BlockEditorActive {
+		// Block editor scroll
+		if wy < 0 {
+			ss.BlockScrollY += 24
+		} else {
+			ss.BlockScrollY -= 24
+		}
+		if ss.BlockScrollY < 0 {
+			ss.BlockScrollY = 0
+		}
+		maxScroll := len(ss.BlockRules)*26 - 200
+		if maxScroll < 0 {
+			maxScroll = 0
+		}
+		if ss.BlockScrollY > maxScroll {
+			ss.BlockScrollY = maxScroll
+		}
+	} else if mx < 350 && wy != 0 {
 		shiftHeld := ebiten.IsKeyPressed(ebiten.KeyShift)
 		if shiftHeld {
 			// Horizontal scroll
@@ -599,6 +616,11 @@ func (g *Game) handleSwarmInput() {
 	if ss.BotCountEdit {
 		g.handleBotCountInput()
 	}
+
+	// Block editor value field input
+	if ss.BlockValueEdit {
+		g.handleBlockValueInput()
+	}
 }
 
 func (g *Game) handleSwarmClick(mx, my int) {
@@ -628,14 +650,51 @@ func (g *Game) handleSwarmClick(mx, my int) {
 		ed.Focused = false
 		ss.DropdownOpen = false
 
+	case "text_mode":
+		if ss.BlockEditorActive {
+			// Serialize blocks back to text
+			ss.BlockEditorActive = false
+			ss.ActiveDropdown = nil
+			text := serializeBlockRules(ss.BlockRules)
+			ss.Editor.Lines = strings.Split(text, "\n")
+			ss.Editor.CursorLine = 0
+			ss.Editor.CursorCol = 0
+			ss.Editor.ScrollY = 0
+			logger.Info("SWARM", "Switched to TEXT mode")
+		}
+
+	case "block_mode":
+		if !ss.BlockEditorActive {
+			// Parse current text into blocks
+			source := strings.Join(ss.Editor.Lines, "\n")
+			prog, err := swarmscript.ParseSwarmScript(source)
+			if err != nil {
+				ss.ErrorMsg = "Block-Modus: " + err.Error()
+				logger.Warn("SWARM", "Cannot switch to block mode: %s", err.Error())
+			} else {
+				ss.BlockRules = rulesToBlockRules(prog.Rules)
+				ss.BlockEditorActive = true
+				ss.ActiveDropdown = nil
+				ss.BlockScrollY = 0
+				ss.BlockValueEdit = false
+				ss.ErrorMsg = ""
+				ed.Focused = false
+				logger.Info("SWARM", "Switched to BLOCKS mode (%d rules)", len(ss.BlockRules))
+			}
+		}
+
 	case "editor":
-		ed.Focused = true
-		ss.BotCountEdit = false
-		ss.DropdownOpen = false
-		line, col := render.SwarmEditorClickToPos(mx, my, ed)
-		ed.CursorLine = line
-		ed.CursorCol = col
-		ed.BlinkTick = 0
+		if ss.BlockEditorActive {
+			g.handleBlockEditorClick(mx, my)
+		} else {
+			ed.Focused = true
+			ss.BotCountEdit = false
+			ss.DropdownOpen = false
+			line, col := render.SwarmEditorClickToPos(mx, my, ed)
+			ed.CursorLine = line
+			ed.CursorCol = col
+			ed.BlinkTick = 0
+		}
 
 	case "obstacles":
 		ss.ObstaclesOn = !ss.ObstaclesOn
@@ -969,6 +1028,13 @@ func (g *Game) handleBotCountInput() {
 
 func (g *Game) deploySwarmProgram() {
 	ss := g.sim.SwarmState
+
+	// If block editor is active, serialize blocks to text first
+	if ss.BlockEditorActive && len(ss.BlockRules) > 0 {
+		text := serializeBlockRules(ss.BlockRules)
+		ss.Editor.Lines = strings.Split(text, "\n")
+	}
+
 	source := strings.Join(ss.Editor.Lines, "\n")
 
 	prog, err := swarmscript.ParseSwarmScript(source)
@@ -1067,6 +1133,208 @@ func (g *Game) loadSwarmPreset(idx int) {
 		}
 		logger.Info("SWARM", "Preset '%s' loaded and deployed: %d rules", ss.ProgramName, len(prog.Rules))
 	}
+}
+
+// --- Block editor helpers ---
+
+func rulesToBlockRules(rules []swarmscript.Rule) []swarm.BlockRule {
+	var result []swarm.BlockRule
+	for _, r := range rules {
+		br := swarm.BlockRule{
+			ActionName:   swarmscript.ActionTypeName(r.Action.Type),
+			ActionParams: [3]int{r.Action.Param1, r.Action.Param2, r.Action.Param3},
+		}
+		for _, c := range r.Conditions {
+			br.Conditions = append(br.Conditions, swarm.BlockCondition{
+				SensorName: swarmscript.ConditionTypeName(c.Type),
+				OpStr:      swarmscript.OpString(c.Op),
+				Value:      c.Value,
+			})
+		}
+		if len(br.Conditions) == 0 {
+			br.Conditions = append(br.Conditions, swarm.BlockCondition{
+				SensorName: "true", OpStr: "==", Value: 1,
+			})
+		}
+		result = append(result, br)
+	}
+	return result
+}
+
+func serializeBlockRules(blocks []swarm.BlockRule) string {
+	var lines []string
+	for _, br := range blocks {
+		line := "IF "
+		for i, cond := range br.Conditions {
+			if i > 0 {
+				line += " AND "
+			}
+			if cond.SensorName == "true" {
+				line += "true"
+			} else {
+				line += fmt.Sprintf("%s %s %d", cond.SensorName, cond.OpStr, cond.Value)
+			}
+		}
+		line += " THEN " + br.ActionName
+		pc := swarmscript.ActionParamCountByName(br.ActionName)
+		if pc >= 1 {
+			line += fmt.Sprintf(" %d", br.ActionParams[0])
+		}
+		if pc >= 2 {
+			line += fmt.Sprintf(" %d", br.ActionParams[1])
+		}
+		if pc >= 3 {
+			line += fmt.Sprintf(" %d", br.ActionParams[2])
+		}
+		lines = append(lines, line)
+	}
+	return strings.Join(lines, "\n")
+}
+
+func (g *Game) handleBlockEditorClick(mx, my int) {
+	ss := g.sim.SwarmState
+
+	// If dropdown is open, check for dropdown click first
+	if ss.ActiveDropdown != nil {
+		idx := render.BlockDropdownHitTest(mx, my, ss.ActiveDropdown)
+		if idx >= 0 {
+			g.applyBlockDropdownSelection(idx)
+		}
+		ss.ActiveDropdown = nil
+		return
+	}
+
+	action, ri, ci := render.BlockEditorHitTest(mx, my, ss)
+	switch action {
+	case "sensor":
+		// Open sensor dropdown
+		items := flattenGroups(swarmscript.SensorGrouped)
+		ddX := blockEditorDropdownX("sensor")
+		ddY := my
+		ss.ActiveDropdown = &swarm.BlockDropdown{
+			RuleIdx: ri, CondIdx: ci, FieldType: "sensor",
+			X: ddX, Y: ddY, Items: items, HoverIdx: -1,
+		}
+
+	case "op":
+		items := []string{">", "<", "=="}
+		ss.ActiveDropdown = &swarm.BlockDropdown{
+			RuleIdx: ri, CondIdx: ci, FieldType: "op",
+			X: blockEditorDropdownX("op"), Y: my, Items: items, HoverIdx: -1,
+		}
+
+	case "value":
+		ss.BlockValueEdit = true
+		ss.BlockValueRuleIdx = ri
+		ss.BlockValueCondIdx = ci
+		ss.BlockValueText = fmt.Sprintf("%d", ss.BlockRules[ri].Conditions[ci].Value)
+		ss.Editor.Focused = false
+
+	case "action":
+		items := flattenGroups(swarmscript.ActionGrouped)
+		ss.ActiveDropdown = &swarm.BlockDropdown{
+			RuleIdx: ri, CondIdx: -1, FieldType: "action",
+			X: blockEditorDropdownX("action"), Y: my, Items: items, HoverIdx: -1,
+		}
+
+	case "delete":
+		if ri >= 0 && ri < len(ss.BlockRules) {
+			ss.BlockRules = append(ss.BlockRules[:ri], ss.BlockRules[ri+1:]...)
+		}
+
+	case "add_cond":
+		if ri >= 0 && ri < len(ss.BlockRules) {
+			ss.BlockRules[ri].Conditions = append(ss.BlockRules[ri].Conditions, swarm.BlockCondition{
+				SensorName: "true", OpStr: "==", Value: 1,
+			})
+		}
+
+	case "new_rule":
+		ss.BlockRules = append(ss.BlockRules, swarm.BlockRule{
+			Conditions:   []swarm.BlockCondition{{SensorName: "true", OpStr: "==", Value: 1}},
+			ActionName:   "FWD",
+			ActionParams: [3]int{},
+		})
+	}
+}
+
+func (g *Game) applyBlockDropdownSelection(idx int) {
+	ss := g.sim.SwarmState
+	dd := ss.ActiveDropdown
+	if dd == nil || idx < 0 || idx >= len(dd.Items) {
+		return
+	}
+	selected := dd.Items[idx]
+	ri := dd.RuleIdx
+	ci := dd.CondIdx
+
+	if ri < 0 || ri >= len(ss.BlockRules) {
+		return
+	}
+
+	switch dd.FieldType {
+	case "sensor":
+		if ci >= 0 && ci < len(ss.BlockRules[ri].Conditions) {
+			ss.BlockRules[ri].Conditions[ci].SensorName = selected
+		}
+	case "op":
+		if ci >= 0 && ci < len(ss.BlockRules[ri].Conditions) {
+			ss.BlockRules[ri].Conditions[ci].OpStr = selected
+		}
+	case "action":
+		ss.BlockRules[ri].ActionName = selected
+		ss.BlockRules[ri].ActionParams = [3]int{}
+	}
+}
+
+func flattenGroups(groups [][]string) []string {
+	var result []string
+	for _, group := range groups {
+		result = append(result, group...)
+	}
+	return result
+}
+
+func (g *Game) handleBlockValueInput() {
+	ss := g.sim.SwarmState
+
+	// Accept digits and minus
+	chars := ebiten.AppendInputChars(nil)
+	for _, ch := range chars {
+		if (ch >= '0' && ch <= '9') || (ch == '-' && len(ss.BlockValueText) == 0) {
+			ss.BlockValueText += string(ch)
+		}
+	}
+
+	// Backspace
+	if isKeyRepeating(ebiten.KeyBackspace) && len(ss.BlockValueText) > 0 {
+		ss.BlockValueText = ss.BlockValueText[:len(ss.BlockValueText)-1]
+	}
+
+	// Enter or Escape: commit
+	if inpututil.IsKeyJustPressed(ebiten.KeyEnter) || inpututil.IsKeyJustPressed(ebiten.KeyEscape) {
+		ri := ss.BlockValueRuleIdx
+		ci := ss.BlockValueCondIdx
+		if ri >= 0 && ri < len(ss.BlockRules) && ci >= 0 && ci < len(ss.BlockRules[ri].Conditions) {
+			val, err := strconv.Atoi(ss.BlockValueText)
+			if err == nil {
+				ss.BlockRules[ri].Conditions[ci].Value = val
+			}
+		}
+		ss.BlockValueEdit = false
+	}
+}
+
+func blockEditorDropdownX(fieldType string) int {
+	switch fieldType {
+	case "sensor":
+		return 4 + 20 // blockPadX + blockIfW
+	case "op":
+		return 4 + 20 + 72 + 2 // after sensor
+	case "action":
+		return 4 + 20 + 72 + 22 + 30 + 8 + 30 // after THEN
+	}
+	return 30
 }
 
 // isKeyRepeating returns true if a key was just pressed OR is being held long enough to repeat.

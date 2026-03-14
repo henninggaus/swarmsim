@@ -70,14 +70,36 @@ func DrawSwarmEditor(screen *ebiten.Image, ss *swarm.SwarmState) {
 	tickTextCache() // maintain text image cache
 	ed := ss.Editor
 
-	// Title bar
+	// Title bar with TEXT/BLOCKS toggle
 	ebitenutil.DebugPrintAt(screen, "SwarmScript Editor", 10, editorTitleY)
+	// TEXT/BLOCKS mode toggle
+	textBtnCol := ColorSwarmBtnDeploy
+	blockBtnCol := color.RGBA{50, 50, 65, 255}
+	if ss.BlockEditorActive {
+		textBtnCol = color.RGBA{50, 50, 65, 255}
+		blockBtnCol = ColorSwarmBtnDeploy
+	}
+	drawSwarmButton(screen, 210, editorTitleY, 45, 16, "TEXT", textBtnCol)
+	drawSwarmButton(screen, 258, editorTitleY, 60, 16, "BLOCKS", blockBtnCol)
 
 	// Button bar: [▼ PresetName] [DEPLOY] [RESET]
 	drawSwarmDropdownButton(screen, ss)
 	drawSwarmButton(screen, 195, editorBarY, 75, editorBarH, "DEPLOY", ColorSwarmBtnDeploy)
 	drawSwarmButton(screen, 275, editorBarY, 65, editorBarH, "RESET", ColorSwarmBtnReset)
 
+	// Code area: either text editor or block editor
+	if ss.BlockEditorActive {
+		DrawBlockEditor(screen, ss)
+	} else {
+		drawTextEditor(screen, ss, ed)
+	}
+
+	// Shared bottom section (error, status, toggles, stats, dropdown)
+	drawSwarmEditorBottom(screen, ss, ed)
+}
+
+// drawTextEditor renders the traditional text code editor.
+func drawTextEditor(screen *ebiten.Image, ss *swarm.SwarmState, ed *swarm.EditorState) {
 	// Code editor area background
 	vector.DrawFilledRect(screen, 0, float32(editorCodeY), float32(editorPanelW), float32(editorCodeH), ColorSwarmEditorBg, false)
 
@@ -162,6 +184,10 @@ func DrawSwarmEditor(screen *ebiten.Image, ss *swarm.SwarmState) {
 		}
 	}
 
+}
+
+// drawSwarmEditorBottom renders the shared bottom part (error, status, toggles, stats).
+func drawSwarmEditorBottom(screen *ebiten.Image, ss *swarm.SwarmState, ed *swarm.EditorState) {
 	// Error message
 	if ss.ErrorMsg != "" {
 		errText := ss.ErrorMsg
@@ -615,6 +641,16 @@ func swarmTokenColor(t swarmscript.SwarmTokenType) color.RGBA {
 func SwarmEditorHitTest(mx, my int) string {
 	if mx > editorPanelW {
 		return ""
+	}
+
+	// TEXT/BLOCKS toggle buttons (in title bar area)
+	if my >= editorTitleY && my < editorTitleY+16 {
+		if mx >= 210 && mx < 255 {
+			return "text_mode"
+		}
+		if mx >= 258 && mx < 318 {
+			return "block_mode"
+		}
 	}
 
 	// Dropdown button
