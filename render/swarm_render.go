@@ -176,6 +176,12 @@ func (r *Renderer) DrawSwarmMode(screen *ebiten.Image, s *simulation.Simulation,
 			selCol := color.RGBA{ColorSwarmSelected.R, ColorSwarmSelected.G, ColorSwarmSelected.B, pulseAlpha}
 			vector.StrokeCircle(a, bx, by, radius+pulse+2, 2, selCol, false)
 		}
+		if i == ss.CompareBot {
+			pulse := float32(2.0 + 2.0*math.Sin(float64(ss.Tick)*0.12+math.Pi))
+			pulseAlpha := uint8(150 + int(50*math.Sin(float64(ss.Tick)*0.08+math.Pi)))
+			cmpCol := color.RGBA{0, 220, 255, pulseAlpha} // cyan ring
+			vector.StrokeCircle(a, bx, by, radius+pulse+2, 2, cmpCol, false)
+		}
 	}
 
 	// Ghost bots (wrap mode only)
@@ -248,8 +254,10 @@ func (r *Renderer) DrawSwarmMode(screen *ebiten.Image, s *simulation.Simulation,
 		drawDeliveryLegend(screen, ss, sw)
 	}
 
-	// Selected bot info overlay
-	if ss.SelectedBot >= 0 && ss.SelectedBot < len(ss.Bots) {
+	// Selected bot info overlay / comparison panel
+	if ss.CompareBot >= 0 && ss.CompareBot < len(ss.Bots) && ss.SelectedBot >= 0 && ss.SelectedBot < len(ss.Bots) {
+		drawBotComparisonPanel(screen, ss)
+	} else if ss.SelectedBot >= 0 && ss.SelectedBot < len(ss.Bots) {
 		drawSelectedBotInfo(screen, ss)
 	}
 
@@ -385,6 +393,100 @@ func drawSelectedBotInfo(screen *ebiten.Image, ss *swarm.SwarmState) {
 	printColoredAt(screen, fmt.Sprintf("Msg TX:%d RX:%d", bot.Stats.MessagesSent, bot.Stats.MessagesReceived), lx, ly, dimCol)
 	ly += lineH
 	printColoredAt(screen, fmt.Sprintf("Stuck:%d Idle:%d", bot.Stats.AntiStuckCount, bot.Stats.TicksIdle), lx, ly, dimCol)
+}
+
+// drawBotComparisonPanel renders a side-by-side comparison of two bots.
+func drawBotComparisonPanel(screen *ebiten.Image, ss *swarm.SwarmState) {
+	botA := &ss.Bots[ss.SelectedBot]
+	botB := &ss.Bots[ss.CompareBot]
+
+	px := 830
+	py := 60
+	pw := 430
+	ph := 300
+	headerCol := color.RGBA{0, 220, 255, 255}
+	dimCol := color.RGBA{140, 140, 160, 255}
+	greenCol := color.RGBA{80, 255, 80, 255}
+
+	// Background
+	vector.DrawFilledRect(screen, float32(px), float32(py), float32(pw), float32(ph), ColorSwarmInfoBg, false)
+	vector.StrokeRect(screen, float32(px), float32(py), float32(pw), float32(ph), 1, ColorSwarmEditorSep, false)
+
+	lx := px + 5
+	ly := py + 5
+	colA := lx + 100  // column for Bot A values
+	colB := lx + 270  // column for Bot B values
+
+	// Title row
+	printColoredAt(screen, "Comparison", lx, ly, headerCol)
+	// LED swatches next to bot labels
+	printColoredAt(screen, fmt.Sprintf("Bot #%d", ss.SelectedBot), colA, ly, ColorSwarmSelected)
+	ledA := color.RGBA{botA.LEDColor[0], botA.LEDColor[1], botA.LEDColor[2], 255}
+	vector.DrawFilledRect(screen, float32(colA+55), float32(ly+2), 8, 8, ledA, false)
+	printColoredAt(screen, fmt.Sprintf("Bot #%d", ss.CompareBot), colB, ly, color.RGBA{0, 220, 255, 255})
+	ledB := color.RGBA{botB.LEDColor[0], botB.LEDColor[1], botB.LEDColor[2], 255}
+	vector.DrawFilledRect(screen, float32(colB+55), float32(ly+2), 8, 8, ledB, false)
+	ly += lineH + 4
+
+	// Separator
+	vector.StrokeLine(screen, float32(px+3), float32(ly), float32(px+pw-3), float32(ly), 1, color.RGBA{60, 60, 80, 200}, false)
+	ly += 4
+
+	// Comparison row helper
+	compareRow := func(label string, valA, valB float64, higherIsBetter bool) {
+		printColoredAt(screen, label, lx, ly, dimCol)
+		aStr := fmt.Sprintf("%.0f", valA)
+		bStr := fmt.Sprintf("%.0f", valB)
+		aCol := dimCol
+		bCol := dimCol
+		if higherIsBetter {
+			if valA > valB {
+				aCol = greenCol
+			} else if valB > valA {
+				bCol = greenCol
+			}
+		} else {
+			if valA < valB {
+				aCol = greenCol
+			} else if valB < valA {
+				bCol = greenCol
+			}
+		}
+		printColoredAt(screen, aStr, colA, ly, aCol)
+		printColoredAt(screen, bStr, colB, ly, bCol)
+		ly += lineH
+	}
+
+	// Stats rows
+	compareRow("Distance", botA.Stats.TotalDistance, botB.Stats.TotalDistance, true)
+	compareRow("Pickups", float64(botA.Stats.TotalPickups), float64(botB.Stats.TotalPickups), true)
+	compareRow("Deliveries", float64(botA.Stats.TotalDeliveries), float64(botB.Stats.TotalDeliveries), true)
+	compareRow("Correct", float64(botA.Stats.CorrectDeliveries), float64(botB.Stats.CorrectDeliveries), true)
+	compareRow("Wrong", float64(botA.Stats.WrongDeliveries), float64(botB.Stats.WrongDeliveries), false)
+	compareRow("Msgs TX", float64(botA.Stats.MessagesSent), float64(botB.Stats.MessagesSent), true)
+	compareRow("Msgs RX", float64(botA.Stats.MessagesReceived), float64(botB.Stats.MessagesReceived), true)
+	compareRow("Stuck", float64(botA.Stats.AntiStuckCount), float64(botB.Stats.AntiStuckCount), false)
+	compareRow("Idle", float64(botA.Stats.TicksIdle), float64(botB.Stats.TicksIdle), false)
+	compareRow("Carrying", float64(botA.CarryingPkg+1), float64(botB.CarryingPkg+1), true)
+	ly += 2
+
+	// Separator
+	vector.StrokeLine(screen, float32(px+3), float32(ly), float32(px+pw-3), float32(ly), 1, color.RGBA{60, 60, 80, 200}, false)
+	ly += 4
+
+	// Position info
+	printColoredAt(screen, "Position", lx, ly, headerCol)
+	printColoredAt(screen, fmt.Sprintf("(%.0f,%.0f)", botA.X, botA.Y), colA, ly, dimCol)
+	printColoredAt(screen, fmt.Sprintf("(%.0f,%.0f)", botB.X, botB.Y), colB, ly, dimCol)
+	ly += lineH
+
+	// State info
+	printColoredAt(screen, "State", lx, ly, headerCol)
+	printColoredAt(screen, fmt.Sprintf("S:%d C:%d", botA.State, botA.Counter), colA, ly, dimCol)
+	printColoredAt(screen, fmt.Sprintf("S:%d C:%d", botB.State, botB.Counter), colB, ly, dimCol)
+	ly += lineH + 2
+
+	printColoredAt(screen, "[Shift+Click to compare, Click to clear]", px+5, py+ph-lineH-2, color.RGBA{80, 80, 100, 200})
 }
 
 // deliveryColor returns the RGBA color for a delivery color ID (1-4).

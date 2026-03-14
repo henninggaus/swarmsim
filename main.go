@@ -865,16 +865,26 @@ func (g *Game) handleSwarmClick(mx, my int) {
 					bestIdx = i
 				}
 			}
-			ss.SelectedBot = bestIdx
-			// Cancel follow-cam if we selected a different bot
-			if ss.FollowCamBot >= 0 && bestIdx != ss.FollowCamBot {
-				ss.FollowCamBot = -1
-			}
-			if bestIdx >= 0 {
-				logger.Info("SWARM", "Selected bot #%d", bestIdx)
+
+			// Shift+click: set compare bot (if a primary bot is already selected)
+			shiftHeld := ebiten.IsKeyPressed(ebiten.KeyShift)
+			if shiftHeld && bestIdx >= 0 && ss.SelectedBot >= 0 && bestIdx != ss.SelectedBot {
+				ss.CompareBot = bestIdx
+				logger.Info("SWARM", "Compare bot #%d vs #%d", ss.SelectedBot, bestIdx)
+			} else {
+				ss.SelectedBot = bestIdx
+				ss.CompareBot = -1 // normal click clears comparison
+				// Cancel follow-cam if we selected a different bot
+				if ss.FollowCamBot >= 0 && bestIdx != ss.FollowCamBot {
+					ss.FollowCamBot = -1
+				}
+				if bestIdx >= 0 {
+					logger.Info("SWARM", "Selected bot #%d", bestIdx)
+				}
 			}
 		} else {
 			ss.SelectedBot = -1
+			ss.CompareBot = -1
 		}
 	}
 }

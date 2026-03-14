@@ -20,6 +20,7 @@ func NewSwarmState(rng *rand.Rand, botCount int) *SwarmState {
 		ProgramName:  "Aggregation",
 		BotCountText: fmt.Sprintf("%d", botCount),
 		SelectedBot:  -1,
+		CompareBot:   -1,
 		FollowCamBot: -1,
 		SwarmCamX:    SwarmArenaSize / 2,
 		SwarmCamY:    SwarmArenaSize / 2,

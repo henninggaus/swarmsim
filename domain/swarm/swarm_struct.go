@@ -228,6 +228,7 @@ type SwarmState struct {
 
 	// Selected bot for info overlay
 	SelectedBot int // -1 = none
+	CompareBot  int // -1 = none, Shift+click to set second bot for comparison
 
 	// Follow-cam
 	FollowCamBot int     // bot index being followed (-1 = off)
