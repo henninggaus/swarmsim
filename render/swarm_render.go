@@ -217,6 +217,11 @@ func (r *Renderer) DrawSwarmMode(screen *ebiten.Image, s *simulation.Simulation,
 		drawSwarmParticles(a, r.SwarmParticles, 0, 0)
 	}
 
+	// Selected bot visual overlays (on arena, before blit)
+	if ss.SelectedBot >= 0 && ss.SelectedBot < len(ss.Bots) {
+		drawSelectedBotOverlays(a, ss)
+	}
+
 	// --- Blit arena image to screen with camera transform ---
 	viewportX := 415.0
 	viewportY := 50.0
@@ -742,3 +747,55 @@ func SwarmScreenToArena(sx, sy int, ss *swarm.SwarmState) (float64, float64, boo
 	inside := wx >= 0 && wx <= swarm.SwarmArenaSize && wy >= 0 && wy <= swarm.SwarmArenaSize
 	return wx, wy, inside
 }
+
+// drawSelectedBotOverlays draws visual tracking overlays for the selected bot on the arena.
+func drawSelectedBotOverlays(target *ebiten.Image, ss *swarm.SwarmState) {
+	bot := &ss.Bots[ss.SelectedBot]
+	bx := float32(bot.X)
+	by := float32(bot.Y)
+
+	// Sensor radius circle (cyan, semi-transparent)
+	vector.StrokeCircle(target, bx, by, float32(swarm.SwarmSensorRange), 1, color.RGBA{0, 200, 255, 40}, false)
+
+	// Comm radius circle (yellow, semi-transparent)
+	vector.StrokeCircle(target, bx, by, float32(swarm.SwarmCommRange), 1, color.RGBA{255, 255, 0, 30}, false)
+
+	// Line to nearest neighbor (white)
+	if bot.NearestIdx >= 0 && bot.NearestIdx < len(ss.Bots) {
+		near := &ss.Bots[bot.NearestIdx]
+		vector.StrokeLine(target, bx, by, float32(near.X), float32(near.Y), 1, color.RGBA{255, 255, 255, 100}, false)
+	}
+
+	// Line to follow target (green, thick)
+	if bot.FollowTargetIdx >= 0 && bot.FollowTargetIdx < len(ss.Bots) {
+		leader := &ss.Bots[bot.FollowTargetIdx]
+		vector.StrokeLine(target, bx, by, float32(leader.X), float32(leader.Y), 2.5, color.RGBA{0, 255, 0, 180}, false)
+	}
+
+	// Line from follower (red, thick)
+	if bot.FollowerIdx >= 0 && bot.FollowerIdx < len(ss.Bots) {
+		follower := &ss.Bots[bot.FollowerIdx]
+		vector.StrokeLine(target, bx, by, float32(follower.X), float32(follower.Y), 2.5, color.RGBA{255, 0, 0, 180}, false)
+	}
+
+	// Highlighted delivery route (carrying bot -> matching dropoff)
+	if ss.DeliveryOn && bot.CarryingPkg >= 0 && bot.CarryingPkg < len(ss.Packages) {
+		pkg := &ss.Packages[bot.CarryingPkg]
+		for si := range ss.Stations {
+			st := &ss.Stations[si]
+			if !st.IsPickup && st.Color == pkg.Color {
+				col := deliveryColor(pkg.Color)
+				col.A = 150
+				drawDashedLine(target, bx, by, float32(st.X), float32(st.Y), 8, 4, 2, col)
+				break
+			}
+		}
+	}
+
+	// "#N" label above bot
+	label := fmt.Sprintf("#%d", ss.SelectedBot)
+	lx := int(bx) - len(label)*charW/2
+	ly := int(by) - int(swarm.SwarmBotRadius) - 16
+	printColoredAt(target, label, lx, ly, color.RGBA{255, 255, 0, 220})
+}
+
