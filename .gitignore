@@ -1,0 +1,24 @@
+# Build artifacts
+swarmsim
+swarmsim.exe
+swarmsim-linux
+swarmsim.wasm
+wasm_exec.js
+
+# Test/coverage
+coverage.out
+coverage.html
+cpu.prof
+
+# Screenshots & recordings
+*.png
+*.gif
+
+# IDE / tools
+.claude/
+.vscode/
+.idea/
+
+# OS files
+Thumbs.db
+.DS_Store
