@@ -10,6 +10,7 @@ import (
 	"swarmsim/domain/swarm"
 	"swarmsim/engine/simulation"
 	"swarmsim/engine/swarmscript"
+	"swarmsim/logger"
 	"swarmsim/render"
 
 	"github.com/hajimehoshi/ebiten/v2"
@@ -240,7 +241,7 @@ func (g *Game) handleGlobalInput() {
 	scenarioKeys := []ebiten.Key{ebiten.KeyF1, ebiten.KeyF2, ebiten.KeyF3, ebiten.KeyF4, ebiten.KeyF5}
 	for i, key := range scenarioKeys {
 		if inpututil.IsKeyJustPressed(key) && i < len(g.scenarios) {
-			fmt.Printf("[KEY] F%d pressed -> Loading scenario: %s\n", i+1, g.scenarios[i].Name)
+			logger.Info("KEY", "F%d pressed -> Loading scenario: %s", i+1, g.scenarios[i].Name)
 			g.sim.LoadScenario(g.scenarios[i])
 			g.camera.X = g.sim.Cfg.ArenaWidth / 2
 			g.camera.Y = g.sim.Cfg.ArenaHeight / 2
@@ -251,7 +252,7 @@ func (g *Game) handleGlobalInput() {
 
 	// F6: load truck scenario
 	if inpututil.IsKeyJustPressed(ebiten.KeyF6) {
-		fmt.Println("[KEY] F6 pressed -> Loading truck scenario: LKW-ENTLADUNG")
+		logger.Info("KEY", "F6 pressed -> Loading truck scenario: LKW-ENTLADUNG")
 		g.sim.LoadTruckScenario()
 		g.camera.X = g.sim.Cfg.ArenaWidth / 2
 		g.camera.Y = g.sim.Cfg.ArenaHeight / 2
@@ -261,7 +262,7 @@ func (g *Game) handleGlobalInput() {
 
 	// F7: load swarm scenario
 	if inpututil.IsKeyJustPressed(ebiten.KeyF7) {
-		fmt.Println("[KEY] F7 pressed -> Loading swarm scenario: PROGRAMMABLE SWARM")
+		logger.Info("KEY", "F7 pressed -> Loading swarm scenario: PROGRAMMABLE SWARM")
 		g.sim.LoadSwarmScenario()
 		g.tickAcc = 0
 	}
@@ -287,7 +288,7 @@ func (g *Game) handleGlobalInput() {
 			} else {
 				g.renderer.Sound.StopAmbient()
 			}
-			fmt.Printf("[KEY] S pressed -> Sound=%v\n", g.renderer.Sound.Enabled)
+			logger.Info("KEY", "S pressed -> Sound=%v", g.renderer.Sound.Enabled)
 		}
 	}
 
@@ -341,55 +342,55 @@ func (g *Game) handleInput() {
 	// F: toggle comm radius
 	if inpututil.IsKeyJustPressed(ebiten.KeyF) {
 		g.sim.ShowCommRadius = !g.sim.ShowCommRadius
-		fmt.Printf("[KEY] F pressed -> ShowCommRadius=%v\n", g.sim.ShowCommRadius)
+		logger.Info("KEY", "F pressed -> ShowCommRadius=%v", g.sim.ShowCommRadius)
 	}
 
 	// G: toggle sensor radius
 	if inpututil.IsKeyJustPressed(ebiten.KeyG) {
 		g.sim.ShowSensorRadius = !g.sim.ShowSensorRadius
-		fmt.Printf("[KEY] G pressed -> ShowSensorRadius=%v\n", g.sim.ShowSensorRadius)
+		logger.Info("KEY", "G pressed -> ShowSensorRadius=%v", g.sim.ShowSensorRadius)
 	}
 
 	// D: toggle debug comm lines
 	if inpututil.IsKeyJustPressed(ebiten.KeyD) {
 		g.sim.ShowDebugComm = !g.sim.ShowDebugComm
-		fmt.Printf("[KEY] D pressed -> ShowDebugComm=%v\n", g.sim.ShowDebugComm)
+		logger.Info("KEY", "D pressed -> ShowDebugComm=%v", g.sim.ShowDebugComm)
 	}
 
 	// T: toggle trail rendering
 	if inpututil.IsKeyJustPressed(ebiten.KeyT) {
 		g.renderer.ShowTrails = !g.renderer.ShowTrails
-		fmt.Printf("[KEY] T pressed -> ShowTrails=%v\n", g.renderer.ShowTrails)
+		logger.Info("KEY", "T pressed -> ShowTrails=%v", g.renderer.ShowTrails)
 	}
 
 	// M: toggle minimap
 	if inpututil.IsKeyJustPressed(ebiten.KeyM) {
 		g.renderer.ShowMinimap = !g.renderer.ShowMinimap
-		fmt.Printf("[KEY] M pressed -> ShowMinimap=%v\n", g.renderer.ShowMinimap)
+		logger.Info("KEY", "M pressed -> ShowMinimap=%v", g.renderer.ShowMinimap)
 	}
 
 	// P: cycle pheromone visualization (OFF -> FOUND -> ALL -> OFF)
 	if inpututil.IsKeyJustPressed(ebiten.KeyP) {
 		g.sim.PheromoneVizMode = (g.sim.PheromoneVizMode + 1) % 3
 		modes := []string{"OFF", "FOUND", "ALL"}
-		fmt.Printf("[KEY] P pressed -> PheromoneVizMode=%s (%d)\n", modes[g.sim.PheromoneVizMode], g.sim.PheromoneVizMode)
+		logger.Info("KEY", "P pressed -> PheromoneVizMode=%s (%d)", modes[g.sim.PheromoneVizMode], g.sim.PheromoneVizMode)
 	}
 
 	// E: force end generation (evolve)
 	if inpututil.IsKeyJustPressed(ebiten.KeyE) {
 		g.sim.ForceEndGeneration()
-		fmt.Printf("[KEY] E pressed -> Generation=%d Best=%.1f Avg=%.1f\n", g.sim.Generation, g.sim.BestFitness, g.sim.AvgFitness)
+		logger.Info("KEY", "E pressed -> Generation=%d Best=%.1f Avg=%.1f", g.sim.Generation, g.sim.BestFitness, g.sim.AvgFitness)
 	}
 
 	// V: toggle genome overlay
 	if inpututil.IsKeyJustPressed(ebiten.KeyV) {
 		g.sim.ShowGenomeOverlay = !g.sim.ShowGenomeOverlay
-		fmt.Printf("[KEY] V pressed -> ShowGenomeOverlay=%v (SelectedBot=%d)\n", g.sim.ShowGenomeOverlay, g.sim.SelectedBotID)
+		logger.Info("KEY", "V pressed -> ShowGenomeOverlay=%v (SelectedBot=%d)", g.sim.ShowGenomeOverlay, g.sim.SelectedBotID)
 	}
 
 	// N: regenerate truck (only in truck mode)
 	if inpututil.IsKeyJustPressed(ebiten.KeyN) && g.sim.TruckMode {
-		fmt.Println("[KEY] N pressed -> Generating new truck")
+		logger.Info("KEY", "N pressed -> Generating new truck")
 		g.sim.RegenerateTruck()
 	}
 }
@@ -524,12 +525,12 @@ func (g *Game) handleSwarmInput() {
 		if inside {
 			if ss.Light.Active {
 				ss.Light.Active = false
-				fmt.Println("[SWARM] Light OFF")
+				logger.Info("SWARM", "Light OFF")
 			} else {
 				ss.Light.Active = true
 				ss.Light.X = awx
 				ss.Light.Y = awy
-				fmt.Printf("[SWARM] Light ON at (%.0f, %.0f)\n", awx, awy)
+				logger.Info("SWARM", "Light ON at (%.0f, %.0f)", awx, awy)
 			}
 		}
 	}
@@ -537,19 +538,19 @@ func (g *Game) handleSwarmInput() {
 	// T key: toggle trails (when editor not focused)
 	if inpututil.IsKeyJustPressed(ebiten.KeyT) && !ed.Focused && !ss.BotCountEdit {
 		ss.ShowTrails = !ss.ShowTrails
-		fmt.Printf("[SWARM] Trails: %v\n", ss.ShowTrails)
+		logger.Info("SWARM", "Trails: %v", ss.ShowTrails)
 	}
 
 	// C key: toggle delivery route lines (when editor not focused)
 	if inpututil.IsKeyJustPressed(ebiten.KeyC) && !ed.Focused && !ss.BotCountEdit {
 		ss.ShowRoutes = !ss.ShowRoutes
-		fmt.Printf("[SWARM] Routes: %v\n", ss.ShowRoutes)
+		logger.Info("SWARM", "Routes: %v", ss.ShowRoutes)
 	}
 
 	// M key: toggle minimap (when editor not focused)
 	if inpututil.IsKeyJustPressed(ebiten.KeyM) && !ed.Focused && !ss.BotCountEdit {
 		g.renderer.ShowMinimap = !g.renderer.ShowMinimap
-		fmt.Printf("[SWARM] Minimap: %v\n", g.renderer.ShowMinimap)
+		logger.Info("SWARM", "Minimap: %v", g.renderer.ShowMinimap)
 	}
 
 	// Editor keyboard input (when editor is focused)
@@ -581,7 +582,7 @@ func (g *Game) handleSwarmClick(mx, my int) {
 
 	case "reset":
 		ss.ResetBots()
-		fmt.Printf("[SWARM] RESET — %d bots scattered\n", ss.BotCount)
+		logger.Info("SWARM", "RESET — %d bots scattered", ss.BotCount)
 		ss.DropdownOpen = false
 		ss.BotCountEdit = false
 
@@ -605,10 +606,10 @@ func (g *Game) handleSwarmClick(mx, my int) {
 			ss.MazeOn = false
 			ss.MazeWalls = nil
 			swarm.GenerateSwarmObstacles(ss)
-			fmt.Printf("[SWARM] Obstacles ON (%d obstacles)\n", len(ss.Obstacles))
+			logger.Info("SWARM", "Obstacles ON (%d obstacles)", len(ss.Obstacles))
 		} else {
 			ss.Obstacles = nil
-			fmt.Println("[SWARM] Obstacles OFF")
+			logger.Info("SWARM", "Obstacles OFF")
 		}
 		ed.Focused = false
 		ss.BotCountEdit = false
@@ -619,10 +620,10 @@ func (g *Game) handleSwarmClick(mx, my int) {
 			ss.ObstaclesOn = false
 			ss.Obstacles = nil
 			swarm.GenerateSwarmMaze(ss)
-			fmt.Printf("[SWARM] Maze ON (%d walls)\n", len(ss.MazeWalls))
+			logger.Info("SWARM", "Maze ON (%d walls)", len(ss.MazeWalls))
 		} else {
 			ss.MazeWalls = nil
-			fmt.Println("[SWARM] Maze OFF")
+			logger.Info("SWARM", "Maze OFF")
 		}
 		ed.Focused = false
 		ss.BotCountEdit = false
@@ -630,12 +631,12 @@ func (g *Game) handleSwarmClick(mx, my int) {
 	case "light":
 		if ss.Light.Active {
 			ss.Light.Active = false
-			fmt.Println("[SWARM] Light OFF (button)")
+			logger.Info("SWARM", "Light OFF (button)")
 		} else {
 			ss.Light.Active = true
 			ss.Light.X = ss.ArenaW / 2
 			ss.Light.Y = ss.ArenaH / 2
-			fmt.Println("[SWARM] Light ON at arena center")
+			logger.Info("SWARM", "Light ON at arena center")
 		}
 		ed.Focused = false
 		ss.BotCountEdit = false
@@ -646,7 +647,7 @@ func (g *Game) handleSwarmClick(mx, my int) {
 		if ss.WrapMode {
 			mode = "WRAP"
 		}
-		fmt.Printf("[SWARM] Walls mode: %s\n", mode)
+		logger.Info("SWARM", "Walls mode: %s", mode)
 		ed.Focused = false
 		ss.BotCountEdit = false
 
@@ -666,7 +667,7 @@ func (g *Game) handleSwarmClick(mx, my int) {
 			for i := range ss.Bots {
 				ss.Bots[i].CarryingPkg = -1
 			}
-			fmt.Printf("[SWARM] Delivery ON (%d stations, %d packages)\n", len(ss.Stations), len(ss.Packages))
+			logger.Info("SWARM", "Delivery ON (%d stations, %d packages)", len(ss.Stations), len(ss.Packages))
 		} else {
 			ss.Stations = nil
 			ss.Packages = nil
@@ -675,7 +676,7 @@ func (g *Game) handleSwarmClick(mx, my int) {
 			for i := range ss.Bots {
 				ss.Bots[i].CarryingPkg = -1
 			}
-			fmt.Println("[SWARM] Delivery OFF")
+			logger.Info("SWARM", "Delivery OFF")
 		}
 		ed.Focused = false
 		ss.BotCountEdit = false
@@ -702,7 +703,7 @@ func (g *Game) handleSwarmClick(mx, my int) {
 			}
 			ss.SelectedBot = bestIdx
 			if bestIdx >= 0 {
-				fmt.Printf("[SWARM] Selected bot #%d\n", bestIdx)
+				logger.Info("SWARM", "Selected bot #%d", bestIdx)
 			}
 		} else {
 			ss.SelectedBot = -1
@@ -893,7 +894,7 @@ func (g *Game) handleBotCountInput() {
 		count, err := strconv.Atoi(ss.BotCountText)
 		if err == nil && count >= swarm.SwarmMinBots && count <= swarm.SwarmMaxBots {
 			ss.RespawnBots(count)
-			fmt.Printf("[SWARM] Bot count changed to %d\n", count)
+			logger.Info("SWARM", "Bot count changed to %d", count)
 		} else {
 			// Reset to current count
 			ss.BotCountText = fmt.Sprintf("%d", ss.BotCount)
@@ -912,7 +913,7 @@ func (g *Game) deploySwarmProgram() {
 		ss.ErrorMsg = err.Error()
 		// Try to extract line number from error
 		ss.ErrorLine = 0
-		fmt.Printf("[SWARM] Parse error: %s\n", err.Error())
+		logger.Warn("SWARM", "Parse error: %s", err.Error())
 		return
 	}
 
@@ -929,7 +930,7 @@ func (g *Game) deploySwarmProgram() {
 		ss.Bots[i].BlinkTimer = 30
 	}
 
-	fmt.Printf("[SWARM] Program deployed: %d rules\n", len(prog.Rules))
+	logger.Info("SWARM", "Program deployed: %d rules", len(prog.Rules))
 }
 
 func (g *Game) loadSwarmPreset(idx int) {
@@ -960,7 +961,7 @@ func (g *Game) loadSwarmPreset(idx int) {
 		for i := range ss.Bots {
 			ss.Bots[i].BlinkTimer = 30
 		}
-		fmt.Printf("[SWARM] Preset '%s' loaded and deployed: %d rules\n", ss.ProgramName, len(prog.Rules))
+		logger.Info("SWARM", "Preset '%s' loaded and deployed: %d rules", ss.ProgramName, len(prog.Rules))
 	}
 }
 
@@ -1045,6 +1046,10 @@ func (g *Game) Layout(outsideWidth, outsideHeight int) (int, int) {
 }
 
 func main() {
+	defer logger.CloseLog()
+
+	logger.Info("INIT", "SwarmSim starting")
+
 	ebiten.SetWindowSize(screenW, screenH)
 	ebiten.SetWindowTitle("Schwarm-Robotik-Simulator")
 	ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
@@ -1055,4 +1060,5 @@ func main() {
 		log.Fatal(err)
 	}
 	StopProfile() // ensure profiling stops on clean exit
+	logger.Info("INIT", "SwarmSim exiting cleanly")
 }

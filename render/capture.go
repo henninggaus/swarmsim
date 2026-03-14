@@ -9,6 +9,7 @@ import (
 	"image/gif"
 	"image/png"
 	"os"
+	"swarmsim/logger"
 	"time"
 
 	"github.com/hajimehoshi/ebiten/v2"
@@ -39,17 +40,17 @@ func CaptureScreenshot(screen *ebiten.Image) string {
 	fname := fmt.Sprintf("swarmsim_%s.png", time.Now().Format("20060102_150405"))
 	f, err := os.Create(fname)
 	if err != nil {
-		fmt.Println("[SCREENSHOT] Error creating file:", err)
+		logger.Error("SCREENSHOT", "Error creating file: %v", err)
 		return ""
 	}
 	defer f.Close()
 
 	if err := png.Encode(f, img); err != nil {
-		fmt.Println("[SCREENSHOT] Error encoding PNG:", err)
+		logger.Error("SCREENSHOT", "Error encoding PNG: %v", err)
 		return ""
 	}
 
-	fmt.Printf("[SCREENSHOT] Saved: %s (%dx%d)\n", fname, w, h)
+	logger.Info("SCREENSHOT", "Saved: %s (%dx%d)", fname, w, h)
 	return fname
 }
 
@@ -62,7 +63,7 @@ func StartRecording(r *Renderer) {
 	r.RecRawFrames = make([]*image.RGBA, 0, gifMaxFrames)
 	r.RecFrameCount = 0
 	r.RecSkipCounter = 0
-	fmt.Println("[GIF] Recording STARTED")
+	logger.Info("GIF", "Recording STARTED")
 }
 
 // StopRecording stops capturing and encodes all frames in a background goroutine.
@@ -71,7 +72,7 @@ func StopRecording(r *Renderer) {
 	r.Recording = false
 
 	if len(r.RecRawFrames) == 0 {
-		fmt.Println("[GIF] No frames captured")
+		logger.Warn("GIF", "No frames captured")
 		return
 	}
 
@@ -90,7 +91,7 @@ func StopRecording(r *Renderer) {
 
 // encodeGIF quantizes raw RGBA frames and writes the GIF file.
 func encodeGIF(frames []*image.RGBA) string {
-	fmt.Printf("[GIF] Encoding %d frames...\n", len(frames))
+	logger.Info("GIF", "Encoding %d frames...", len(frames))
 
 	palettedFrames := make([]*image.Paletted, len(frames))
 	delays := make([]int, len(frames))
@@ -106,7 +107,7 @@ func encodeGIF(frames []*image.RGBA) string {
 	fname := fmt.Sprintf("swarmsim_%s.gif", time.Now().Format("20060102_150405"))
 	f, err := os.Create(fname)
 	if err != nil {
-		fmt.Println("[GIF] Error creating file:", err)
+		logger.Error("GIF", "Error creating file: %v", err)
 		return ""
 	}
 	defer f.Close()
@@ -117,11 +118,11 @@ func encodeGIF(frames []*image.RGBA) string {
 	}
 
 	if err := gif.EncodeAll(f, anim); err != nil {
-		fmt.Println("[GIF] Error encoding GIF:", err)
+		logger.Error("GIF", "Error encoding GIF: %v", err)
 		return ""
 	}
 
-	fmt.Printf("[GIF] Saved: %s (%d frames)\n", fname, len(frames))
+	logger.Info("GIF", "Saved: %s (%d frames)", fname, len(frames))
 	return fname
 }
 
