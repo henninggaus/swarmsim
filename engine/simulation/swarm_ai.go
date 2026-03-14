@@ -131,6 +131,11 @@ func (s *Simulation) updateSwarmMode() {
 		}
 	}
 
+	// Phase 4.6: Truck system updates
+	if ss.TruckToggle && ss.TruckState != nil {
+		swarm.UpdateSwarmTruck(ss)
+	}
+
 	// Phase 4.9: Accumulate lifetime stats (before StuckPrevX/Y is overwritten)
 	for i := range ss.Bots {
 		bot := &ss.Bots[i]

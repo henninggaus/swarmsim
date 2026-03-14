@@ -250,8 +250,8 @@ func drawSwarmEditorBottom(screen *ebiten.Image, ss *swarm.SwarmState, ed *swarm
 	}
 	drawSwarmButton(screen, 175, editorToggle2Y, toggleBtnW, toggleBtnH, wallLabel, wallColor)
 
-	// Toggle buttons row 3: [Delivery: OFF/ON/—]
-	if ss.ProgramName != "Custom" && !ss.IsDeliveryProgram {
+	// Toggle buttons row 3: [Delivery: OFF/ON/—] [Trucks: OFF/ON/—]
+	if ss.ProgramName != "Custom" && !ss.IsDeliveryProgram && !ss.IsTruckProgram {
 		// Non-delivery preset: grayed out
 		drawSwarmButton(screen, 5, editorToggle3Y, toggleBtnW, toggleBtnH, "Delivery: \u2014", color.RGBA{60, 60, 70, 128})
 	} else {
@@ -262,6 +262,19 @@ func drawSwarmEditorBottom(screen *ebiten.Image, ss *swarm.SwarmState, ed *swarm
 			delivColor = color.RGBA{200, 120, 40, 255} // orange
 		}
 		drawSwarmButton(screen, 5, editorToggle3Y, toggleBtnW, toggleBtnH, delivLabel, delivColor)
+	}
+
+	// Trucks toggle (beside delivery)
+	if ss.ProgramName != "Custom" && !ss.IsTruckProgram {
+		drawSwarmButton(screen, 175, editorToggle3Y, toggleBtnW, toggleBtnH, "Trucks: \u2014", color.RGBA{60, 60, 70, 128})
+	} else {
+		truckLabel := "Trucks: OFF"
+		truckColor := ColorSwarmBtnToggleOff
+		if ss.TruckToggle {
+			truckLabel = "Trucks: ON"
+			truckColor = color.RGBA{180, 100, 40, 255} // brown/orange
+		}
+		drawSwarmButton(screen, 175, editorToggle3Y, toggleBtnW, toggleBtnH, truckLabel, truckColor)
 	}
 
 	// Separator 2
@@ -432,6 +445,26 @@ func DrawSwarmHUD(screen *ebiten.Image, s *simulation.Simulation, fps float64) {
 				ds.TotalDelivered, ds.CorrectDelivered, ds.WrongDelivered, avgTime)
 			printColoredAt(screen, dInfo, 420, 15, color.RGBA{255, 200, 100, 255})
 		}
+
+		// Truck HUD line
+		if ss.TruckToggle && ss.TruckState != nil {
+			ts := ss.TruckState
+			remaining := 0
+			if ts.CurrentTruck != nil {
+				for _, p := range ts.CurrentTruck.Packages {
+					if !p.PickedUp {
+						remaining++
+					}
+				}
+			}
+			total := 0
+			if ts.CurrentTruck != nil {
+				total = len(ts.CurrentTruck.Packages)
+			}
+			tInfo := fmt.Sprintf("Truck %d/%d | Pkgs: %d/%d | Score: %d",
+				ts.TruckNum, ts.TrucksPerRound, total-remaining, total, ts.Score)
+			printColoredAt(screen, tInfo, 420, 32, color.RGBA{220, 150, 50, 255})
+		}
 	}
 
 	// Help text at very bottom
@@ -585,6 +618,7 @@ func drawSwarmTooltips(screen *ebiten.Image) {
 		{5, editorToggle2Y, toggleBtnW, toggleBtnH, "Lichtquelle fuer light_value Sensor"},
 		{175, editorToggle2Y, toggleBtnW, toggleBtnH, "BOUNCE=Abprallen WRAP=Durchlaufen"},
 		{5, editorToggle3Y, toggleBtnW, toggleBtnH, "Paket-Liefersystem mit Stationen"},
+		{175, editorToggle3Y, toggleBtnW, toggleBtnH, "LKW-Entladung mit Rampe"},
 	}
 
 	for _, z := range zones {
@@ -637,7 +671,7 @@ func swarmTokenColor(t swarmscript.SwarmTokenType) color.RGBA {
 
 // SwarmEditorHitTest checks what was clicked in the editor panel.
 // Returns: "dropdown", "deploy", "reset", "botcount", "editor",
-// "obstacles", "maze", "light", "walls", or ""
+// "obstacles", "maze", "light", "walls", "delivery", "trucks", or ""
 func SwarmEditorHitTest(mx, my int) string {
 	if mx > editorPanelW {
 		return ""
@@ -698,10 +732,13 @@ func SwarmEditorHitTest(mx, my int) string {
 		}
 	}
 
-	// Toggle row 3: Delivery
+	// Toggle row 3: Delivery / Trucks
 	if my >= editorToggle3Y && my < editorToggle3Y+toggleBtnH {
 		if mx >= 5 && mx < 5+toggleBtnW {
 			return "delivery"
+		}
+		if mx >= 175 && mx < 175+toggleBtnW {
+			return "trucks"
 		}
 	}
 

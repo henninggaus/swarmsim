@@ -425,6 +425,118 @@ func IsDeliveryPresetIdx(idx int) bool {
 	return idx >= 10 && idx <= 12
 }
 
+// IsTruckPresetIdx returns true if the preset index is a truck program (13-14).
+func IsTruckPresetIdx(idx int) bool {
+	return idx >= 13 && idx <= 14
+}
+
+// NewSwarmTruckState creates a fresh truck unloading round.
+func NewSwarmTruckState(rng *rand.Rand) *SwarmTruckState {
+	ts := &SwarmTruckState{
+		TrucksPerRound: 3,
+		RoundNum:       1,
+		TruckNum:       0,
+		RampX:          SwarmRampX,
+		RampY:          SwarmRampY,
+		RampW:          SwarmRampW,
+		RampH:          SwarmRampH,
+	}
+	ts.SpawnNextTruck(rng)
+	return ts
+}
+
+// SpawnNextTruck creates the next truck in the round sequence.
+func (ts *SwarmTruckState) SpawnNextTruck(rng *rand.Rand) {
+	ts.TruckNum++
+	truckType := rng.Intn(3) // 0=Small, 1=Medium, 2=Large
+	ts.CurrentTruck = NewSwarmTruck(rng, truckType)
+}
+
+// NewSwarmTruck creates a truck with packages at the off-screen start position.
+func NewSwarmTruck(rng *rand.Rand, truckType int) *SwarmTruck {
+	pkgCounts := [3]int{6, 8, 10}
+	count := pkgCounts[truckType]
+
+	t := &SwarmTruck{
+		X:         -120,
+		Y:         SwarmRampY + SwarmRampH/2 - 20,
+		Phase:     TruckDrivingIn,
+		TruckType: truckType,
+		Packages:  make([]TruckPackage, count),
+	}
+
+	// Layout packages in a 2-row grid on the cargo area
+	for i := 0; i < count; i++ {
+		col := i / 2
+		row := i % 2
+		t.Packages[i] = TruckPackage{
+			Color: 1 + rng.Intn(4), // 1-4
+			RelX:  float64(20 + col*12),
+			RelY:  float64(5 + row*14),
+		}
+	}
+
+	return t
+}
+
+// UpdateSwarmTruck advances the truck animation state machine.
+func UpdateSwarmTruck(ss *SwarmState) {
+	ts := ss.TruckState
+	if ts == nil || ts.CurrentTruck == nil {
+		return
+	}
+	t := ts.CurrentTruck
+
+	switch t.Phase {
+	case TruckDrivingIn:
+		t.X += 2
+		if t.X >= SwarmTruckParkX {
+			t.X = SwarmTruckParkX
+			t.Phase = TruckParked
+		}
+
+	case TruckParked:
+		// Check if all packages picked up
+		allPicked := true
+		for i := range t.Packages {
+			if !t.Packages[i].PickedUp {
+				allPicked = false
+				break
+			}
+		}
+		if allPicked {
+			t.Phase = TruckComplete
+			t.PhaseTimer = 60
+		}
+
+	case TruckComplete:
+		t.PhaseTimer--
+		if t.PhaseTimer <= 0 {
+			t.Phase = TruckDrivingOut
+		}
+
+	case TruckDrivingOut:
+		t.X += 3
+		if t.X > ss.ArenaW+100 {
+			if ts.TruckNum >= ts.TrucksPerRound {
+				t.Phase = TruckRoundDone
+			} else {
+				t.Phase = TruckWaiting
+				t.PhaseTimer = 90
+			}
+		}
+
+	case TruckWaiting:
+		t.PhaseTimer--
+		if t.PhaseTimer <= 0 {
+			ts.SpawnNextTruck(ss.Rng)
+		}
+
+	case TruckRoundDone:
+		// Wait for N key
+	}
+}
+
 // NeighborDelta computes dx, dy from (ax,ay) to (bx,by) with optional wrap-mode.
 func NeighborDelta(ax, ay, bx, by float64, ss *SwarmState) (float64, float64) {
 	dx := bx - ax

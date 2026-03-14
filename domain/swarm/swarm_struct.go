@@ -17,6 +17,25 @@ const (
 	SwarmDefaultBots         = 50
 	SwarmMaxBots             = 500
 	SwarmMinBots             = 5
+
+	// Truck / Ramp constants
+	SwarmRampX      = 0.0
+	SwarmRampY      = 250.0
+	SwarmRampW      = 150.0
+	SwarmRampH      = 300.0
+	SwarmTruckParkX = 20.0
+)
+
+// TruckAnimPhase represents the animation state of a truck.
+type TruckAnimPhase int
+
+const (
+	TruckDrivingIn  TruckAnimPhase = iota // truck entering from left
+	TruckParked                           // waiting for packages to be picked up
+	TruckComplete                         // all packages picked, short delay
+	TruckDrivingOut                       // truck leaving to the right
+	TruckWaiting                          // pause between trucks
+	TruckRoundDone                        // all trucks in round delivered
 )
 
 // SwarmBot is a simple programmable robot with no identity.
@@ -185,6 +204,38 @@ type SwarmDeliveryEvent struct {
 	IsPickup bool // true=pickup event, false=drop event
 }
 
+// TruckPackage is a single package on a truck.
+type TruckPackage struct {
+	Color    int     // 1-4
+	PickedUp bool
+	RelX     float64 // position relative to truck body for rendering
+	RelY     float64
+}
+
+// SwarmTruck represents a truck that drives into the ramp area.
+type SwarmTruck struct {
+	X, Y       float64        // current position (X animates)
+	Phase      TruckAnimPhase
+	PhaseTimer int
+	Packages   []TruckPackage
+	TruckType  int // 0=Small(6), 1=Medium(8), 2=Large(10)
+}
+
+// SwarmTruckState tracks the overall truck unloading round state.
+type SwarmTruckState struct {
+	CurrentTruck   *SwarmTruck
+	TruckNum       int // 1-based (which truck in round)
+	TrucksPerRound int // 3
+	RoundNum       int
+	Score          int
+	TotalPkgs      int
+	DeliveredPkgs  int
+	CorrectPkgs    int
+	WrongPkgs      int
+	RampX, RampY   float64 // ramp area in arena coords
+	RampW, RampH   float64
+}
+
 // SwarmState holds all state for the programmable swarm scenario.
 type SwarmState struct {
 	Bots     []SwarmBot
@@ -239,6 +290,11 @@ type SwarmState struct {
 	// Delivery system
 	DeliveryOn        bool
 	IsDeliveryProgram bool // true when a delivery preset (idx 10-12) is active
+
+	// Truck system (in Swarm Lab)
+	TruckToggle    bool
+	IsTruckProgram bool // true when a truck preset (idx 13-14) is active
+	TruckState     *SwarmTruckState
 	Stations       []DeliveryStation
 	Packages       []DeliveryPackage
 	DeliveryStats  DeliveryStats

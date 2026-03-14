@@ -107,6 +107,14 @@ func (r *Renderer) DrawSwarmMode(screen *ebiten.Image, s *simulation.Simulation,
 		drawDeliveryPackages(a, ss, 0, 0)
 	}
 
+	// Truck rendering (ramp + vehicle)
+	if ss.TruckToggle && ss.TruckState != nil {
+		drawSwarmRamp(a, ss)
+		if ss.TruckState.CurrentTruck != nil {
+			drawSwarmTruckVehicle(a, ss)
+		}
+	}
+
 	// Trails
 	if ss.ShowTrails {
 		for i := range ss.Bots {
@@ -823,6 +831,94 @@ func drawSwarmParticles(screen *ebiten.Image, ps *ParticleSystem, offX, offY flo
 			size = 0.5
 		}
 		vector.DrawFilledCircle(screen, sx, sy, size, col, false)
+	}
+}
+
+// drawSwarmRamp renders the loading ramp area on the arena.
+func drawSwarmRamp(screen *ebiten.Image, ss *swarm.SwarmState) {
+	ts := ss.TruckState
+	rx := float32(ts.RampX)
+	ry := float32(ts.RampY)
+	rw := float32(ts.RampW)
+	rh := float32(ts.RampH)
+
+	// Semi-transparent background
+	vector.DrawFilledRect(screen, rx, ry, rw, rh, color.RGBA{60, 50, 30, 80}, false)
+
+	// Diagonal hatching lines
+	hatchStep := float32(20)
+	for d := float32(0); d < rw+rh; d += hatchStep {
+		x1 := rx + d
+		y1 := ry
+		x2 := rx
+		y2 := ry + d
+		if x1 > rx+rw {
+			y1 += x1 - (rx + rw)
+			x1 = rx + rw
+		}
+		if y2 > ry+rh {
+			x2 += y2 - (ry + rh)
+			y2 = ry + rh
+		}
+		vector.StrokeLine(screen, x1, y1, x2, y2, 1, color.RGBA{100, 80, 40, 60}, false)
+	}
+
+	// Border
+	vector.StrokeRect(screen, rx, ry, rw, rh, 2, color.RGBA{180, 140, 60, 150}, false)
+
+	// "RAMP" label
+	label := "RAMP"
+	lx := int(rx+rw/2) - len(label)*charW/2
+	ly := int(ry + 5)
+	printColoredAt(screen, label, lx, ly, color.RGBA{180, 140, 60, 180})
+}
+
+// drawSwarmTruckVehicle renders the truck body with packages.
+func drawSwarmTruckVehicle(screen *ebiten.Image, ss *swarm.SwarmState) {
+	t := ss.TruckState.CurrentTruck
+
+	tx := float32(t.X)
+	ty := float32(t.Y)
+
+	// Truck body dimensions
+	bodyW := float32(80)
+	bodyH := float32(40)
+	cabinW := float32(18)
+
+	// Cabin (front, darker gray)
+	vector.DrawFilledRect(screen, tx, ty, cabinW, bodyH, color.RGBA{70, 70, 80, 255}, false)
+	vector.StrokeRect(screen, tx, ty, cabinW, bodyH, 1, color.RGBA{120, 120, 130, 200}, false)
+	// Windshield
+	vector.DrawFilledRect(screen, tx+2, ty+4, cabinW-4, 12, color.RGBA{140, 180, 220, 200}, false)
+
+	// Cargo area (light gray)
+	cargoX := tx + cabinW
+	vector.DrawFilledRect(screen, cargoX, ty, bodyW-cabinW, bodyH, color.RGBA{160, 160, 150, 255}, false)
+	vector.StrokeRect(screen, cargoX, ty, bodyW-cabinW, bodyH, 1, color.RGBA{120, 120, 130, 200}, false)
+
+	// Wheels
+	wheelR := float32(5)
+	vector.DrawFilledCircle(screen, tx+12, ty+bodyH+2, wheelR, color.RGBA{40, 40, 40, 255}, false)
+	vector.DrawFilledCircle(screen, tx+bodyW-12, ty+bodyH+2, wheelR, color.RGBA{40, 40, 40, 255}, false)
+
+	// Draw packages on cargo
+	for _, pkg := range t.Packages {
+		if pkg.PickedUp {
+			continue
+		}
+		px := cargoX + float32(pkg.RelX)
+		py := ty + float32(pkg.RelY)
+		col := deliveryColor(pkg.Color)
+		vector.DrawFilledRect(screen, px, py, 8, 8, col, false)
+		vector.StrokeRect(screen, px, py, 8, 8, 1, color.RGBA{255, 255, 255, 150}, false)
+	}
+
+	// Phase overlay text
+	switch t.Phase {
+	case swarm.TruckComplete:
+		printColoredAt(screen, "COMPLETE", int(tx+10), int(ty-14), color.RGBA{0, 255, 100, 255})
+	case swarm.TruckRoundDone:
+		// Big overlay handled elsewhere (HUD)
 	}
 }
 

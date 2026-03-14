@@ -856,6 +856,41 @@ func (g *Game) handleSwarmClick(mx, my int) {
 		ed.Focused = false
 		ss.BotCountEdit = false
 
+	case "trucks":
+		// Non-truck preset: button is grayed, ignore clicks
+		if ss.ProgramName != "Custom" && !ss.IsTruckProgram {
+			break
+		}
+		// Truck preset: cannot disable trucks
+		if ss.IsTruckProgram && ss.TruckToggle {
+			logger.Info("SWARM", "Cannot disable trucks while a truck program is active")
+			break
+		}
+		ss.TruckToggle = !ss.TruckToggle
+		if ss.TruckToggle {
+			// Force delivery on (need dropoff stations)
+			if !ss.DeliveryOn {
+				ss.DeliveryOn = true
+			}
+			// Force maze on
+			if !ss.MazeOn {
+				ss.MazeOn = true
+				ss.ObstaclesOn = false
+				ss.Obstacles = nil
+				swarm.GenerateSwarmMaze(ss)
+			}
+			// Generate stations and truck state
+			swarm.GenerateDeliveryStations(ss)
+			ss.TruckState = swarm.NewSwarmTruckState(ss.Rng)
+			logger.Info("SWARM", "Trucks ON (round %d)", ss.TruckState.RoundNum)
+		} else {
+			ss.TruckState = nil
+			logger.Info("SWARM", "Trucks OFF")
+		}
+		g.autoReset("Trucks toggled")
+		ed.Focused = false
+		ss.BotCountEdit = false
+
 	default:
 		// Clicked outside editor panel — check arena for bot selection
 		ed.Focused = false
