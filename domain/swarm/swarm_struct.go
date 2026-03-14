@@ -1,0 +1,226 @@
+package swarm
+
+import (
+	"math/rand"
+	"swarmsim/domain/physics"
+	"swarmsim/engine/swarmscript"
+)
+
+const (
+	SwarmBotRadius           = 10.0
+	SwarmBotSpeed            = 1.5
+	SwarmSensorRange         = 60.0
+	SwarmDeliverySensorRange = 200.0 // extended range for delivery station + LED scanning
+	SwarmCommRange           = 40.0
+	SwarmArenaSize           = 800.0
+	SwarmEdgeMargin          = 20.0
+	SwarmDefaultBots         = 50
+	SwarmMaxBots             = 500
+	SwarmMinBots             = 5
+)
+
+// SwarmBot is a simple programmable robot with no identity.
+type SwarmBot struct {
+	X, Y  float64 // world position
+	Angle float64 // facing direction (radians)
+	Speed float64 // current speed (0 or SwarmBotSpeed)
+
+	LEDColor [3]uint8 // visual LED color (R, G, B)
+
+	// Internal state variables (user-programmable)
+	State   int
+	Counter int
+	Value1  int
+	Value2  int
+	Timer   int // counts down each tick when > 0
+
+	// Per-tick sensor cache (rebuilt by environment builder)
+	NeighborCount int
+	NearestDist   float64
+	NearestAngle  float64 // absolute angle to nearest neighbor
+	AvgNeighborX  float64 // average X of neighbors (relative to bot)
+	AvgNeighborY  float64 // average Y of neighbors (relative to bot)
+	OnEdge        bool
+	ReceivedMsg   int // 0 = none, >0 = message value
+	LightValue    int // 0-100
+
+	// Per-tick output
+	PendingMsg int // 0 = no message, >0 = broadcast value
+	BlinkTimer int // deploy-confirmation blink (frames countdown)
+
+	// Follow mechanic
+	FollowTargetIdx int // index of bot being followed (-1 = none)
+	FollowerIdx     int // index of bot following this one (-1 = none)
+
+	// Extended sensor cache
+	NearestLEDR   uint8
+	NearestLEDG   uint8
+	NearestLEDB   uint8
+	ObstacleAhead bool    // obstacle within 50px in facing direction
+	ObstacleDist  float64 // distance to nearest obstacle ahead (999 if none)
+	NearestIdx    int     // index of nearest neighbor (-1 if none)
+
+	// Anti-stuck tracking
+	StuckTicks    int     // how many ticks bot barely moved
+	StuckPrevX    float64 // position last tick for stuck detection
+	StuckPrevY    float64
+	StuckCooldown int // cooldown: forced solo movement after unfollow (counts down)
+
+	// Trail history (ring buffer)
+	Trail    [10][2]float64
+	TrailIdx int
+
+	// Delivery system
+	CarryingPkg int // -1 = not carrying, otherwise package index
+
+	// Delivery sensor cache (rebuilt per tick)
+	NearestPickupDist   float64
+	NearestPickupColor  int
+	NearestPickupHasPkg bool
+	NearestPickupIdx    int // station index
+	NearestDropoffDist  float64
+	NearestDropoffColor int
+	NearestDropoffIdx   int // station index
+	DropoffMatch        bool
+	HeardPickupColor    int
+	HeardPickupAngle    float64
+	HeardDropoffColor   int
+	HeardDropoffAngle   float64
+
+	// LED pheromone matching (for delivery navigation gradient)
+	NearestMatchLEDDist  float64 // dist to nearest bot whose LED matches carrying color
+	NearestMatchLEDAngle float64 // angle to that bot
+}
+
+// LightSource represents an optional light source in the arena.
+type LightSource struct {
+	Active bool
+	X, Y   float64
+}
+
+// SwarmMessage is a broadcast int message with position.
+type SwarmMessage struct {
+	Value int
+	X, Y  float64
+}
+
+// EditorState tracks the text editor's internal state.
+type EditorState struct {
+	Lines      []string
+	CursorLine int
+	CursorCol  int
+	ScrollY    int // first visible line index
+	ScrollX    int // first visible column index (horizontal scroll)
+	Focused    bool
+	BlinkTick  int // cursor blink animation counter
+	MaxVisible int // number of visible lines in editor area
+}
+
+// DeliveryStation represents a pickup or dropoff station.
+type DeliveryStation struct {
+	X, Y         float64
+	Color        int  // 1=red, 2=blue, 3=yellow, 4=green
+	IsPickup     bool // true=Pickup, false=Dropoff
+	HasPackage   bool // only for Pickup: is a package ready?
+	RespawnIn    int  // countdown until new package spawns
+	FlashTimer   int  // visual flash effect on delivery
+	FlashOK      bool // true=correct delivery, false=wrong
+	DeliverCount int  // total packages delivered to this dropoff
+}
+
+// DeliveryPackage represents a package in the delivery system.
+type DeliveryPackage struct {
+	Color      int     // 1=red, 2=blue, 3=yellow, 4=green
+	CarriedBy  int     // bot index, -1 if not carried
+	X, Y       float64 // position when on ground
+	OnGround   bool    // true if dropped on ground (not at station)
+	PickupTick int     // tick when picked up (for avg time)
+	Active     bool    // false if delivered and waiting respawn
+}
+
+// DeliveryStats tracks delivery performance.
+type DeliveryStats struct {
+	TotalDelivered   int
+	CorrectDelivered int
+	WrongDelivered   int
+	DeliveryTimes    []int
+	ColorDelivered   [5]int // index 1-4 for each color
+}
+
+// ScorePopup is a floating score text that rises and fades.
+type ScorePopup struct {
+	X, Y  float64
+	Text  string
+	Timer int // counts down from 60
+	Color [3]uint8
+}
+
+// SwarmDeliveryEvent signals a delivery to the renderer for particle effects.
+type SwarmDeliveryEvent struct {
+	X, Y     float64
+	Color    int  // delivery color 1-4
+	Correct  bool // true=matched, false=wrong
+	IsPickup bool // true=pickup event, false=drop event
+}
+
+// SwarmState holds all state for the programmable swarm scenario.
+type SwarmState struct {
+	Bots     []SwarmBot
+	BotCount int
+
+	ArenaW float64
+	ArenaH float64
+
+	Program     *swarmscript.SwarmProgram
+	ProgramText string
+	ProgramName string // active preset name or "Custom"
+
+	Light LightSource
+	Tick  int
+	Rng   *rand.Rand
+	Hash  *physics.SpatialHash
+
+	PrevMessages []SwarmMessage // messages from previous tick (readable)
+	NextMessages []SwarmMessage // messages being sent this tick
+
+	Editor *EditorState
+
+	ErrorMsg  string // parse error message (empty if no error)
+	ErrorLine int    // 1-based line of error, 0 if none
+
+	PresetNames    []string
+	PresetPrograms []string
+	DropdownOpen   bool
+	DropdownHover  int
+
+	BotCountText string // editable bot count field text
+	BotCountEdit bool   // is bot count field focused
+
+	// Obstacles / Maze / Environment toggles
+	Obstacles   []*physics.Obstacle
+	MazeWalls   []*physics.Obstacle
+	ObstaclesOn bool
+	MazeOn      bool
+	WrapMode    bool // false=BOUNCE, true=WRAP
+	ShowTrails  bool
+
+	// Selected bot for info overlay
+	SelectedBot int // -1 = none
+
+	// Delivery system
+	DeliveryOn     bool
+	Stations       []DeliveryStation
+	Packages       []DeliveryPackage
+	DeliveryStats  DeliveryStats
+	ShowRoutes     bool                 // 'C' key toggle: show pickup→dropoff route lines
+	ScorePopups    []ScorePopup         // floating score text on delivery
+	DeliveryEvents []SwarmDeliveryEvent // consumed by renderer for particle effects
+}
+
+// AllObstacles returns combined obstacles and maze walls.
+func (ss *SwarmState) AllObstacles() []*physics.Obstacle {
+	result := make([]*physics.Obstacle, 0, len(ss.Obstacles)+len(ss.MazeWalls))
+	result = append(result, ss.Obstacles...)
+	result = append(result, ss.MazeWalls...)
+	return result
+}
