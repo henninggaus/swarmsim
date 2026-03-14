@@ -57,14 +57,14 @@ func DrawHelpOverlay(screen *ebiten.Image, isSwarmMode bool, scrollY int) {
 	globalKeys := []struct{ key, desc string }{
 		{"Space", "Pause / Fortsetzen"},
 		{"+/-", "Geschwindigkeit aendern (0.5x - 5.0x)"},
-		{"F1-F5", "Szenarien laden (Basis, Kooperativ, Nachrichten, Wellen, Genetik)"},
-		{"F6", "LKW-Entladung Szenario"},
-		{"F7", "Programmable Swarm (SwarmScript Editor)"},
+		{"F1", "Classic Mode (Sandbox, Foraging, Labyrinth, Energy, Evolution)"},
+		{"F2", "Swarm Lab (SwarmScript Editor)"},
 		{"F10", "Screenshot speichern (PNG)"},
 		{"F11", "GIF Aufnahme starten/stoppen"},
 		{"F12", "CPU Profiling (Build-Tag: profile)"},
 		{"H", "Hilfe ein-/ausblenden"},
 		{"S", "Sound ein-/ausschalten"},
+		{"F/Tab/T/M", "Comm-Radius / Bot-Info / Trails / Minimap"},
 		{"ESC", "Beenden"},
 	}
 	for _, kv := range globalKeys {
@@ -75,7 +75,7 @@ func DrawHelpOverlay(screen *ebiten.Image, isSwarmMode bool, scrollY int) {
 	y += 8
 
 	// === STANDARD MODE ===
-	printColoredAt(screen, "-- Standard-Modus (F1-F6) --", px, y, colorHelpSection)
+	printColoredAt(screen, "-- Classic Mode (F1) --", px, y, colorHelpSection)
 	y += lineH + 2
 
 	stdKeys := []struct{ key, desc string }{
@@ -90,7 +90,7 @@ func DrawHelpOverlay(screen *ebiten.Image, isSwarmMode bool, scrollY int) {
 		{"P", "Pheromone (OFF -> FOUND -> ALL)"},
 		{"E", "Generation beenden (Evolution erzwingen)"},
 		{"V", "Genom-Overlay anzeigen"},
-		{"N", "Neuen LKW generieren (nur LKW-Modus)"},
+		{"N", "Naechstes Szenario (Classic Mode)"},
 		{"WASD", "Kamera bewegen"},
 		{"Mausrad", "Zoom"},
 		{"Rechtsklick", "Kamera ziehen"},
@@ -104,7 +104,7 @@ func DrawHelpOverlay(screen *ebiten.Image, isSwarmMode bool, scrollY int) {
 	y += 8
 
 	// === SWARM MODE ===
-	printColoredAt(screen, "-- Schwarm-Modus (F7) --", px, y, colorHelpSection)
+	printColoredAt(screen, "-- Swarm Lab (F2) --", px, y, colorHelpSection)
 	y += lineH + 2
 
 	swarmKeys := []struct{ key, desc string }{

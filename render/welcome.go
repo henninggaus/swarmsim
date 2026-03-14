@@ -133,66 +133,41 @@ func (r *Renderer) DrawWelcomeScreen(screen *ebiten.Image, tick int) {
 	sepY := float32(260)
 	vector.StrokeLine(screen, float32(sw/2-200), sepY, float32(sw/2+200), sepY, 1, color.RGBA{60, 60, 80, 255}, false)
 
-	// Scenario list
-	scenarioY := 285
-	scenarioCol := color.RGBA{180, 200, 220, 255}
+	// Mode selection (2 modes)
+	modeY := 285
 	keyCol := color.RGBA{136, 204, 255, 255} // cyan for keys
 	dimCol := color.RGBA{100, 100, 120, 255}
+	scenarioCol := color.RGBA{180, 200, 220, 255}
 
-	scenarios := []struct {
-		key  string
-		name string
-		desc string
-	}{
-		{"F1", "Basis-Schwarm", "Einfache Bots mit Sensoren und Energie"},
-		{"F2", "Kooperatives Sammeln", "Bots sammeln Ressourcen kooperativ"},
-		{"F3", "Nachrichtenbasiert", "Kommunikation zwischen Bots"},
-		{"F4", "Wellen-Modus", "Wellen von Ressourcen einsammeln"},
-		{"F5", "Genetik-Evolution", "Evolutionaere Optimierung der Bots"},
-		{"F6", "LKW-Entladung", "Pakete sortieren und entladen"},
-	}
+	// [F1] Classic Mode
+	f1Text := "[F1] Classic Mode"
+	f1Desc := "Foraging, Evolution, Pheromone"
+	f1W := len(f1Text) * charW
+	f1X := sw/2 - f1W/2 - 60
+	printColoredAt(screen, "[F1]", f1X, modeY, keyCol)
+	printColoredAt(screen, "Classic Mode", f1X+30, modeY, scenarioCol)
+	printColoredAt(screen, f1Desc, f1X+30, modeY+lineH+2, dimCol)
 
-	// Draw scenarios in two columns
-	colW := 300
-	col1X := sw/2 - colW - 20
-	col2X := sw/2 + 20
+	// [F2] Swarm Lab — highlighted as recommended
+	f2Y := modeY + 55
+	f2Text := "[F2] Swarm Lab — SwarmScript Editor (empfohlen)"
+	f2W := len(f2Text) * charW
+	f2X := sw/2 - f2W/2
 
-	for i, sc := range scenarios {
-		x := col1X
-		y := scenarioY + (i/2)*28
-		if i%2 == 1 {
-			x = col2X
-		}
-		if i >= 2 && i%2 == 0 {
-			y = scenarioY + (i/2)*28
-		}
-
-		printColoredAt(screen, "["+sc.key+"]", x, y, keyCol)
-		printColoredAt(screen, sc.name, x+30, y, scenarioCol)
-	}
-
-	// F7 highlight (default option)
-	f7Y := scenarioY + 3*28 + 10
-
-	// Highlight box behind F7
-	f7Text := "[F7] Programmable Swarm — SwarmScript Editor"
-	f7W := len(f7Text) * charW
-	f7X := sw/2 - f7W/2
-
-	// Pulsing glow for F7
+	// Pulsing glow for F2 (recommended default)
 	pulse := 0.7 + 0.3*math.Sin(float64(tick)*0.05)
 	glowAlpha := uint8(float64(40) * pulse)
-	vector.DrawFilledRect(screen, float32(f7X-8), float32(f7Y-4), float32(f7W+16), 24,
+	vector.DrawFilledRect(screen, float32(f2X-8), float32(f2Y-4), float32(f2W+16), 24,
 		color.RGBA{40, 80, 140, glowAlpha}, false)
-	vector.StrokeRect(screen, float32(f7X-8), float32(f7Y-4), float32(f7W+16), 24,
+	vector.StrokeRect(screen, float32(f2X-8), float32(f2Y-4), float32(f2W+16), 24,
 		1, color.RGBA{136, 204, 255, uint8(float64(100) * pulse)}, false)
 
-	printColoredAt(screen, "[F7]", f7X, f7Y, keyCol)
-	printColoredAt(screen, "Programmable Swarm", f7X+30, f7Y, color.RGBA{255, 255, 255, 255})
-	printColoredAt(screen, "— SwarmScript Editor", f7X+30+19*charW, f7Y, dimCol)
+	printColoredAt(screen, "[F2]", f2X, f2Y, keyCol)
+	printColoredAt(screen, "Swarm Lab", f2X+30, f2Y, color.RGBA{255, 255, 255, 255})
+	printColoredAt(screen, "— SwarmScript Editor (empfohlen)", f2X+30+10*charW, f2Y, dimCol)
 
 	// Bottom separator
-	sepY2 := float32(f7Y + 45)
+	sepY2 := float32(f2Y + 45)
 	vector.StrokeLine(screen, float32(sw/2-200), sepY2, float32(sw/2+200), sepY2, 1, color.RGBA{60, 60, 80, 255}, false)
 
 	// Hint text (blinking)
