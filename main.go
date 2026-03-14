@@ -141,6 +141,11 @@ func (g *Game) handleGlobalInput() {
 		g.sim.LoadSwarmScenario()
 		g.tickAcc = 0
 	}
+
+	// F12: toggle CPU profiling (requires: go build -tags profile)
+	if inpututil.IsKeyJustPressed(ebiten.KeyF12) {
+		ToggleProfile()
+	}
 }
 
 func (g *Game) handleInput() {
@@ -192,6 +197,12 @@ func (g *Game) handleInput() {
 	if inpututil.IsKeyJustPressed(ebiten.KeyD) {
 		g.sim.ShowDebugComm = !g.sim.ShowDebugComm
 		fmt.Printf("[KEY] D pressed -> ShowDebugComm=%v\n", g.sim.ShowDebugComm)
+	}
+
+	// T: toggle trail rendering
+	if inpututil.IsKeyJustPressed(ebiten.KeyT) {
+		g.renderer.ShowTrails = !g.renderer.ShowTrails
+		fmt.Printf("[KEY] T pressed -> ShowTrails=%v\n", g.renderer.ShowTrails)
 	}
 
 	// P: cycle pheromone visualization (OFF -> FOUND -> ALL -> OFF)
@@ -810,4 +821,5 @@ func main() {
 	if err := ebiten.RunGame(game); err != nil {
 		log.Fatal(err)
 	}
+	StopProfile() // ensure profiling stops on clean exit
 }

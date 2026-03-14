@@ -95,8 +95,17 @@ func (r *Renderer) DrawSwarmMode(screen *ebiten.Image, s *simulation.Simulation,
 		if ss.ShowRoutes {
 			drawPickupDropoffRoutes(screen, ss, arenaOffX, arenaOffY)
 		}
-		// Dashed lines from carrying bots to their matching dropoff
-		drawCarryRouteLines(screen, ss, arenaOffX, arenaOffY)
+		// Dashed lines from carrying bots to their matching dropoff (skip if none carrying)
+		hasCarrying := false
+		for i := range ss.Bots {
+			if ss.Bots[i].CarryingPkg >= 0 {
+				hasCarrying = true
+				break
+			}
+		}
+		if hasCarrying {
+			drawCarryRouteLines(screen, ss, arenaOffX, arenaOffY)
+		}
 		// Stations with labels, timer bars, counters
 		drawDeliveryStations(screen, ss, arenaOffX, arenaOffY)
 		drawStationLabels(screen, ss, arenaOffX, arenaOffY)

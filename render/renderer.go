@@ -31,6 +31,8 @@ func (c *Camera) ScreenToWorld(sx, sy float64, sw, sh int) (float64, float64) {
 	return (sx-float64(sw)/2)/c.Zoom + c.X, (sy-float64(sh)/2)/c.Zoom + c.Y
 }
 
+const botSpriteSize = 24 // pixels for pre-rendered bot triangle sprites
+
 // Renderer draws the simulation.
 type Renderer struct {
 	Camera   *Camera
@@ -41,14 +43,44 @@ type Renderer struct {
 	Particles         *ParticleSystem
 	SwarmParticles    *ParticleSystem // separate particle system for swarm delivery effects
 	HomeBaseGlowAlpha float64
+
+	ShowTrails bool // toggle with T key (default off for performance)
+
+	botSprites [5]*ebiten.Image // pre-rendered triangle per BotType
 }
 
 // NewRenderer creates a new renderer with a particle system.
 func NewRenderer(cam *Camera) *Renderer {
-	return &Renderer{
+	r := &Renderer{
 		Camera:         cam,
 		Particles:      NewParticleSystem(),
 		SwarmParticles: NewParticleSystem(),
+	}
+	r.initBotSprites()
+	return r
+}
+
+// initBotSprites pre-renders a white triangle sprite for each BotType.
+// At draw time the sprite is tinted via ColorScale and rotated via GeoM.
+func (r *Renderer) initBotSprites() {
+	// Triangle geometry at angle=0 (pointing right), size=1 unit, centered at (half,half)
+	half := float64(botSpriteSize) / 2
+	// Unit triangle: apex at 1.5 forward, rear corners at ±2.5 radians
+	ax := half + 1.5*half*0.75 // apex (use 0.75 scale to fit inside sprite)
+	ay := half
+	bx := half + half*0.75*math.Cos(2.5)
+	by := half + half*0.75*math.Sin(2.5)
+	cx := half + half*0.75*math.Cos(-2.5)
+	cy := half + half*0.75*math.Sin(-2.5)
+
+	for i := 0; i < 5; i++ {
+		img := ebiten.NewImage(botSpriteSize, botSpriteSize)
+		// Draw white triangle; color is applied at render time via ColorScale
+		white := color.RGBA{255, 255, 255, 255}
+		vector.StrokeLine(img, float32(ax), float32(ay), float32(bx), float32(by), 1.5, white, false)
+		vector.StrokeLine(img, float32(bx), float32(by), float32(cx), float32(cy), 1.5, white, false)
+		vector.StrokeLine(img, float32(cx), float32(cy), float32(ax), float32(ay), 1.5, white, false)
+		r.botSprites[i] = img
 	}
 }
 
@@ -107,7 +139,9 @@ func (r *Renderer) Draw(screen *ebiten.Image, s *simulation.Simulation) {
 		r.drawRadii(screen, s, sw, sh, true)
 	}
 
-	r.drawBotTrails(screen, s, sw, sh)
+	if r.ShowTrails {
+		r.drawBotTrails(screen, s, sw, sh)
+	}
 	r.drawBots(screen, s, sw, sh)
 	r.Particles.Draw(screen, r.Camera, sw, sh)
 
@@ -127,8 +161,8 @@ func (r *Renderer) drawPheromones(screen *ebiten.Image, s *simulation.Simulation
 		r.pherRGBA = image.NewRGBA(image.Rect(0, 0, pg.Cols, pg.Rows))
 	}
 
-	// Update pixel data every other tick for performance
-	if s.Tick != r.pherTick {
+	// Update pixel data every 5 ticks for performance (decay is 0.995/tick, imperceptible)
+	if s.Tick-r.pherTick >= 5 {
 		r.pherTick = s.Tick
 
 		for ri := 0; ri < pg.Rows; ri++ {
@@ -303,7 +337,7 @@ func (r *Renderer) drawBots(screen *ebiten.Image, s *simulation.Simulation, sw, 
 		if vel.Len() < 0.01 {
 			angle = 0
 		}
-		drawTriangle(screen, float32(sx), float32(sy), float32(rad), float32(angle), col)
+		r.drawBotSprite(screen, sx, sy, rad, angle, b.Type(), col)
 
 		drawBar(screen, float32(sx), float32(sy-rad-6), float32(rad*2), 2,
 			b.Health()/b.MaxHealth(), ColorHealthBar, ColorHealthBg)
@@ -354,6 +388,22 @@ func (r *Renderer) drawCommLines(screen *ebiten.Image, s *simulation.Simulation,
 			}
 		}
 	}
+}
+
+// drawBotSprite draws a pre-rendered bot triangle sprite with rotation and color tinting.
+func (r *Renderer) drawBotSprite(screen *ebiten.Image, sx, sy, rad, angle float64, btype bot.BotType, col color.RGBA) {
+	sprite := r.botSprites[int(btype)%len(r.botSprites)]
+	half := float64(botSpriteSize) / 2
+	scale := (rad * 2) / float64(botSpriteSize) // scale sprite to match bot radius
+
+	op := &ebiten.DrawImageOptions{}
+	// Center sprite at origin, rotate, scale, then translate to screen position
+	op.GeoM.Translate(-half, -half)
+	op.GeoM.Rotate(angle)
+	op.GeoM.Scale(scale, scale)
+	op.GeoM.Translate(sx, sy)
+	op.ColorScale.Scale(float32(col.R)/255, float32(col.G)/255, float32(col.B)/255, float32(col.A)/255)
+	screen.DrawImage(sprite, op)
 }
 
 func drawTriangle(screen *ebiten.Image, cx, cy, size, angle float32, col color.RGBA) {

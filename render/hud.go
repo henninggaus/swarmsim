@@ -208,10 +208,8 @@ func drawWaveHUD(screen *ebiten.Image, s *simulation.Simulation, sw int) {
 
 	// Large centered score
 	scoreText := fmt.Sprintf("Score: %d", s.Score)
-	textW := len(scoreText)*6 + 10
-	textH := 16
-	scoreImg := ebiten.NewImage(textW, textH)
-	ebitenutil.DebugPrintAt(scoreImg, scoreText, 5, 3)
+	scoreImg := cachedTextImage(scoreText)
+	textW := scoreImg.Bounds().Dx()
 
 	scale := 2.5
 	totalW := float64(textW) * scale
@@ -234,10 +232,8 @@ func drawTruckHUD(screen *ebiten.Image, s *simulation.Simulation, sw, sh int) {
 
 	// Large centered score
 	scoreText := fmt.Sprintf("Score: %d", s.Score)
-	textW := len(scoreText)*6 + 10
-	textH := 16
-	scoreImg := ebiten.NewImage(textW, textH)
-	ebitenutil.DebugPrintAt(scoreImg, scoreText, 5, 3)
+	scoreImg := cachedTextImage(scoreText)
+	textW := scoreImg.Bounds().Dx()
 
 	scale := 2.5
 	totalW := float64(textW) * scale
@@ -272,10 +268,9 @@ func drawTruckHUD(screen *ebiten.Image, s *simulation.Simulation, sw, sh int) {
 	// Completion overlay
 	if ts.Completed {
 		completeText := "COMPLETED!"
-		ctW := len(completeText)*6 + 10
-		ctH := 16
-		ctImg := ebiten.NewImage(ctW, ctH)
-		ebitenutil.DebugPrintAt(ctImg, completeText, 5, 3)
+		ctImg := cachedTextImage(completeText)
+		ctW := ctImg.Bounds().Dx()
+		ctH := ctImg.Bounds().Dy()
 
 		ctScale := 3.0
 		ctTotalW := float64(ctW) * ctScale
@@ -307,10 +302,9 @@ func drawScenarioTitle(screen *ebiten.Image, title string, sw, sh, timer int) {
 		alpha = uint8(timer * 255 / 30)
 	}
 
-	textW := len(title)*6 + 10
-	textH := 16
-	textImg := ebiten.NewImage(textW, textH)
-	ebitenutil.DebugPrintAt(textImg, title, 5, 3)
+	textImg := cachedTextImage(title)
+	textW := textImg.Bounds().Dx()
+	textH := textImg.Bounds().Dy()
 
 	scale := 3.0
 	totalW := float64(textW) * scale

@@ -123,31 +123,40 @@ func ResolveCircleRectOverlap(cx, cy, cr, rx, ry, rw, rh float64) (float64, floa
 }
 
 // NewSpatialHash creates a spatial hash for the given arena size and cell size.
+// Pre-allocates all cell slices to avoid per-frame heap allocations.
 func NewSpatialHash(arenaW, arenaH, cellSize float64) *SpatialHash {
 	cols := int(math.Ceil(arenaW / cellSize))
 	rows := int(math.Ceil(arenaH / cellSize))
+	total := cols * rows
+	cells := make([][]int, total)
+	for i := range cells {
+		cells[i] = make([]int, 0, 8)
+	}
 	return &SpatialHash{
 		CellSize: cellSize,
 		Cols:     cols,
 		Rows:     rows,
-		Cells:    make(map[int][]int),
+		cells:    cells,
+		queryBuf: make([]int, 0, 64),
 	}
 }
 
-// Clear removes all entries.
+// Clear resets all cells without deallocating backing arrays.
 func (s *SpatialHash) Clear() {
-	for k := range s.Cells {
-		delete(s.Cells, k)
+	for i := range s.cells {
+		s.cells[i] = s.cells[i][:0]
 	}
 }
 
 // Insert adds an entity at (x, y) with the given id.
 func (s *SpatialHash) Insert(id int, x, y float64) {
 	ci := s.cellIndex(x, y)
-	s.Cells[ci] = append(s.Cells[ci], id)
+	s.cells[ci] = append(s.cells[ci], id)
 }
 
-// Query returns all entity IDs within radius of (x, y).
+// Query returns all entity IDs in cells overlapping the given radius.
+// The returned slice is reused across calls — callers must consume it
+// before the next Query call.
 func (s *SpatialHash) Query(x, y, radius float64) []int {
 	minCX := int((x - radius) / s.CellSize)
 	maxCX := int((x + radius) / s.CellSize)
@@ -165,14 +174,14 @@ func (s *SpatialHash) Query(x, y, radius float64) []int {
 	if maxCY >= s.Rows {
 		maxCY = s.Rows - 1
 	}
-	var result []int
+	s.queryBuf = s.queryBuf[:0]
 	for cy := minCY; cy <= maxCY; cy++ {
 		for cx := minCX; cx <= maxCX; cx++ {
 			ci := cy*s.Cols + cx
-			result = append(result, s.Cells[ci]...)
+			s.queryBuf = append(s.queryBuf, s.cells[ci]...)
 		}
 	}
-	return result
+	return s.queryBuf
 }
 
 func (s *SpatialHash) cellIndex(x, y float64) int {

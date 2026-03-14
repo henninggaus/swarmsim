@@ -16,9 +16,11 @@ type Arena struct {
 }
 
 // SpatialHash provides O(1) neighbor lookups for entities.
+// Uses pre-allocated flat slices to avoid per-frame allocations.
 type SpatialHash struct {
 	CellSize float64
 	Cols     int
 	Rows     int
-	Cells    map[int][]int // cell index -> list of entity IDs
+	cells    [][]int // pre-allocated [Cols*Rows], each with initial cap 8
+	queryBuf []int   // reusable query result buffer
 }

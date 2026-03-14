@@ -67,6 +67,7 @@ func DrawSwarmEditor(screen *ebiten.Image, ss *swarm.SwarmState) {
 	if ss == nil || ss.Editor == nil {
 		return
 	}
+	tickTextCache() // maintain text image cache
 	ed := ss.Editor
 
 	// Title bar
@@ -444,19 +445,74 @@ func drawSwarmDropdownOverlay(screen *ebiten.Image, ss *swarm.SwarmState) {
 	}
 }
 
+// textCacheEntry holds a cached colored text image.
+type textCacheEntry struct {
+	img      *ebiten.Image
+	lastUsed int
+}
+
+var (
+	textCache      = make(map[string]*textCacheEntry, 128)
+	textCacheFrame int
+)
+
+// tickTextCache increments the frame counter and evicts stale entries.
+// Call once per frame from the draw entry point.
+func tickTextCache() {
+	textCacheFrame++
+	if textCacheFrame%120 == 0 {
+		for k, e := range textCache {
+			if textCacheFrame-e.lastUsed > 120 {
+				e.img.Deallocate()
+				delete(textCache, k)
+			}
+		}
+	}
+}
+
+// cachedTextImage returns a cached white-text image for the given string.
+// Used by HUD functions that need a scaled text image.
+func cachedTextImage(text string) *ebiten.Image {
+	key := "__hud__" + text
+	entry, ok := textCache[key]
+	if !ok {
+		tw := len(text)*6 + 10
+		if tw < 1 {
+			tw = 1
+		}
+		th := 16
+		img := ebiten.NewImage(tw, th)
+		ebitenutil.DebugPrintAt(img, text, 5, 3)
+		entry = &textCacheEntry{img: img}
+		textCache[key] = entry
+	}
+	entry.lastUsed = textCacheFrame
+	return entry.img
+}
+
 // printColoredAt draws colored text at the given position.
-// We create a tiny image, draw the text, then tint it.
+// Uses a text image cache to avoid per-frame GPU image allocations.
 func printColoredAt(screen *ebiten.Image, text string, x, y int, col color.RGBA) {
 	if text == "" {
 		return
 	}
-	tw := len(text)*charW + 2
-	if tw < 1 {
-		tw = 1
+
+	// Build cache key: text + color bytes
+	key := text + string([]byte{col.R, col.G, col.B, col.A})
+
+	entry, ok := textCache[key]
+	if !ok {
+		tw := len(text)*charW + 2
+		if tw < 1 {
+			tw = 1
+		}
+		th := lineH
+		img := ebiten.NewImage(tw, th)
+		ebitenutil.DebugPrintAt(img, text, 0, 0)
+		entry = &textCacheEntry{img: img}
+		textCache[key] = entry
 	}
-	th := lineH
-	tmpImg := ebiten.NewImage(tw, th)
-	ebitenutil.DebugPrintAt(tmpImg, text, 0, 0)
+	entry.lastUsed = textCacheFrame
 
 	op := &ebiten.DrawImageOptions{}
 	op.GeoM.Translate(float64(x), float64(y))
@@ -468,7 +524,7 @@ func printColoredAt(screen *ebiten.Image, text string, x, y int, col color.RGBA)
 	a := float64(col.A) / 255.0
 	op.ColorScale.Scale(float32(r), float32(g), float32(b), float32(a))
 
-	screen.DrawImage(tmpImg, op)
+	screen.DrawImage(entry.img, op)
 }
 
 // swarmTokenColor maps a SwarmScript token type to a display color.
