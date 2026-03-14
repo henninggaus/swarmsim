@@ -32,11 +32,13 @@ func NewSwarmState(rng *rand.Rand, botCount int) *SwarmState {
 		"Aggregation", "Dispersion", "Orbit", "Color Wave", "Flocking",
 		"Snake Formation", "Obstacle Nav", "Pulse Sync", "Trail Follow", "Ant Colony",
 		"Simple Delivery", "Delivery Comm", "Delivery Roles",
+		"Simple Unload", "Coordinated Unload",
 	}
 	ss.PresetPrograms = []string{
 		presetAggregation, presetDispersion, presetOrbit, presetColorWave, presetFlocking,
 		presetSnakeFormation, presetObstacleNav, presetPulseSync, presetTrailFollow, presetAntColony,
 		presetSimpleDelivery, presetDeliveryComm, presetDeliveryRoles,
+		presetSimpleUnload, presetCoordinatedUnload,
 	}
 
 	// Initialize editor with default preset
@@ -788,6 +790,64 @@ IF state == 2 AND carry == 1 THEN FWD
 IF match == 1 AND d_dist < 25 THEN DROP
 IF match == 1 THEN GOTO_DROPOFF
 IF match == 1 THEN FWD
+# --- Navigation LAST ---
+IF obs_ahead == 1 THEN AVOID_OBSTACLE
+IF edge == 1 THEN TURN_RIGHT 180`
+
+var presetSimpleUnload = `# Simple Unload — enable Trucks!
+# Go to ramp, pick up, deliver
+# --- Explore (lowest priority) ---
+IF rnd < 8 THEN TURN_RANDOM
+IF true THEN FWD
+# --- Separation ---
+IF near_dist < 15 THEN TURN_FROM_NEAREST
+IF near_dist < 15 THEN FWD
+# --- LED gradient ---
+IF d_dist < 200 THEN LED_DROPOFF
+IF d_dist > 200 THEN COPY_LED
+# --- Truck pickup ---
+IF carry == 0 AND truck_here == 1 THEN GOTO_TRUCK_PKG
+IF carry == 0 AND truck_here == 1 THEN FWD
+IF carry == 0 AND on_ramp == 1 THEN PICKUP
+IF carry == 0 THEN GOTO_RAMP
+IF carry == 0 THEN FWD
+# --- Deliver ---
+IF led_dist < 200 THEN GOTO_LED
+IF led_dist < 200 THEN FWD
+IF match == 1 AND d_dist < 25 THEN DROP
+IF match == 1 THEN GOTO_DROPOFF
+IF match == 1 THEN FWD
+# --- Navigation LAST ---
+IF obs_ahead == 1 THEN AVOID_OBSTACLE
+IF edge == 1 THEN TURN_RIGHT 180`
+
+var presetCoordinatedUnload = `# Coordinated Unload — enable Trucks!
+# Messages + LED + truck sensors
+# --- Explore (lowest) ---
+IF rnd < 6 THEN TURN_RANDOM
+IF true THEN FWD
+# --- Separation ---
+IF near_dist < 15 THEN TURN_FROM_NEAREST
+# --- LED gradient + broadcast ---
+IF d_dist < 200 THEN LED_DROPOFF
+IF carry == 1 AND d_dist > 200 THEN COPY_LED
+IF d_dist < 200 THEN SEND_DROPOFF 1
+# --- Truck pickup ---
+IF carry == 0 AND truck_here == 1 AND t_pkg < 40 THEN GOTO_TRUCK_PKG
+IF carry == 0 AND truck_here == 1 THEN FWD
+IF carry == 0 AND on_ramp == 1 THEN PICKUP
+IF carry == 0 AND truck_pkg > 0 THEN GOTO_RAMP
+IF carry == 0 AND truck_pkg > 0 THEN FWD
+IF carry == 0 AND heard_dropoff > 0 THEN GOTO_HEARD_DROPOFF
+# --- Deliver: LED gradient ---
+IF led_dist < 200 THEN GOTO_LED
+IF led_dist < 200 THEN FWD
+# --- Deliver: direct ---
+IF match == 1 AND d_dist < 25 THEN DROP
+IF match == 1 THEN GOTO_DROPOFF
+IF match == 1 THEN FWD
+IF carry == 1 THEN SET_LED 255 99 0
+IF carry == 1 THEN FWD
 # --- Navigation LAST ---
 IF obs_ahead == 1 THEN AVOID_OBSTACLE
 IF edge == 1 THEN TURN_RIGHT 180`

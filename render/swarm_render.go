@@ -269,6 +269,20 @@ func (r *Renderer) DrawSwarmMode(screen *ebiten.Image, s *simulation.Simulation,
 		drawSelectedBotInfo(screen, ss)
 	}
 
+	// Truck round complete overlay
+	if ss.TruckToggle && ss.TruckState != nil && ss.TruckState.CurrentTruck != nil &&
+		ss.TruckState.CurrentTruck.Phase == swarm.TruckRoundDone {
+		roundText := fmt.Sprintf("ROUND COMPLETE! Score: %d [N: New Round]", ss.TruckState.Score)
+		rtW := len(roundText) * charW
+		rtX := sw/2 - rtW/2 + 100
+		rtY := sh/2 - 30
+		vector.DrawFilledRect(screen, float32(rtX-10), float32(rtY-8), float32(rtW+20), 30,
+			color.RGBA{30, 30, 20, 220}, false)
+		vector.StrokeRect(screen, float32(rtX-10), float32(rtY-8), float32(rtW+20), 30,
+			2, color.RGBA{255, 200, 50, 200}, false)
+		printColoredAt(screen, roundText, rtX, rtY, color.RGBA{255, 220, 50, 255})
+	}
+
 	// Follow-cam HUD indicator
 	if ss.FollowCamBot >= 0 && ss.FollowCamBot < len(ss.Bots) {
 		label := fmt.Sprintf("Following Bot #%d [F to stop]", ss.FollowCamBot)

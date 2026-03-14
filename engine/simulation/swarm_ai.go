@@ -426,6 +426,43 @@ func buildSwarmEnvironment(ss *swarm.SwarmState, i int) {
 		}
 	}
 
+	// Truck sensors: build when truck toggle active
+	bot.TruckHere = false
+	bot.TruckPkgCount = 0
+	bot.OnRamp = false
+	bot.NearestTruckPkgDist = 999
+	bot.NearestTruckPkgIdx = -1
+
+	if ss.TruckToggle && ss.TruckState != nil {
+		ts := ss.TruckState
+		// Check if bot is on ramp
+		if bot.X >= ts.RampX && bot.X <= ts.RampX+ts.RampW &&
+			bot.Y >= ts.RampY && bot.Y <= ts.RampY+ts.RampH {
+			bot.OnRamp = true
+		}
+		// Check if truck is parked
+		if ts.CurrentTruck != nil && ts.CurrentTruck.Phase == swarm.TruckParked {
+			bot.TruckHere = true
+			// Count remaining packages and find nearest
+			for pi, pkg := range ts.CurrentTruck.Packages {
+				if pkg.PickedUp {
+					continue
+				}
+				bot.TruckPkgCount++
+				// Package world position
+				wpx := ts.CurrentTruck.X + pkg.RelX + 18 + 4 // cabin offset + center
+				wpy := ts.CurrentTruck.Y + pkg.RelY + 4      // center
+				pdx := bot.X - wpx
+				pdy := bot.Y - wpy
+				pdist := math.Sqrt(pdx*pdx + pdy*pdy)
+				if pdist < bot.NearestTruckPkgDist {
+					bot.NearestTruckPkgDist = pdist
+					bot.NearestTruckPkgIdx = pi
+				}
+			}
+		}
+	}
+
 	// Obstacle raycast — check 10 steps at 5px in facing direction (50px lookahead)
 	allObs := ss.AllObstacles()
 	if len(allObs) > 0 {
@@ -662,6 +699,26 @@ func evaluateSwarmCondition(cond swarmscript.Condition, bot *swarm.SwarmBot, sna
 
 	case swarmscript.CondNearestMatchLEDDist:
 		return compareInt(int(bot.NearestMatchLEDDist), cond.Op, cond.Value)
+
+	case swarmscript.CondTruckHere:
+		v := 0
+		if bot.TruckHere {
+			v = 1
+		}
+		return compareInt(v, cond.Op, cond.Value)
+
+	case swarmscript.CondTruckPkgCount:
+		return compareInt(bot.TruckPkgCount, cond.Op, cond.Value)
+
+	case swarmscript.CondOnRamp:
+		v := 0
+		if bot.OnRamp {
+			v = 1
+		}
+		return compareInt(v, cond.Op, cond.Value)
+
+	case swarmscript.CondNearestTruckPkgDist:
+		return compareInt(int(bot.NearestTruckPkgDist), cond.Op, cond.Value)
 	}
 
 	return false
@@ -904,6 +961,37 @@ func executeSwarmAction(act swarmscript.Action, bot *swarm.SwarmBot, ss *swarm.S
 		if !ss.DeliveryOn || bot.CarryingPkg >= 0 {
 			return
 		}
+		// Truck packages: pick up from truck ramp
+		if ss.TruckToggle && ss.TruckState != nil && bot.OnRamp &&
+			ss.TruckState.CurrentTruck != nil && ss.TruckState.CurrentTruck.Phase == swarm.TruckParked {
+			t := ss.TruckState.CurrentTruck
+			if bot.NearestTruckPkgIdx >= 0 && bot.NearestTruckPkgDist < 40 {
+				tpkg := &t.Packages[bot.NearestTruckPkgIdx]
+				if !tpkg.PickedUp {
+					tpkg.PickedUp = true
+					ss.TruckState.TotalPkgs++
+					// Convert to DeliveryPackage
+					dpkg := swarm.DeliveryPackage{
+						Color:      tpkg.Color,
+						CarriedBy:  botIdx,
+						X:          bot.X,
+						Y:          bot.Y,
+						Active:     true,
+						PickupTick: ss.Tick,
+					}
+					ss.Packages = append(ss.Packages, dpkg)
+					bot.CarryingPkg = len(ss.Packages) - 1
+					bot.Stats.TotalPickups++
+					// Emit pickup event for particles
+					ss.DeliveryEvents = append(ss.DeliveryEvents, swarm.SwarmDeliveryEvent{
+						X: bot.X, Y: bot.Y,
+						Color: tpkg.Color, IsPickup: true,
+					})
+					logger.InfoBot(botIdx, "TRUCK", "Bot #%d picked up %s from truck", botIdx, swarm.DeliveryColorName(tpkg.Color))
+					return
+				}
+			}
+		}
 		// Check ground packages first (closer interaction)
 		for pi := range ss.Packages {
 			pkg := &ss.Packages[pi]
@@ -998,6 +1086,18 @@ func executeSwarmAction(act swarmscript.Action, bot *swarm.SwarmBot, ss *swarm.S
 					logger.InfoBot(botIdx, "DELIVERY", "Bot #%d delivered %s CORRECT (%d ticks)", botIdx, swarm.DeliveryColorName(pkg.Color), deliveryTime)
 				} else {
 					logger.WarnBot(botIdx, "DELIVERY", "Bot #%d delivered %s WRONG (%d ticks)", botIdx, swarm.DeliveryColorName(pkg.Color), deliveryTime)
+				}
+				// Truck scoring
+				if ss.TruckToggle && ss.TruckState != nil {
+					ts := ss.TruckState
+					ts.DeliveredPkgs++
+					if correct {
+						ts.Score += 10
+						ts.CorrectPkgs++
+					} else {
+						ts.Score += 3
+						ts.WrongPkgs++
+					}
 				}
 				// Deactivate package, schedule respawn at its pickup station
 				pkg.Active = false
@@ -1128,6 +1228,32 @@ func executeSwarmAction(act swarmscript.Action, bot *swarm.SwarmBot, ss *swarm.S
 		}
 		r, g, b := deliveryColorRGB(ss.Stations[bot.NearestDropoffIdx].Color)
 		bot.LEDColor = [3]uint8{r, g, b}
+
+	case swarmscript.ActTurnToRamp:
+		if !ss.TruckToggle || ss.TruckState == nil {
+			return
+		}
+		ts := ss.TruckState
+		cx := ts.RampX + ts.RampW/2
+		cy := ts.RampY + ts.RampH/2
+		dx := cx - bot.X
+		dy := cy - bot.Y
+		bot.Angle = math.Atan2(dy, dx)
+
+	case swarmscript.ActTurnToTruckPkg:
+		if !ss.TruckToggle || ss.TruckState == nil || ss.TruckState.CurrentTruck == nil {
+			return
+		}
+		t := ss.TruckState.CurrentTruck
+		if t.Phase != swarm.TruckParked || bot.NearestTruckPkgIdx < 0 {
+			return
+		}
+		pkg := &t.Packages[bot.NearestTruckPkgIdx]
+		wpx := t.X + pkg.RelX + 18 + 4
+		wpy := t.Y + pkg.RelY + 4
+		dx := wpx - bot.X
+		dy := wpy - bot.Y
+		bot.Angle = math.Atan2(dy, dx)
 	}
 }
 

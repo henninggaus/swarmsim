@@ -641,6 +641,21 @@ func (g *Game) handleSwarmInput() {
 		logger.Info("SWARM", "Routes: %v", ss.ShowRoutes)
 	}
 
+	// N key: new truck round (when editor not focused and truck mode active)
+	if inpututil.IsKeyJustPressed(ebiten.KeyN) && !ed.Focused && !ss.BotCountEdit {
+		if ss.TruckToggle && ss.TruckState != nil {
+			if ss.TruckState.CurrentTruck != nil && ss.TruckState.CurrentTruck.Phase == swarm.TruckRoundDone {
+				ss.TruckState = swarm.NewSwarmTruckState(ss.Rng)
+				ss.TruckState.RoundNum++
+				ss.ResetBots()
+				if ss.DeliveryOn {
+					swarm.GenerateDeliveryStations(ss)
+				}
+				logger.Info("SWARM", "New truck round %d", ss.TruckState.RoundNum)
+			}
+		}
+	}
+
 	// M key: toggle minimap (when editor not focused)
 	if inpututil.IsKeyJustPressed(ebiten.KeyM) && !ed.Focused && !ss.BotCountEdit {
 		g.renderer.ShowMinimap = !g.renderer.ShowMinimap
@@ -1202,8 +1217,9 @@ func (g *Game) loadSwarmPreset(idx int) {
 	ss.ErrorLine = 0
 
 	// Delivery-program coupling
-	if swarm.IsDeliveryPresetIdx(idx) {
-		ss.IsDeliveryProgram = true
+	if swarm.IsDeliveryPresetIdx(idx) || swarm.IsTruckPresetIdx(idx) {
+		ss.IsDeliveryProgram = swarm.IsDeliveryPresetIdx(idx)
+		ss.IsTruckProgram = swarm.IsTruckPresetIdx(idx)
 		// Force delivery ON, maze ON, obstacles OFF
 		ss.DeliveryOn = true
 		ss.MazeOn = true
@@ -1214,8 +1230,20 @@ func (g *Game) loadSwarmPreset(idx int) {
 		for i := range ss.Bots {
 			ss.Bots[i].CarryingPkg = -1
 		}
+		// Truck preset: also enable truck system
+		if swarm.IsTruckPresetIdx(idx) {
+			ss.TruckToggle = true
+			ss.TruckState = swarm.NewSwarmTruckState(ss.Rng)
+			logger.Info("SWARM", "Truck preset: trucks enabled (round %d)", ss.TruckState.RoundNum)
+		} else {
+			ss.TruckToggle = false
+			ss.TruckState = nil
+		}
 	} else {
 		ss.IsDeliveryProgram = false
+		ss.IsTruckProgram = false
+		ss.TruckToggle = false
+		ss.TruckState = nil
 		// Force delivery OFF for non-delivery presets
 		if ss.DeliveryOn {
 			ss.DeliveryOn = false

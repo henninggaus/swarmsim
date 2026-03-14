@@ -113,6 +113,13 @@ type SwarmBot struct {
 	NearestMatchLEDDist  float64 // dist to nearest bot whose LED matches carrying color
 	NearestMatchLEDAngle float64 // angle to that bot
 
+	// Truck sensor cache (rebuilt per tick when TruckToggle)
+	TruckHere           bool
+	TruckPkgCount       int
+	OnRamp              bool
+	NearestTruckPkgDist float64
+	NearestTruckPkgIdx  int // index in SwarmTruck.Packages (-1 if none)
+
 	// Lifetime statistics (persist across sim reset, cleared on bot count change)
 	Stats BotLifetimeStats
 }

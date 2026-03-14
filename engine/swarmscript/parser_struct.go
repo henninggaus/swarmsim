@@ -48,6 +48,10 @@ const (
 	CondHeardPickupColor                         // heard_pickup_color
 	CondHeardDropoffColor                        // heard_dropoff_color
 	CondNearestMatchLEDDist                      // nearest_matching_led_dist
+	CondTruckHere                                // truck_here
+	CondTruckPkgCount                            // truck_pkg_count
+	CondOnRamp                                   // on_ramp
+	CondNearestTruckPkgDist                      // nearest_truck_pkg
 )
 
 // Condition represents a single boolean check in a rule.
@@ -96,6 +100,8 @@ const (
 	ActTurnToMatchingLED                       // TURN_TO_MATCHING_LED
 	ActSetLEDPickupColor                       // SET_LED_PICKUP_COLOR
 	ActSetLEDDropoffColor                      // SET_LED_DROPOFF_COLOR
+	ActTurnToRamp                              // GOTO_RAMP
+	ActTurnToTruckPkg                          // GOTO_TRUCK_PKG
 )
 
 // Action represents an action to execute when a rule matches.
@@ -152,6 +158,10 @@ var conditionNames = map[string]ConditionType{
 	"heard_pickup_color":         CondHeardPickupColor,
 	"heard_dropoff_color":        CondHeardDropoffColor,
 	"nearest_matching_led_dist":  CondNearestMatchLEDDist,
+	"truck_here":                CondTruckHere,
+	"truck_pkg_count":           CondTruckPkgCount,
+	"on_ramp":                   CondOnRamp,
+	"nearest_truck_pkg":         CondNearestTruckPkgDist,
 	// Short aliases for general conditions (keeps preset lines under 70 chars)
 	"nearest_dist": CondNearestDistance,
 	"nbr_count":    CondNeighborsCount,
@@ -183,6 +193,9 @@ var conditionNames = map[string]ConditionType{
 	"msg":       CondReceivedMessage,
 	"light":     CondLightValue,
 	"edge":      CondOnEdge,
+	// Short aliases for truck conditions
+	"truck_pkg": CondTruckPkgCount,
+	"t_pkg":     CondNearestTruckPkgDist,
 }
 
 // actionNames maps action name strings to (ActionType, paramCount).
@@ -225,6 +238,9 @@ var actionNames = map[string]struct {
 	"TURN_TO_MATCHING_LED":     {ActTurnToMatchingLED, 0},
 	"SET_LED_PICKUP_COLOR":     {ActSetLEDPickupColor, 0},
 	"SET_LED_DROPOFF_COLOR":    {ActSetLEDDropoffColor, 0},
+	// Truck actions
+	"GOTO_RAMP":          {ActTurnToRamp, 0},
+	"GOTO_TRUCK_PKG":     {ActTurnToTruckPkg, 0},
 	// Short aliases for delivery actions (keeps preset lines under 70 chars)
 	"GOTO_PICKUP":        {ActTurnToPickup, 0},
 	"GOTO_DROPOFF":       {ActTurnToMatchingDropoff, 0},
@@ -297,6 +313,9 @@ var highlightConditions = map[string]bool{
 	"p_dist": true, "d_dist": true, "led_dist": true,
 	"obs_ahead": true, "obs_dist": true, "near_dist": true,
 	"neighbors": true, "nbrs": true, "msg": true, "light": true, "edge": true,
+	// Truck sensors
+	"truck_here": true, "truck_pkg_count": true, "on_ramp": true,
+	"nearest_truck_pkg": true, "truck_pkg": true, "t_pkg": true,
 }
 
 var highlightActions = map[string]bool{
@@ -324,6 +343,8 @@ var highlightActions = map[string]bool{
 	"LED_PICKUP": true, "LED_DROPOFF": true,
 	"COPY_LED": true, "AVOID_OBSTACLE": true,
 	"FWD": true, "FWD_SLOW": true, "GOTO_MATCH": true,
+	// Truck actions
+	"GOTO_RAMP": true, "GOTO_TRUCK_PKG": true,
 }
 
 // --- Reverse mapping functions (for block editor / serialization) ---
@@ -395,6 +416,14 @@ func ConditionTypeName(ct ConditionType) string {
 		return "heard_dropoff"
 	case CondNearestMatchLEDDist:
 		return "led_dist"
+	case CondTruckHere:
+		return "truck_here"
+	case CondTruckPkgCount:
+		return "truck_pkg_count"
+	case CondOnRamp:
+		return "on_ramp"
+	case CondNearestTruckPkgDist:
+		return "nearest_truck_pkg"
 	}
 	return "unknown"
 }
@@ -485,6 +514,10 @@ func ActionTypeName(at ActionType) string {
 		return "LED_PICKUP"
 	case ActSetLEDDropoffColor:
 		return "LED_DROPOFF"
+	case ActTurnToRamp:
+		return "GOTO_RAMP"
+	case ActTurnToTruckPkg:
+		return "GOTO_TRUCK_PKG"
 	}
 	return "UNKNOWN"
 }
@@ -516,6 +549,7 @@ var SensorGrouped = [][]string{
 	{"-- Kommunikation --", "msg", "heard_pickup", "heard_dropoff", "led_dist"},
 	{"-- LED --", "nearest_led_r", "nearest_led_g", "nearest_led_b"},
 	{"-- Intern --", "state", "counter", "value1", "value2", "timer", "tick"},
+	{"-- Truck --", "truck_here", "truck_pkg_count", "on_ramp", "nearest_truck_pkg"},
 }
 
 // ActionGrouped returns action names organized in groups for dropdown display.
@@ -527,6 +561,7 @@ var ActionGrouped = [][]string{
 	{"-- LED --", "SET_LED", "LED_PICKUP", "LED_DROPOFF", "COPY_LED"},
 	{"-- Intern --", "SET_STATE", "SET_COUNTER", "INC_COUNTER", "DEC_COUNTER", "SET_TIMER", "SET_VALUE1", "SET_VALUE2"},
 	{"-- Follow --", "FOLLOW_NEAREST", "UNFOLLOW"},
+	{"-- Truck --", "GOTO_RAMP", "GOTO_TRUCK_PKG"},
 }
 
 // wordPos tracks a word and its column position in a line.
