@@ -93,6 +93,25 @@ type SwarmBot struct {
 	// LED pheromone matching (for delivery navigation gradient)
 	NearestMatchLEDDist  float64 // dist to nearest bot whose LED matches carrying color
 	NearestMatchLEDAngle float64 // angle to that bot
+
+	// Lifetime statistics (persist across sim reset, cleared on bot count change)
+	Stats BotLifetimeStats
+}
+
+// BotLifetimeStats tracks cumulative performance metrics for a single bot.
+type BotLifetimeStats struct {
+	TotalDistance     float64 // sum of per-tick displacement in px
+	TotalPickups      int
+	TotalDeliveries   int
+	CorrectDeliveries int
+	WrongDeliveries   int
+	DeliveryTimes     []int // ticks per completed delivery
+	MessagesSent      int
+	MessagesReceived  int
+	AntiStuckCount    int
+	TicksAlive        int // incremented every tick
+	TicksCarrying     int // ticks while CarryingPkg >= 0
+	TicksIdle         int // ticks while Speed == 0
 }
 
 // LightSource represents an optional light source in the arena.

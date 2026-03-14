@@ -99,6 +99,7 @@ func (s *Simulation) updateSwarmMode() {
 				X:     ss.Bots[i].X,
 				Y:     ss.Bots[i].Y,
 			})
+			ss.Bots[i].Stats.MessagesSent++
 		}
 	}
 
@@ -127,6 +128,21 @@ func (s *Simulation) updateSwarmMode() {
 			fmt.Printf("[DELIVERY] tick=%d delivered=%d (correct=%d wrong=%d) carrying=%d\n",
 				ss.Tick, ss.DeliveryStats.TotalDelivered, ss.DeliveryStats.CorrectDelivered,
 				ss.DeliveryStats.WrongDelivered, carrying)
+		}
+	}
+
+	// Phase 4.9: Accumulate lifetime stats (before StuckPrevX/Y is overwritten)
+	for i := range ss.Bots {
+		bot := &ss.Bots[i]
+		ddx := bot.X - bot.StuckPrevX
+		ddy := bot.Y - bot.StuckPrevY
+		bot.Stats.TotalDistance += math.Sqrt(ddx*ddx + ddy*ddy)
+		bot.Stats.TicksAlive++
+		if bot.Speed == 0 {
+			bot.Stats.TicksIdle++
+		}
+		if bot.CarryingPkg >= 0 {
+			bot.Stats.TicksCarrying++
 		}
 	}
 
@@ -181,6 +197,7 @@ func (s *Simulation) updateSwarmMode() {
 			bot.AntiStuckTimer = 45
 			bot.StuckCooldown = 30
 			bot.StuckTicks = 0
+			bot.Stats.AntiStuckCount++
 			logger.Warn("STUCK", "Bot #%d anti-stuck triggered at (%.0f, %.0f)", i, bot.X, bot.Y)
 		} else if bot.StuckTicks >= 60 {
 			// Legacy: auto-unfollow at 60 ticks (before full breakout at 90)
@@ -278,6 +295,7 @@ func buildSwarmEnvironment(ss *swarm.SwarmState, i int) {
 		dist := math.Sqrt(dx*dx + dy*dy)
 		if dist <= swarm.SwarmCommRange {
 			bot.ReceivedMsg = msg.Value
+			bot.Stats.MessagesReceived++
 			break
 		}
 	}
@@ -891,6 +909,7 @@ func executeSwarmAction(act swarmscript.Action, bot *swarm.SwarmBot, ss *swarm.S
 				pkg.OnGround = false
 				pkg.PickupTick = ss.Tick
 				bot.CarryingPkg = pi
+				bot.Stats.TotalPickups++
 				// Emit pickup event for particles
 				ss.DeliveryEvents = append(ss.DeliveryEvents, swarm.SwarmDeliveryEvent{
 					X: pkg.X, Y: pkg.Y,
@@ -957,6 +976,15 @@ func executeSwarmAction(act swarmscript.Action, bot *swarm.SwarmBot, ss *swarm.S
 				deliveryTime := ss.Tick - pkg.PickupTick
 				if deliveryTime > 0 {
 					ss.DeliveryStats.DeliveryTimes = append(ss.DeliveryStats.DeliveryTimes, deliveryTime)
+				}
+				bot.Stats.TotalDeliveries++
+				if correct {
+					bot.Stats.CorrectDeliveries++
+				} else {
+					bot.Stats.WrongDeliveries++
+				}
+				if deliveryTime > 0 {
+					bot.Stats.DeliveryTimes = append(bot.Stats.DeliveryTimes, deliveryTime)
 				}
 				// Deactivate package, schedule respawn at its pickup station
 				pkg.Active = false
