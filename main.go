@@ -300,6 +300,14 @@ func (g *Game) handleGlobalInput() {
 		}
 	}
 
+	// Backquote (`): toggle in-game log console
+	if inpututil.IsKeyJustPressed(ebiten.KeyGraveAccent) {
+		if !(g.sim.SwarmMode && g.sim.SwarmState != nil && g.sim.SwarmState.Editor != nil && g.sim.SwarmState.Editor.Focused) &&
+			!(g.sim.SwarmMode && g.sim.SwarmState != nil && g.sim.SwarmState.BotCountEdit) {
+			g.showConsole = !g.showConsole
+		}
+	}
+
 	// F12: toggle CPU profiling (requires: go build -tags profile)
 	if inpututil.IsKeyJustPressed(ebiten.KeyF12) {
 		ToggleProfile()
@@ -1034,7 +1042,12 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		}
 	}
 
-	// Help overlay (drawn on top of everything)
+	// In-game log console
+	if g.showConsole {
+		render.DrawConsole(screen, logger.Entries())
+	}
+
+	// Help overlay (drawn on top of everything, including console)
 	if g.showHelp {
 		render.DrawHelpOverlay(screen, g.sim.SwarmMode, g.helpScrollY)
 	}
