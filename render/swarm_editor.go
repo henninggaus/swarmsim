@@ -243,6 +243,9 @@ func DrawSwarmEditor(screen *ebiten.Image, ss *swarm.SwarmState) {
 	if ss.DropdownOpen {
 		drawSwarmDropdownOverlay(screen, ss)
 	}
+
+	// Tooltips for toggle buttons (when hovering)
+	drawSwarmTooltips(screen)
 }
 
 // drawSwarmStats renders the stats panel at the bottom of the editor.
@@ -525,6 +528,49 @@ func printColoredAt(screen *ebiten.Image, text string, x, y int, col color.RGBA)
 	op.ColorScale.Scale(float32(r), float32(g), float32(b), float32(a))
 
 	screen.DrawImage(entry.img, op)
+}
+
+// drawSwarmTooltips shows tooltip text when hovering over toggle buttons.
+func drawSwarmTooltips(screen *ebiten.Image) {
+	mx, my := ebiten.CursorPosition()
+
+	// Define tooltip zones: (x, y, w, h, text)
+	type tooltipZone struct {
+		x, y, w, h int
+		text        string
+	}
+	zones := []tooltipZone{
+		{5, editorToggle1Y, toggleBtnW, toggleBtnH, "Zufaellige Hindernisse im Feld"},
+		{175, editorToggle1Y, toggleBtnW, toggleBtnH, "Labyrinth mit Gaengen und Waenden"},
+		{5, editorToggle2Y, toggleBtnW, toggleBtnH, "Lichtquelle fuer light_value Sensor"},
+		{175, editorToggle2Y, toggleBtnW, toggleBtnH, "BOUNCE=Abprallen WRAP=Durchlaufen"},
+		{5, editorToggle3Y, toggleBtnW, toggleBtnH, "Paket-Liefersystem mit Stationen"},
+	}
+
+	for _, z := range zones {
+		if mx >= z.x && mx < z.x+z.w && my >= z.y && my < z.y+z.h {
+			// Draw tooltip near cursor
+			tipX := mx + 10
+			tipY := my - lineH - 6
+			tipW := len(z.text)*charW + 8
+
+			// Keep tooltip on screen
+			sw := screen.Bounds().Dx()
+			if tipX+tipW > sw {
+				tipX = sw - tipW - 5
+			}
+			if tipY < 0 {
+				tipY = my + 20
+			}
+
+			vector.DrawFilledRect(screen, float32(tipX-3), float32(tipY-2), float32(tipW), float32(lineH+4),
+				color.RGBA{30, 30, 50, 230}, false)
+			vector.StrokeRect(screen, float32(tipX-3), float32(tipY-2), float32(tipW), float32(lineH+4),
+				1, color.RGBA{100, 100, 130, 200}, false)
+			printColoredAt(screen, z.text, tipX, tipY, color.RGBA{200, 200, 220, 255})
+			break // only one tooltip at a time
+		}
+	}
 }
 
 // swarmTokenColor maps a SwarmScript token type to a display color.

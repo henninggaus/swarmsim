@@ -248,12 +248,31 @@ func (g *Game) handleGlobalInput() {
 		}
 	}
 
-	// F1-F5: load scenarios
+	// F1-F5: load scenarios (with fade transition)
 	scenarioKeys := []ebiten.Key{ebiten.KeyF1, ebiten.KeyF2, ebiten.KeyF3, ebiten.KeyF4, ebiten.KeyF5}
 	for i, key := range scenarioKeys {
-		if inpututil.IsKeyJustPressed(key) && i < len(g.scenarios) {
-			logger.Info("KEY", "F%d pressed -> Loading scenario: %s", i+1, g.scenarios[i].Name)
-			g.sim.LoadScenario(g.scenarios[i])
+		if inpututil.IsKeyJustPressed(key) && i < len(g.scenarios) && g.renderer.FadeDir == 0 {
+			idx := i // capture for closure
+			logger.Info("KEY", "F%d pressed -> Loading scenario: %s", idx+1, g.scenarios[idx].Name)
+			g.renderer.FadeDir = -1
+			g.renderer.FadeAlpha = 0
+			g.renderer.FadeLoad = func() {
+				g.sim.LoadScenario(g.scenarios[idx])
+				g.camera.X = g.sim.Cfg.ArenaWidth / 2
+				g.camera.Y = g.sim.Cfg.ArenaHeight / 2
+				g.camera.Zoom = 0.7
+				g.tickAcc = 0
+			}
+		}
+	}
+
+	// F6: load truck scenario (with fade)
+	if inpututil.IsKeyJustPressed(ebiten.KeyF6) && g.renderer.FadeDir == 0 {
+		logger.Info("KEY", "F6 pressed -> Loading truck scenario: LKW-ENTLADUNG")
+		g.renderer.FadeDir = -1
+		g.renderer.FadeAlpha = 0
+		g.renderer.FadeLoad = func() {
+			g.sim.LoadTruckScenario()
 			g.camera.X = g.sim.Cfg.ArenaWidth / 2
 			g.camera.Y = g.sim.Cfg.ArenaHeight / 2
 			g.camera.Zoom = 0.7
@@ -261,21 +280,15 @@ func (g *Game) handleGlobalInput() {
 		}
 	}
 
-	// F6: load truck scenario
-	if inpututil.IsKeyJustPressed(ebiten.KeyF6) {
-		logger.Info("KEY", "F6 pressed -> Loading truck scenario: LKW-ENTLADUNG")
-		g.sim.LoadTruckScenario()
-		g.camera.X = g.sim.Cfg.ArenaWidth / 2
-		g.camera.Y = g.sim.Cfg.ArenaHeight / 2
-		g.camera.Zoom = 0.7
-		g.tickAcc = 0
-	}
-
-	// F7: load swarm scenario
-	if inpututil.IsKeyJustPressed(ebiten.KeyF7) {
+	// F7: load swarm scenario (with fade)
+	if inpututil.IsKeyJustPressed(ebiten.KeyF7) && g.renderer.FadeDir == 0 {
 		logger.Info("KEY", "F7 pressed -> Loading swarm scenario: PROGRAMMABLE SWARM")
-		g.sim.LoadSwarmScenario()
-		g.tickAcc = 0
+		g.renderer.FadeDir = -1
+		g.renderer.FadeAlpha = 0
+		g.renderer.FadeLoad = func() {
+			g.sim.LoadSwarmScenario()
+			g.tickAcc = 0
+		}
 	}
 
 	// F10: screenshot

@@ -65,6 +65,14 @@ type Renderer struct {
 
 	// Welcome screen
 	WelcomeBots []WelcomeBot
+
+	// Fade transition
+	FadeAlpha float32 // 0.0 = transparent, 1.0 = fully black
+	FadeDir   int     // -1 = fading out (to black), +1 = fading in (from black), 0 = none
+	FadeLoad  func()  // callback when fade reaches 1.0 (load scenario, then reverse)
+
+	// FPS warning
+	LowFPSCounter int
 }
 
 // NewRenderer creates a new renderer with a particle system.

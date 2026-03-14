@@ -19,6 +19,8 @@ func DrawHUD(screen *ebiten.Image, s *simulation.Simulation, fps float64, r *Ren
 		DrawSwarmEditor(screen, s.SwarmState)
 		DrawSwarmHUD(screen, s, fps)
 		DrawCaptureOverlay(screen, r)
+		drawFPSWarning(screen, r, fps, screen.Bounds().Dx())
+		drawFadeOverlay(screen, r)
 		return
 	}
 
@@ -104,6 +106,64 @@ func DrawHUD(screen *ebiten.Image, s *simulation.Simulation, fps float64, r *Ren
 
 	// Screenshot / GIF overlay
 	DrawCaptureOverlay(screen, r)
+
+	// FPS warning
+	drawFPSWarning(screen, r, fps, sw)
+
+	// Fade transition overlay
+	drawFadeOverlay(screen, r)
+}
+
+// drawFPSWarning shows a yellow warning when FPS is consistently low.
+func drawFPSWarning(screen *ebiten.Image, r *Renderer, fps float64, sw int) {
+	if fps > 0 && fps < 30 {
+		r.LowFPSCounter++
+	} else {
+		r.LowFPSCounter = 0
+	}
+	if r.LowFPSCounter > 60 {
+		warn := fmt.Sprintf("Low FPS: %.0f", fps)
+		warnW := len(warn) * charW
+		warnX := sw - warnW - 15
+		vector.DrawFilledRect(screen, float32(warnX-4), 2, float32(warnW+8), float32(lineH+4),
+			color.RGBA{100, 80, 0, 200}, false)
+		printColoredAt(screen, warn, warnX, 4, color.RGBA{255, 220, 80, 255})
+	}
+}
+
+// drawFadeOverlay draws a full-screen black rect for fade transitions.
+func drawFadeOverlay(screen *ebiten.Image, r *Renderer) {
+	if r.FadeAlpha <= 0 && r.FadeDir == 0 {
+		return
+	}
+	sw := screen.Bounds().Dx()
+	sh := screen.Bounds().Dy()
+
+	// Animate
+	if r.FadeDir == -1 {
+		r.FadeAlpha += 0.1
+		if r.FadeAlpha >= 1.0 {
+			r.FadeAlpha = 1.0
+			// Execute load callback and reverse fade direction
+			if r.FadeLoad != nil {
+				r.FadeLoad()
+				r.FadeLoad = nil
+			}
+			r.FadeDir = 1
+		}
+	} else if r.FadeDir == 1 {
+		r.FadeAlpha -= 0.08
+		if r.FadeAlpha <= 0 {
+			r.FadeAlpha = 0
+			r.FadeDir = 0
+		}
+	}
+
+	if r.FadeAlpha > 0 {
+		alpha := uint8(r.FadeAlpha * 255)
+		vector.DrawFilledRect(screen, 0, 0, float32(sw), float32(sh),
+			color.RGBA{0, 0, 0, alpha}, false)
+	}
 }
 
 func drawBotCount(screen *ebiten.Image, x, y int, name string, count int, col color.RGBA) {
