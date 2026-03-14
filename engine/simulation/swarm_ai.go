@@ -198,7 +198,7 @@ func (s *Simulation) updateSwarmMode() {
 			bot.StuckCooldown = 30
 			bot.StuckTicks = 0
 			bot.Stats.AntiStuckCount++
-			logger.Warn("STUCK", "Bot #%d anti-stuck triggered at (%.0f, %.0f)", i, bot.X, bot.Y)
+			logger.WarnBot(i, "STUCK", "Bot #%d anti-stuck at (%.0f, %.0f)", i, bot.X, bot.Y)
 		} else if bot.StuckTicks >= 60 {
 			// Legacy: auto-unfollow at 60 ticks (before full breakout at 90)
 			if bot.FollowTargetIdx >= 0 && bot.FollowTargetIdx < len(ss.Bots) {
@@ -830,11 +830,13 @@ func executeSwarmAction(act swarmscript.Action, bot *swarm.SwarmBot, ss *swarm.S
 			if !wouldCycle {
 				bot.FollowTargetIdx = bestIdx
 				ss.Bots[bestIdx].FollowerIdx = botIdx
+				logger.InfoBot(botIdx, "FOLLOW", "Bot #%d following Bot #%d", botIdx, bestIdx)
 			}
 		}
 
 	case swarmscript.ActUnfollow:
 		if bot.FollowTargetIdx >= 0 && bot.FollowTargetIdx < len(ss.Bots) {
+			logger.InfoBot(botIdx, "FOLLOW", "Bot #%d unfollowed Bot #%d", botIdx, bot.FollowTargetIdx)
 			// Clear leader's follower reference
 			ss.Bots[bot.FollowTargetIdx].FollowerIdx = -1
 		}
@@ -910,6 +912,7 @@ func executeSwarmAction(act swarmscript.Action, bot *swarm.SwarmBot, ss *swarm.S
 				pkg.PickupTick = ss.Tick
 				bot.CarryingPkg = pi
 				bot.Stats.TotalPickups++
+				logger.InfoBot(botIdx, "DELIVERY", "Bot #%d picked up %s package", botIdx, swarm.DeliveryColorName(pkg.Color))
 				// Emit pickup event for particles
 				ss.DeliveryEvents = append(ss.DeliveryEvents, swarm.SwarmDeliveryEvent{
 					X: pkg.X, Y: pkg.Y,
@@ -985,6 +988,11 @@ func executeSwarmAction(act swarmscript.Action, bot *swarm.SwarmBot, ss *swarm.S
 				}
 				if deliveryTime > 0 {
 					bot.Stats.DeliveryTimes = append(bot.Stats.DeliveryTimes, deliveryTime)
+				}
+				if correct {
+					logger.InfoBot(botIdx, "DELIVERY", "Bot #%d delivered %s CORRECT (%d ticks)", botIdx, swarm.DeliveryColorName(pkg.Color), deliveryTime)
+				} else {
+					logger.WarnBot(botIdx, "DELIVERY", "Bot #%d delivered %s WRONG (%d ticks)", botIdx, swarm.DeliveryColorName(pkg.Color), deliveryTime)
 				}
 				// Deactivate package, schedule respawn at its pickup station
 				pkg.Active = false

@@ -56,7 +56,8 @@ type Game struct {
 	helpScrollY int
 
 	// In-game console
-	showConsole bool
+	showConsole    bool
+	consoleFilterBot int // -1 = all logs, >= 0 = filter for this bot
 
 	// Panic recovery overlay
 	panicMsg   string
@@ -74,8 +75,9 @@ func NewGame() *Game {
 		renderer:    r,
 		camera:      cam,
 		scenarios:   simulation.GetScenarios(),
-		showWelcome: true,
-		showConsole: true,
+		showWelcome:      true,
+		showConsole:      true,
+		consoleFilterBot: -1,
 	}
 }
 
@@ -632,6 +634,15 @@ func (g *Game) handleSwarmInput() {
 	if inpututil.IsKeyJustPressed(ebiten.KeyM) && !ed.Focused && !ss.BotCountEdit {
 		g.renderer.ShowMinimap = !g.renderer.ShowMinimap
 		logger.Info("SWARM", "Minimap: %v", g.renderer.ShowMinimap)
+	}
+
+	// Tab key: toggle console bot filter (when editor not focused)
+	if inpututil.IsKeyJustPressed(ebiten.KeyTab) && !ed.Focused && !ss.BotCountEdit {
+		if g.consoleFilterBot >= 0 {
+			g.consoleFilterBot = -1
+		} else if ss.SelectedBot >= 0 {
+			g.consoleFilterBot = ss.SelectedBot
+		}
 	}
 
 	// F key: toggle follow-cam (when editor not focused)
@@ -1450,7 +1461,15 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	// In-game log console
 	if g.showConsole {
-		render.DrawConsole(screen, logger.Entries(), g.sim.SwarmMode)
+		filterID := g.consoleFilterBot
+		var logEntries []logger.LogEntry
+		if filterID >= 0 && g.sim.SwarmMode {
+			logEntries = logger.EntriesForBot(filterID)
+		} else {
+			logEntries = logger.Entries()
+			filterID = -1
+		}
+		render.DrawConsole(screen, logEntries, g.sim.SwarmMode, filterID)
 	}
 
 	// Help overlay (drawn on top of everything, including console)

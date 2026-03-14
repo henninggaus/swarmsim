@@ -21,6 +21,7 @@ type LogEntry struct {
 	Level   Level
 	Tag     string // e.g. "SWARM", "GIF", "KEY"
 	Message string
+	BotID   int // -1 = no specific bot
 }
 
 const maxEntries = 200
@@ -33,22 +34,36 @@ var (
 // Info logs an informational message.
 func Info(tag, format string, args ...interface{}) {
 	msg := fmt.Sprintf(format, args...)
-	add(LevelInfo, tag, msg)
+	addBot(LevelInfo, tag, msg, -1)
 	output(LevelInfo, tag, msg)
 }
 
 // Warn logs a warning message.
 func Warn(tag, format string, args ...interface{}) {
 	msg := fmt.Sprintf(format, args...)
-	add(LevelWarn, tag, msg)
+	addBot(LevelWarn, tag, msg, -1)
 	output(LevelWarn, tag, msg)
 }
 
 // Error logs an error message.
 func Error(tag, format string, args ...interface{}) {
 	msg := fmt.Sprintf(format, args...)
-	add(LevelError, tag, msg)
+	addBot(LevelError, tag, msg, -1)
 	output(LevelError, tag, msg)
+}
+
+// InfoBot logs an info message associated with a specific bot.
+func InfoBot(botID int, tag, format string, args ...interface{}) {
+	msg := fmt.Sprintf(format, args...)
+	addBot(LevelInfo, tag, msg, botID)
+	output(LevelInfo, tag, msg)
+}
+
+// WarnBot logs a warning message associated with a specific bot.
+func WarnBot(botID int, tag, format string, args ...interface{}) {
+	msg := fmt.Sprintf(format, args...)
+	addBot(LevelWarn, tag, msg, botID)
+	output(LevelWarn, tag, msg)
 }
 
 // Entries returns a snapshot of recent log entries for the in-game console.
@@ -60,8 +75,22 @@ func Entries() []LogEntry {
 	return cp
 }
 
-// add appends an entry to the ring buffer.
-func add(level Level, tag, msg string) {
+// EntriesForBot returns entries filtered by bot ID.
+// Returns entries with matching BotID or generic entries (BotID == -1).
+func EntriesForBot(botID int) []LogEntry {
+	mu.Lock()
+	defer mu.Unlock()
+	var result []LogEntry
+	for _, e := range entries {
+		if e.BotID == botID || e.BotID == -1 {
+			result = append(result, e)
+		}
+	}
+	return result
+}
+
+// addBot appends an entry to the ring buffer with an optional bot ID.
+func addBot(level Level, tag, msg string, botID int) {
 	mu.Lock()
 	defer mu.Unlock()
 	entry := LogEntry{
@@ -69,6 +98,7 @@ func add(level Level, tag, msg string) {
 		Level:   level,
 		Tag:     tag,
 		Message: msg,
+		BotID:   botID,
 	}
 	entries = append(entries, entry)
 	if len(entries) > maxEntries {

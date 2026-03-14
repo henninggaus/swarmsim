@@ -1,6 +1,7 @@
 package render
 
 import (
+	"fmt"
 	"image/color"
 	"swarmsim/logger"
 
@@ -24,7 +25,7 @@ var (
 
 // DrawConsole renders the in-game log console at the bottom of the screen.
 // In swarm mode it draws only in the arena area (right of editor panel).
-func DrawConsole(screen *ebiten.Image, entries []logger.LogEntry, isSwarmMode bool) {
+func DrawConsole(screen *ebiten.Image, entries []logger.LogEntry, isSwarmMode bool, filterBotID int) {
 	sw := screen.Bounds().Dx()
 	sh := screen.Bounds().Dy()
 
@@ -46,7 +47,11 @@ func DrawConsole(screen *ebiten.Image, entries []logger.LogEntry, isSwarmMode bo
 	vector.StrokeLine(screen, float32(panelX), float32(panelY), float32(panelX+panelW), float32(panelY), 1, colorConsoleLine, false)
 
 	// Title
-	printColoredAt(screen, "~ Log", panelX+consolePadding, panelY+2, color.RGBA{100, 100, 120, 255})
+	if filterBotID >= 0 {
+		printColoredAt(screen, fmt.Sprintf("~ Bot #%d Logs [Tab:all]", filterBotID), panelX+consolePadding, panelY+2, color.RGBA{0, 220, 255, 255})
+	} else {
+		printColoredAt(screen, "~ Log", panelX+consolePadding, panelY+2, color.RGBA{100, 100, 120, 255})
+	}
 
 	// Show last N entries
 	maxVisible := consoleMaxLines - 1 // -1 for title line
