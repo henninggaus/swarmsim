@@ -8,8 +8,9 @@ linux:
 	GOOS=linux GOARCH=amd64 go build -o swarmsim-linux .
 
 wasm:
-	GOOS=js GOARCH=wasm go build -o swarmsim.wasm .
-	cp $$(go env GOROOT)/misc/wasm/wasm_exec.js .
+	mkdir -p docs
+	GOOS=js GOARCH=wasm go build -o docs/swarmsim.wasm .
+	cp $$(go env GOROOT)/lib/wasm/wasm_exec.js docs/
 
 test:
 	go test ./... -v -count=1

@@ -74,10 +74,13 @@ func (s *Simulation) updateSwarmMode() {
 		}
 	}
 
-	// Phase 4: Physics — move bots, clamp to bounds, separation
+	// Phase 4: Physics — move bots, clamp to bounds
 	for i := range ss.Bots {
 		applySwarmPhysics(ss, i)
 	}
+
+	// Phase 4.1: Hard separation — symmetric rigid-body push for all pairs
+	applyHardSeparation(ss)
 
 	// Phase 4.5: Delivery system updates (pickup/drop, respawn, carried package position)
 	if ss.DeliveryOn {
@@ -270,11 +273,11 @@ func buildSwarmEnvironment(ss *swarm.SwarmState, i int) {
 					bot.NearestDropoffDist = sdist
 					bot.NearestDropoffColor = st.Color
 					bot.NearestDropoffIdx = si
-					// Check if this dropoff matches carrying color
-					if bot.CarryingPkg >= 0 && bot.CarryingPkg < len(ss.Packages) {
-						if ss.Packages[bot.CarryingPkg].Color == st.Color {
-							bot.DropoffMatch = true
-						}
+				}
+				// Check match against ANY visible dropoff (not just nearest)
+				if bot.CarryingPkg >= 0 && bot.CarryingPkg < len(ss.Packages) {
+					if ss.Packages[bot.CarryingPkg].Color == st.Color {
+						bot.DropoffMatch = true
 					}
 				}
 			}
@@ -439,11 +442,6 @@ func executeSwarmProgram(ss *swarm.SwarmState, i int) {
 			}
 		}
 		if allMatch {
-			// Debug: log first bot's rule matches (only every 60 ticks to avoid spam)
-			if i == 0 && ss.Tick%300 == 1 {
-				fmt.Printf("[SWARM] Bot0 tick=%d rule L%d action=%d carry=%d obst=%v\n",
-					ss.Tick, rule.Line, rule.Action.Type, bot.CarryingPkg, bot.ObstacleAhead)
-			}
 			executeSwarmAction(rule.Action, bot, ss, i)
 		}
 	}
@@ -1182,31 +1180,61 @@ func applySwarmPhysics(ss *swarm.SwarmState, i int) {
 	for bot.Angle >= 2*math.Pi {
 		bot.Angle -= 2 * math.Pi
 	}
+}
 
-	// Simple bot-bot separation (push apart if overlapping)
-	// Skip separation between directly linked follower↔leader pairs
-	// to prevent the physics from fighting the follow behavior.
-	nearIDs := ss.Hash.Query(bot.X, bot.Y, swarm.SwarmBotRadius*2.5)
-	for _, nid := range nearIDs {
-		if nid == i || nid < 0 || nid >= len(ss.Bots) {
-			continue
+// applyHardSeparation is a symmetric rigid-body pass that guarantees no two
+// bots overlap. Both bots in a pair are pushed apart to exactly minDist.
+// Runs twice per tick to resolve multi-bot clusters (triangles etc.).
+func applyHardSeparation(ss *swarm.SwarmState) {
+	const minDist = swarm.SwarmBotRadius * 2.4 // 24px hard shell
+
+	for iter := 0; iter < 2; iter++ {
+		// Rebuild spatial hash each iteration (positions shifted)
+		ss.Hash.Clear()
+		for i := range ss.Bots {
+			ss.Hash.Insert(i, ss.Bots[i].X, ss.Bots[i].Y)
 		}
-		// Don't push apart bots that are in a direct follow link
-		if bot.FollowTargetIdx == nid || bot.FollowerIdx == nid {
-			continue
-		}
-		other := &ss.Bots[nid]
-		dx := bot.X - other.X
-		dy := bot.Y - other.Y
-		dist := math.Sqrt(dx*dx + dy*dy)
-		minDist := swarm.SwarmBotRadius * 2
-		if dist > 0 && dist < minDist {
-			// Push apart
-			overlap := (minDist - dist) * 0.5
-			nx := dx / dist
-			ny := dy / dist
-			bot.X += nx * overlap
-			bot.Y += ny * overlap
+
+		for i := range ss.Bots {
+			a := &ss.Bots[i]
+			nearIDs := ss.Hash.Query(a.X, a.Y, minDist+1)
+			for _, j := range nearIDs {
+				if j <= i || j >= len(ss.Bots) {
+					continue // each pair once (j > i)
+				}
+				// Skip directly linked follower↔leader pairs
+				if a.FollowTargetIdx == j || a.FollowerIdx == j {
+					continue
+				}
+				b := &ss.Bots[j]
+				dx := a.X - b.X
+				dy := a.Y - b.Y
+				dist := math.Sqrt(dx*dx + dy*dy)
+				if dist >= minDist {
+					continue
+				}
+				if dist < 0.001 {
+					// Coincident — nudge with random direction
+					angle := ss.Rng.Float64() * 2 * math.Pi
+					dx = math.Cos(angle)
+					dy = math.Sin(angle)
+					dist = 0.001
+				}
+				// Push BOTH apart to full minDist (each gets half)
+				nx := dx / dist
+				ny := dy / dist
+				half := (minDist - dist) * 0.5
+				a.X += nx * half
+				a.Y += ny * half
+				b.X -= nx * half
+				b.Y -= ny * half
+
+				// Elastic heading deflection when very close
+				if dist < 12 {
+					a.Angle = math.Atan2(ny, nx) + (ss.Rng.Float64()-0.5)*0.3
+					b.Angle = math.Atan2(-ny, -nx) + (ss.Rng.Float64()-0.5)*0.3
+				}
+			}
 		}
 	}
 }

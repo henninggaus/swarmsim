@@ -1,5 +1,7 @@
 # SwarmSim — Schwarm-Robotik-Simulator
 
+**[Live Demo (WebAssembly)](https://henning-heisenberg.github.io/swarmsim/)**
+
 Ein 2D-Schwarm-Robotik-Simulator mit eigener Skriptsprache (SwarmScript), genetischem Algorithmus und dezentraler Multi-Agent-Logistik. Gebaut in Go mit [Ebiten](https://ebitengine.org/).
 
 ## Features

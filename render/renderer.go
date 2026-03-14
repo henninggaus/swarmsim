@@ -51,12 +51,14 @@ type Renderer struct {
 
 	// Screenshot & GIF recording
 	Recording      bool
-	RecFrames      []*image.Paletted
+	RecRawFrames   []*image.RGBA // raw frames (dithering happens after stop)
 	RecFrameCount  int
 	RecSkipCounter int
 	RecBlinkTick   int
 	OverlayText    string
 	OverlayTimer   int
+	GIFEncoding    bool   // true while background goroutine encodes
+	GIFEncodedFile string // set by goroutine when done
 
 	// Sound system
 	Sound *SoundSystem

@@ -140,10 +140,33 @@ func (ss *SwarmState) ResetBots() {
 	ss.Tick = 0
 	ss.PrevMessages = nil
 	ss.NextMessages = nil
-	// Reset delivery packages
-	if ss.DeliveryOn {
-		ss.resetDeliveryPackages()
+	// Reset delivery state (packages, stats, station timers)
+	ss.ResetDeliveryState()
+}
+
+// ResetDeliveryState resets all delivery counters, package states, and bot
+// carrying state. Called on DEPLOY and preset switch to start with a clean slate.
+func (ss *SwarmState) ResetDeliveryState() {
+	if !ss.DeliveryOn {
+		return
 	}
+	// Clear bot carrying state and delivery sensor caches
+	for i := range ss.Bots {
+		ss.Bots[i].CarryingPkg = -1
+		ss.Bots[i].NearestPickupDist = 999
+		ss.Bots[i].NearestDropoffDist = 999
+		ss.Bots[i].NearestPickupIdx = -1
+		ss.Bots[i].NearestDropoffIdx = -1
+		ss.Bots[i].NearestPickupColor = 0
+		ss.Bots[i].NearestDropoffColor = 0
+		ss.Bots[i].NearestPickupHasPkg = false
+		ss.Bots[i].DropoffMatch = false
+		ss.Bots[i].HeardPickupColor = 0
+		ss.Bots[i].HeardDropoffColor = 0
+		ss.Bots[i].NearestMatchLEDDist = 999
+		ss.Bots[i].NearestMatchLEDAngle = 0
+	}
+	ss.resetDeliveryPackages()
 }
 
 // resetDeliveryPackages resets all packages to their initial state.
@@ -574,6 +597,9 @@ IF edge == 1 THEN TURN_RIGHT 180`
 
 var presetDeliveryComm = `# Delivery+Comm — enable Delivery!
 # Messages AND LED gradient
+# --- Anti-cluster: idle bots leave empty stations ---
+IF carry == 0 AND p_dist < 30 AND has_pkg == 0 THEN SET_LED 255 255 255
+IF carry == 0 AND p_dist < 30 AND has_pkg == 0 THEN TURN_FROM_NEAREST
 # --- Explore (lowest priority) ---
 IF rnd < 6 THEN TURN_RANDOM
 IF true THEN FWD
@@ -582,20 +608,20 @@ IF near_dist < 15 THEN TURN_FROM_NEAREST
 IF near_dist < 15 THEN FWD
 # --- LED gradient + broadcast ---
 IF d_dist < 200 THEN LED_DROPOFF
-IF d_dist > 200 THEN COPY_LED
+IF carry == 1 AND d_dist > 200 THEN COPY_LED
 IF has_pkg == 1 THEN SEND_PICKUP 1
 IF d_dist < 200 THEN SEND_DROPOFF 1
-# --- Pickup ---
+# --- Pickup (only non-carrying) ---
 IF carry == 0 AND p_dist < 20 THEN PICKUP
-IF has_pkg == 1 THEN GOTO_PICKUP
-IF has_pkg == 1 THEN FWD
-IF heard_pickup > 0 THEN GOTO_HEARD_PICKUP
-IF heard_pickup > 0 THEN FWD
+IF carry == 0 AND has_pkg == 1 THEN GOTO_PICKUP
+IF carry == 0 AND has_pkg == 1 THEN FWD
+IF carry == 0 AND heard_pickup > 0 THEN GOTO_HEARD_PICKUP
+IF carry == 0 AND heard_pickup > 0 THEN FWD
 # --- Deliver: LED/messages ---
 IF led_dist < 200 THEN GOTO_LED
 IF led_dist < 200 THEN FWD
-IF heard_dropoff > 0 THEN GOTO_HEARD_DROPOFF
-IF heard_dropoff > 0 THEN FWD
+IF carry == 1 AND heard_dropoff > 0 THEN GOTO_HEARD_DROPOFF
+IF carry == 1 AND heard_dropoff > 0 THEN FWD
 # --- Deliver: direct ---
 IF match == 1 AND d_dist < 25 THEN DROP
 IF match == 1 THEN GOTO_DROPOFF
@@ -622,12 +648,12 @@ IF d_dist < 200 THEN LED_DROPOFF
 IF d_dist > 200 THEN COPY_LED
 IF has_pkg == 1 THEN SEND_PICKUP 1
 IF d_dist < 200 THEN SEND_DROPOFF 1
-# --- Pickup ---
+# --- Pickup (only non-carrying) ---
 IF carry == 0 AND p_dist < 20 THEN PICKUP
-IF has_pkg == 1 THEN GOTO_PICKUP
-IF has_pkg == 1 THEN FWD
-IF heard_pickup > 0 THEN GOTO_HEARD_PICKUP
-IF heard_pickup > 0 THEN FWD
+IF carry == 0 AND has_pkg == 1 THEN GOTO_PICKUP
+IF carry == 0 AND has_pkg == 1 THEN FWD
+IF carry == 0 AND heard_pickup > 0 THEN GOTO_HEARD_PICKUP
+IF carry == 0 AND heard_pickup > 0 THEN FWD
 # --- Beacon: explore (overrides pickup) ---
 IF state == 1 AND rnd < 8 THEN TURN_RANDOM
 IF state == 1 THEN FWD

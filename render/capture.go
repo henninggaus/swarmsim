@@ -16,9 +16,9 @@ import (
 )
 
 const (
-	gifFrameSkip = 3   // capture every 3rd frame
-	gifMaxFrames = 200 // max GIF frames (10s at 60fps / 3)
-	gifDelay     = 5   // centiseconds per frame (50ms → ~20fps playback)
+	gifFrameSkip = 4   // capture every 4th frame (25% of frames)
+	gifMaxFrames = 300 // max GIF frames (~10s at 30fps effective capture)
+	gifDelay     = 5   // centiseconds per frame (50ms -> ~20fps playback)
 )
 
 // CaptureScreenshot saves the current screen as a PNG file.
@@ -55,54 +55,78 @@ func CaptureScreenshot(screen *ebiten.Image) string {
 
 // StartRecording initializes GIF recording state on the renderer.
 func StartRecording(r *Renderer) {
+	if r.GIFEncoding {
+		return // still encoding previous GIF
+	}
 	r.Recording = true
-	r.RecFrames = make([]*image.Paletted, 0, 200)
+	r.RecRawFrames = make([]*image.RGBA, 0, gifMaxFrames)
 	r.RecFrameCount = 0
 	r.RecSkipCounter = 0
 	fmt.Println("[GIF] Recording STARTED")
 }
 
-// StopRecording encodes all captured frames into a GIF file.
-// Returns the filename on success, empty string on error.
-func StopRecording(r *Renderer) string {
+// StopRecording stops capturing and encodes all frames in a background goroutine.
+// The renderer shows an "Encoding GIF..." overlay until done.
+func StopRecording(r *Renderer) {
 	r.Recording = false
 
-	if len(r.RecFrames) == 0 {
+	if len(r.RecRawFrames) == 0 {
 		fmt.Println("[GIF] No frames captured")
-		return ""
+		return
+	}
+
+	// Move frames out of renderer and start background encoding
+	frames := r.RecRawFrames
+	r.RecRawFrames = nil
+	r.GIFEncoding = true
+
+	go func() {
+		fname := encodeGIF(frames)
+		// Signal completion back to renderer (checked in Draw)
+		r.GIFEncodedFile = fname
+		r.GIFEncoding = false
+	}()
+}
+
+// encodeGIF quantizes raw RGBA frames and writes the GIF file.
+func encodeGIF(frames []*image.RGBA) string {
+	fmt.Printf("[GIF] Encoding %d frames...\n", len(frames))
+
+	palettedFrames := make([]*image.Paletted, len(frames))
+	delays := make([]int, len(frames))
+
+	for i, raw := range frames {
+		bounds := raw.Bounds()
+		p := image.NewPaletted(bounds, palette.Plan9)
+		draw.FloydSteinberg.Draw(p, bounds, raw, image.Point{})
+		palettedFrames[i] = p
+		delays[i] = gifDelay
 	}
 
 	fname := fmt.Sprintf("swarmsim_%s.gif", time.Now().Format("20060102_150405"))
 	f, err := os.Create(fname)
 	if err != nil {
 		fmt.Println("[GIF] Error creating file:", err)
-		r.RecFrames = nil
 		return ""
 	}
 	defer f.Close()
 
-	delays := make([]int, len(r.RecFrames))
-	for i := range delays {
-		delays[i] = gifDelay
-	}
-
 	anim := &gif.GIF{
-		Image: r.RecFrames,
+		Image: palettedFrames,
 		Delay: delays,
 	}
 
 	if err := gif.EncodeAll(f, anim); err != nil {
 		fmt.Println("[GIF] Error encoding GIF:", err)
-		r.RecFrames = nil
 		return ""
 	}
 
-	fmt.Printf("[GIF] Saved: %s (%d frames)\n", fname, len(r.RecFrames))
-	r.RecFrames = nil
+	fmt.Printf("[GIF] Saved: %s (%d frames)\n", fname, len(frames))
 	return fname
 }
 
-// CaptureGIFFrame captures a frame for GIF recording (every 3rd call).
+// CaptureGIFFrame captures a raw RGBA frame for GIF recording (every 4th call).
+// Only reads pixels and downscales — no dithering during recording.
 // Returns true if max frames reached and recording should auto-stop.
 func CaptureGIFFrame(screen *ebiten.Image, r *Renderer) bool {
 	r.RecSkipCounter++
@@ -117,15 +141,10 @@ func CaptureGIFFrame(screen *ebiten.Image, r *Renderer) bool {
 	pix := make([]byte, srcW*srcH*4)
 	screen.ReadPixels(pix)
 
-	// Downscale to 50%
+	// Downscale to 50% (fast box averaging, no dithering)
 	scaled := halfScale(pix, srcW, srcH)
 
-	// Quantize to Plan9 palette
-	bounds := scaled.Bounds()
-	palettedImg := image.NewPaletted(bounds, palette.Plan9)
-	draw.FloydSteinberg.Draw(palettedImg, bounds, scaled, image.Point{})
-
-	r.RecFrames = append(r.RecFrames, palettedImg)
+	r.RecRawFrames = append(r.RecRawFrames, scaled)
 	r.RecFrameCount++
 
 	return r.RecFrameCount >= gifMaxFrames
@@ -190,6 +209,27 @@ func DrawCaptureOverlay(screen *ebiten.Image, r *Renderer) {
 		op.GeoM.Translate(float64(x), float64(y+1))
 		op.ColorScale.ScaleAlpha(float32(alpha) / 255.0)
 		screen.DrawImage(img, op)
+	}
+
+	// "Encoding GIF..." overlay
+	if r.GIFEncoding {
+		text := "Encoding GIF..."
+		textW := len(text) * 6
+		x := sw/2 - textW/2
+		y := 5
+		ebitenutil.DrawRect(screen, float64(x-5), float64(y-2), float64(textW+10), 18,
+			color.RGBA{0, 0, 80, 220})
+		printColoredAt(screen, text, x, y, color.RGBA{120, 180, 255, 255})
+	}
+
+	// Check if background encoding finished
+	if !r.GIFEncoding && r.GIFEncodedFile != "" {
+		fname := r.GIFEncodedFile
+		r.GIFEncodedFile = ""
+		if fname != "" {
+			r.OverlayText = "GIF saved: " + fname
+			r.OverlayTimer = 90
+		}
 	}
 
 	// REC indicator (blinking red dot + text)

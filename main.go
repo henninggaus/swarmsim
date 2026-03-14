@@ -793,6 +793,9 @@ func (g *Game) deploySwarmProgram() {
 	ss.ErrorMsg = ""
 	ss.ErrorLine = 0
 
+	// Reset delivery state so counters/packages start fresh
+	ss.ResetDeliveryState()
+
 	// Blink all bots green to confirm deploy
 	for i := range ss.Bots {
 		ss.Bots[i].BlinkTimer = 30
@@ -822,6 +825,10 @@ func (g *Game) loadSwarmPreset(idx int) {
 	if err == nil {
 		ss.Program = prog
 		ss.ProgramText = presetText
+
+		// Reset delivery state so counters/packages start fresh
+		ss.ResetDeliveryState()
+
 		for i := range ss.Bots {
 			ss.Bots[i].BlinkTimer = 30
 		}
@@ -874,12 +881,8 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	if g.gifToggleRequested {
 		g.gifToggleRequested = false
 		if g.renderer.Recording {
-			fname := render.StopRecording(g.renderer)
-			if fname != "" {
-				g.renderer.OverlayText = "GIF saved: " + fname
-				g.renderer.OverlayTimer = 90
-			}
-		} else {
+			render.StopRecording(g.renderer) // async: encodes in goroutine
+		} else if !g.renderer.GIFEncoding {
 			render.StartRecording(g.renderer)
 		}
 	}
@@ -888,11 +891,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	if g.renderer.Recording {
 		if render.CaptureGIFFrame(screen, g.renderer) {
 			// Max frames reached — auto-stop
-			fname := render.StopRecording(g.renderer)
-			if fname != "" {
-				g.renderer.OverlayText = "GIF saved (max): " + fname
-				g.renderer.OverlayTimer = 90
-			}
+			render.StopRecording(g.renderer) // async: encodes in goroutine
 		}
 	}
 }
