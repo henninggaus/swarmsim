@@ -896,12 +896,14 @@ var presetSimpleUnload = `# Simple Unload — enable Trucks!
 IF near_dist < 15 THEN TURN_FROM_NEAREST
 IF near_dist < 15 THEN FWD
 # 2. Carrying + match: deliver at correct dropoff
-IF carry == 1 AND match == 1 AND d_dist < 25 THEN DROP
+IF carry == 1 AND match == 1 AND d_dist < 30 THEN DROP
 IF carry == 1 AND match == 1 THEN GOTO_DROPOFF
 IF carry == 1 AND match == 1 THEN FWD
-# 3. Carrying + hear beacon: follow beacon
+# 3. Carrying + hear beacon/dropoff: follow
 IF carry == 1 AND heard_beacon == 1 THEN GOTO_BEACON
 IF carry == 1 AND heard_beacon == 1 THEN FWD
+IF carry == 1 AND heard_dropoff > 0 THEN GOTO_HEARD_DROPOFF
+IF carry == 1 AND heard_dropoff > 0 THEN FWD
 # 4. Carrying + lost: spiral search
 IF carry == 1 AND exploring == 1 THEN SPIRAL
 IF carry == 1 THEN FWD
@@ -920,7 +922,7 @@ var presetCoordinatedUnload = `# Coordinated Unload — enable Trucks!
 IF near_dist < 15 THEN TURN_FROM_NEAREST
 IF near_dist < 15 THEN FWD
 # 2. Carrying + match: deliver at correct dropoff
-IF carry == 1 AND match == 1 AND d_dist < 25 THEN DROP
+IF carry == 1 AND match == 1 AND d_dist < 30 THEN DROP
 IF carry == 1 AND match == 1 THEN GOTO_DROPOFF
 IF carry == 1 AND match == 1 THEN SEND_DROPOFF 1
 IF carry == 1 AND match == 1 THEN LED_DROPOFF

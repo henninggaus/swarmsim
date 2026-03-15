@@ -322,6 +322,15 @@ func (s *Simulation) updateSwarmMode() {
 			}
 		}
 
+		// Anti-stuck at ramp: non-carrying bots stuck near ramp get pushed into arena
+		if bot.StuckTicks >= 45 && ss.TruckToggle && bot.OnRamp && bot.CarryingPkg < 0 {
+			bot.Angle = math.Pi / 4 // push rightward into arena
+			bot.Speed = swarm.SwarmBotSpeed
+			bot.StuckTicks = 0
+			bot.StuckCooldown = 30
+			logger.WarnBot(i, "RAMP", "Bot #%d anti-stuck at ramp — pushed into arena", i)
+		}
+
 		// Anti-stuck breakout after 90 ticks stuck
 		if bot.StuckTicks >= 90 {
 			// Break follow link
@@ -629,10 +638,14 @@ func buildSwarmEnvironment(ss *swarm.SwarmState, i int) {
 	if ss.TruckToggle && ss.TruckState != nil {
 		ts := ss.TruckState
 		// OnRamp = bot is near the right edge of the ramp (ready for crane pickup)
-		// Bots don't enter the ramp; they wait at the edge (doubled zone: 100px wide)
+		// Detection zone: rampEdge ±50px in X, full ramp height in Y
 		rampEdgeX := ts.RampX + ts.RampW // right edge (200)
 		if bot.Y >= ts.RampY && bot.Y <= ts.RampY+ts.RampH &&
 			bot.X >= rampEdgeX-50 && bot.X <= rampEdgeX+50 {
+			if !bot.OnRamp && ss.Tick%60 == 0 {
+				logger.InfoBot(i, "RAMP", "Bot #%d entered ramp zone (%.0f, %.0f) bounds X:[%.0f-%.0f] Y:[%.0f-%.0f]",
+					i, bot.X, bot.Y, rampEdgeX-50, rampEdgeX+50, ts.RampY, ts.RampY+ts.RampH)
+			}
 			bot.OnRamp = true
 		}
 		if ts.CurrentTruck != nil {
