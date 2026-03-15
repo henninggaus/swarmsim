@@ -170,6 +170,12 @@ func (r *Renderer) DrawSwarmMode(screen *ebiten.Image, s *simulation.Simulation,
 			vector.StrokeCircle(a, bx, by, radius+5, 2, glowCol, false)
 			vector.DrawFilledRect(a, bx-4, by-radius-8, 8, 8, pkgCol, false)
 			vector.StrokeRect(a, bx-4, by-radius-8, 8, 8, 1, color.RGBA{255, 255, 255, 180}, false)
+			// Visual indicator: "!" = heading to dropoff, "?" = lost/searching
+			if bot.DropoffMatch || bot.HeardBeaconDropoffColor > 0 {
+				printColoredAt(a, "!", int(bx-3), int(by-radius-20), color.RGBA{50, 255, 50, 255})
+			} else {
+				printColoredAt(a, "?", int(bx-3), int(by-radius-20), color.RGBA{255, 100, 50, 255})
+			}
 		}
 
 		if bot.BlinkTimer > 0 && (bot.BlinkTimer/4)%2 == 0 {
