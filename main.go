@@ -71,6 +71,9 @@ type Game struct {
 
 	// Tutorial
 	tutorial render.TutorialState
+
+	// Tooltips
+	tooltip render.TooltipState
 }
 
 // NewGame creates a new game instance.
@@ -749,6 +752,20 @@ func (g *Game) handleSwarmInput() {
 	if ss.BlockValueEdit {
 		g.handleBlockValueInput()
 	}
+
+	// Tooltip hover detection
+	hoverID := ""
+	if !ed.Focused && !ss.BotCountEdit {
+		hoverID = render.SwarmEditorHitTest(mx, my)
+		// Also check dropdown hover for preset tooltips
+		if ss.DropdownOpen {
+			idx := render.SwarmDropdownHitTest(mx, my, len(ss.PresetNames))
+			if idx >= 0 && idx < len(ss.PresetNames) {
+				hoverID = "preset:" + ss.PresetNames[idx]
+			}
+		}
+	}
+	render.UpdateTooltip(&g.tooltip, mx, my, hoverID)
 }
 
 func (g *Game) handleSwarmClick(mx, my int) {
@@ -1871,6 +1888,11 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	// Help overlay (drawn on top of everything, including console)
 	if g.showHelp {
 		render.DrawHelpOverlay(screen, g.sim.SwarmMode, g.helpScrollY)
+	}
+
+	// Tooltips (below tutorial overlay)
+	if g.sim.SwarmMode && g.tooltip.Visible {
+		render.DrawTooltip(screen, &g.tooltip)
 	}
 
 	// Tutorial overlay (on top of everything)
