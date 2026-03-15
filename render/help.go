@@ -111,8 +111,9 @@ func DrawHelpOverlay(screen *ebiten.Image, isSwarmMode bool, scrollY int) {
 	swarmKeys := []struct{ key, desc string }{
 		{"L", "Lichtquelle ein-/ausschalten (Klick fuer Position)"},
 		{"T", "Trails anzeigen"},
-		{"C", "Lieferrouten anzeigen"},
-		{"N", "Neue Runde (Truck-Modus, nach Runden-Ende)"},
+		{"C", "Lieferrouten / Challenge starten (Teams-Modus)"},
+		{"N", "Neue Runde (Truck/Teams-Modus)"},
+		{"D", "Statistik-Dashboard ein-/ausschalten"},
 		{"V", "Genom-Visualisierung (Evolution)"},
 		{"M", "Minimap anzeigen"},
 		{"Editor", "Linksklick zum Fokussieren, Tab=4 Spaces"},
@@ -122,7 +123,57 @@ func DrawHelpOverlay(screen *ebiten.Image, isSwarmMode bool, scrollY int) {
 		printColoredAt(screen, kv.desc, px+120, y, colorHelpText)
 		y += lineH
 	}
-	y += 12
+	y += 8
+
+	// === GP / TEAMS / DASHBOARD ===
+	printColoredAt(screen, "-- Genetische Programmierung (GP) --", px, y, colorHelpSection)
+	y += lineH + 2
+
+	gpItems := []struct{ key, desc string }{
+		{"GP Button", "GP ein-/ausschalten (Editor-Panel)"},
+		{"Export Best", "Bestes GP-Programm in Editor uebernehmen"},
+		{"Preset 18", "GP: Random Start (zufaellige Programme)"},
+		{"Preset 19", "GP: Seeded Start (50% Seed + 50% zufaellig)"},
+	}
+	for _, kv := range gpItems {
+		printColoredAt(screen, kv.key, px+5, y, colorHelpKey)
+		printColoredAt(screen, kv.desc, px+120, y, colorHelpText)
+		y += lineH
+	}
+	y += 6
+
+	printColoredAt(screen, "-- Multiplayer / Teams --", px, y, colorHelpSection)
+	y += lineH + 2
+
+	teamItems := []struct{ key, desc string }{
+		{"Teams Button", "Teams ein-/ausschalten (Editor-Panel)"},
+		{"C", "Challenge starten (5000 Ticks, wer mehr liefert)"},
+		{"N", "Neue Runde (Punkte + Positionen zuruecksetzen)"},
+		{"Sensoren", "team, team_score, enemy_score"},
+	}
+	for _, kv := range teamItems {
+		printColoredAt(screen, kv.key, px+5, y, colorHelpKey)
+		printColoredAt(screen, kv.desc, px+120, y, colorHelpText)
+		y += lineH
+	}
+	y += 6
+
+	printColoredAt(screen, "-- Statistik-Dashboard (D) --", px, y, colorHelpSection)
+	y += lineH + 2
+
+	dashItems := []struct{ key, desc string }{
+		{"Fitness-Graph", "Best/Avg Fitness ueber Generationen"},
+		{"Lieferrate", "Lieferungen pro 500-Tick-Fenster"},
+		{"Heatmap", "Bot-Bewegungsdichte (blau->rot)"},
+		{"Ranking", "Top-5 Bots nach Lieferungen"},
+		{"Ticker", "Live-Events (Pickups, Deliveries)"},
+	}
+	for _, kv := range dashItems {
+		printColoredAt(screen, kv.key, px+5, y, colorHelpKey)
+		printColoredAt(screen, kv.desc, px+120, y, colorHelpText)
+		y += lineH
+	}
+	y += 8
 
 	// === SWARMSCRIPT REFERENCE ===
 	vector.StrokeLine(screen, float32(px), float32(y), float32(sw-px), float32(y), 1, color.RGBA{60, 60, 80, 255}, false)
@@ -185,6 +236,9 @@ func DrawHelpOverlay(screen *ebiten.Image, isSwarmMode bool, scrollY int) {
 		{"wall_left", "Wand innerhalb 25px links? (0/1)"},
 		{"wall_front", "Alias fuer obs_ahead"},
 		{"pher / pheromone", "Pheromon-Intensitaet voraus (0-100)"},
+		{"team", "Team-Zugehoerigkeit (1=A, 2=B)"},
+		{"team_score", "Eigene Teampunkte"},
+		{"enemy_score", "Gegnerische Teampunkte"},
 	}
 
 	// Right column: actions

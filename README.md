@@ -9,6 +9,9 @@ Ein 2D-Schwarm-Robotik-Simulator mit eigener Skriptsprache (SwarmScript), geneti
 - **7 Simulationsmodi** (F1-F7): Foraging, Labyrinth, Energy Crisis, Sandbox, Evolution, LKW-Entladung, Swarm-Editor
 - **SwarmScript**: Eigene DSL zum Programmieren von Bot-Verhalten mit 30+ Sensoren und 25+ Aktionen
 - **Dezentrales Delivery-System**: Farbcodierte Pickup/Dropoff-Stationen mit emergenter LED-Gradient-Navigation
+- **Genetische Programmierung (GP)**: Jeder Bot evoliert sein eigenes SwarmScript-Programm mit Crossover und Mutation
+- **Multiplayer / Teams**: Zwei Teams (A/B) treten gegeneinander an mit Scoreboard und Challenge-Modus
+- **Statistik-Dashboard**: Echtzeit-Graphen, Heatmap, Bot-Ranking und Event-Ticker (D-Taste)
 - **Genetischer Algorithmus**: 7-Gen-Genom mit Crossover, Mutation und Fitness-Tracking
 - **Pheromon-System** (Ant Colony Optimization): Search, Found-Resource und Danger Pheromone
 - **LKW-Entlade-Szenario**: Kooperatives Heben, Sortierzonen, Timer-basierte Bewertung
@@ -111,9 +114,11 @@ go build -o swarmsim .
 |-------|--------|
 | **Linksklick** | Bot/UI-Element auswählen |
 | **T** | Trails anzeigen |
-| **C** | Delivery-Routen anzeigen |
+| **C** | Delivery-Routen / Challenge starten (Teams) |
+| **D** | Statistik-Dashboard ein-/ausschalten |
 | **L** | Lichtquelle setzen/entfernen |
 | **M** | Minimap |
+| **N** | Neue Runde (Truck/Teams-Modus) |
 
 ## SwarmScript
 
@@ -262,6 +267,8 @@ IF true THEN FWD
 | Evolving Delivery | Delivery mit evolutionären Parametern ($A-$Z) |
 | Evolving Truck | LKW-Entladung mit Evolution |
 | Maze Explorer | Right-Hand-Wall-Following im Labyrinth |
+| GP: Random Start | Genetische Programmierung mit zufälligen Programmen |
+| GP: Seeded Start | GP: 50% mutiertes Seed-Programm + 50% zufällig |
 
 ## Systeme
 
@@ -277,6 +284,15 @@ Alle Bots haben Energie (0-100). Bewegung, Messaging, Tragen, Pheromone und Hind
 ### Delivery-System (Swarm-Modus)
 Farbcodierte Pickup/Dropoff-Stationen (Rot, Blau, Gelb, Grün). Bots müssen Pakete von Pickups aufheben und zu passenden Dropoffs liefern. Emergente Navigation über LED-Gradienten: Bots setzen ihre LED-Farbe basierend auf Station-Nähe, andere Bots navigieren entlang des Farbgradienten.
 
+### Genetische Programmierung (GP)
+Jeder Bot erhält sein eigenes SwarmScript-Programm. Programme werden durch Crossover (erste Hälfte von Elter A, Rest von Elter B) und Mutation (Sensor/Wert/Aktion/Regelwechsel) evolviert. Fitness basiert auf Lieferungen, Pickups, Distanz und Anti-Stuck-Zähler. Top 3 Programme werden als Elite bewahrt. Evolution alle 2000 Ticks. GP-Button im Editor-Panel, "Export Best" übernimmt das beste Programm.
+
+### Multiplayer / Teams
+Zwei Teams (A=Blau, B=Rot) treten in der gleichen Arena gegeneinander an. Jedes Team kann ein eigenes Programm erhalten. Challenge-Modus (C-Taste): 5000 Ticks, wer mehr liefert gewinnt. Neue Runde (N-Taste) setzt Punkte und Positionen zurück. Team-Sensoren: `team`, `team_score`, `enemy_score`.
+
+### Statistik-Dashboard
+Echtzeit-Dashboard (D-Taste) mit fünf Panels: Fitness-Graph (Best/Avg über Generationen), Lieferrate-Balkendiagramm (pro 500-Tick-Fenster), Bot-Heatmap (Bewegungsdichte blau→rot), Bot-Effizienz-Ranking (Top 5), und Live-Event-Ticker.
+
 ## Architektur
 
 ```
@@ -287,16 +303,17 @@ swarmsim/
     comm/          Dezentrales Messaging (TTL, Range-basiert)
     genetics/      Genom, Crossover, Mutation, Fitness
     resource/      Ressourcen-Spawning und -Management
-    swarm/         SwarmBot, SwarmState, Delivery-Stations
+    swarm/         SwarmBot, SwarmState, Delivery-Stations, GP, Teams, Stats
   engine/          Orchestrierung
     simulation/    Simulation-Loop, Szenarien, Config
-    swarmscript/   Parser + Interpreter für SwarmScript DSL
+    swarmscript/   Parser + Interpreter für SwarmScript DSL, GP-Operatoren
     pheromone/     Pheromon-Grid mit Diffusion und Evaporation
   render/          Ebiten-basierte Visualisierung
     renderer.go    Kamera, Bot-Sprites, Pheromon-Rendering
     hud.go         Heads-Up Display
     swarm_render.go  Swarm-Modus Arena-Rendering
     swarm_editor.go  Code-Editor mit Syntax-Highlighting
+    dashboard.go   Statistik-Dashboard (Graphen, Heatmap, Ranking)
     minimap.go     150x100px Übersichtskarte
     capture.go     Screenshot (PNG) und GIF-Recording
     particles.go   Partikel-Effekte
