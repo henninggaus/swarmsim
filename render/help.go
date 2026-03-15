@@ -181,6 +181,9 @@ func DrawHelpOverlay(screen *ebiten.Image, isSwarmMode bool, scrollY int) {
 		{"beacon_dist", "Abstand zum Beacon"},
 		{"exploring", "Bot sucht Dropoff? (0/1)"},
 		{"$A:15 ... $Z:99", "Evolutions-Parameter (Hinweis:Default)"},
+		{"wall_right", "Wand innerhalb 25px rechts? (0/1)"},
+		{"wall_left", "Wand innerhalb 25px links? (0/1)"},
+		{"wall_front", "Alias fuer obs_ahead"},
 	}
 
 	// Right column: actions
@@ -211,6 +214,8 @@ func DrawHelpOverlay(screen *ebiten.Image, isSwarmMode bool, scrollY int) {
 		{"GOTO_TRUCK_PKG", "Zum LKW-Paket navigieren"},
 		{"GOTO_BEACON", "Zum Beacon-Dropoff navigieren"},
 		{"SPIRAL", "Spiralsuche (traegt Paket)"},
+		{"WALL_FOLLOW_RIGHT", "Rechte-Hand-Regel (Wand rechts)"},
+		{"WALL_FOLLOW_LEFT", "Linke-Hand-Regel (Wand links)"},
 	}
 
 	// Render both columns

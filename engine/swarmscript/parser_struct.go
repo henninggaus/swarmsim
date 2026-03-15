@@ -112,6 +112,8 @@ const (
 	ActTurnToTruckPkg                          // GOTO_TRUCK_PKG
 	ActTurnToBeaconDropoff                     // GOTO_BEACON
 	ActSpiralFwd                               // SPIRAL
+	ActWallFollowRight                         // WALL_FOLLOW_RIGHT (right-hand rule)
+	ActWallFollowLeft                          // WALL_FOLLOW_LEFT (left-hand rule)
 )
 
 // Action represents an action to execute when a rule matches.
@@ -267,6 +269,9 @@ var actionNames = map[string]struct {
 	// Beacon actions
 	"GOTO_BEACON":        {ActTurnToBeaconDropoff, 0},
 	"SPIRAL":             {ActSpiralFwd, 0},
+	// Wall-follow actions
+	"WALL_FOLLOW_RIGHT":  {ActWallFollowRight, 0},
+	"WALL_FOLLOW_LEFT":   {ActWallFollowLeft, 0},
 	// Extra delivery alias
 	"GOTO_LED_MATCH":     {ActTurnToMatchingLED, 0},
 	// Short aliases for delivery actions (keeps preset lines under 70 chars)
@@ -381,6 +386,8 @@ var highlightActions = map[string]bool{
 	// Beacon actions
 	"GOTO_BEACON": true, "GOTO_LED_MATCH": true,
 	"SPIRAL": true,
+	// Wall-follow
+	"WALL_FOLLOW_RIGHT": true, "WALL_FOLLOW_LEFT": true,
 }
 
 // --- Reverse mapping functions (for block editor / serialization) ---
@@ -568,6 +575,10 @@ func ActionTypeName(at ActionType) string {
 		return "GOTO_BEACON"
 	case ActSpiralFwd:
 		return "SPIRAL"
+	case ActWallFollowRight:
+		return "WALL_FOLLOW_RIGHT"
+	case ActWallFollowLeft:
+		return "WALL_FOLLOW_LEFT"
 	}
 	return "UNKNOWN"
 }
@@ -605,7 +616,7 @@ var SensorGrouped = [][]string{
 // ActionGrouped returns action names organized in groups for dropdown display.
 var ActionGrouped = [][]string{
 	{"-- Bewegung --", "FWD", "FWD_SLOW", "STOP", "TURN_LEFT", "TURN_RIGHT", "TURN_RANDOM"},
-	{"-- Navigation --", "TURN_TO_NEAREST", "TURN_FROM_NEAREST", "TURN_TO_CENTER", "TURN_TO_LIGHT", "AVOID_OBSTACLE"},
+	{"-- Navigation --", "TURN_TO_NEAREST", "TURN_FROM_NEAREST", "TURN_TO_CENTER", "TURN_TO_LIGHT", "AVOID_OBSTACLE", "WALL_FOLLOW_RIGHT", "WALL_FOLLOW_LEFT"},
 	{"-- Delivery --", "PICKUP", "DROP", "GOTO_PICKUP", "GOTO_DROPOFF", "GOTO_LED", "GOTO_BEACON", "SPIRAL"},
 	{"-- Kommunikation --", "SEND_MESSAGE", "SEND_PICKUP", "SEND_DROPOFF", "GOTO_HEARD_PICKUP", "GOTO_HEARD_DROPOFF"},
 	{"-- LED --", "SET_LED", "LED_PICKUP", "LED_DROPOFF", "COPY_LED"},

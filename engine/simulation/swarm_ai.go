@@ -1548,6 +1548,24 @@ func executeSwarmAction(act swarmscript.Action, bot *swarm.SwarmBot, ss *swarm.S
 			bot.ExplorationAngle = -bot.ExplorationAngle
 			bot.Angle += math.Pi * 0.3 // partial turn inward
 		}
+
+	case swarmscript.ActWallFollowRight:
+		// Right-hand rule: keep wall on right side
+		if bot.ObstacleAhead {
+			bot.Angle -= math.Pi / 2 // wall in front → turn left 90°
+		} else if !bot.WallRight {
+			bot.Angle += math.Pi / 2 // lost wall on right → turn right 90° to refind
+		}
+		bot.Speed = swarm.SwarmBotSpeed
+
+	case swarmscript.ActWallFollowLeft:
+		// Left-hand rule: keep wall on left side
+		if bot.ObstacleAhead {
+			bot.Angle += math.Pi / 2 // wall in front → turn right 90°
+		} else if !bot.WallLeft {
+			bot.Angle -= math.Pi / 2 // lost wall on left → turn left 90° to refind
+		}
+		bot.Speed = swarm.SwarmBotSpeed
 	}
 }
 
