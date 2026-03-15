@@ -678,6 +678,15 @@ func (g *Game) handleSwarmInput() {
 		logger.Info("SWARM", "Minimap: %v", g.renderer.ShowMinimap)
 	}
 
+	// D key: toggle dashboard (when editor not focused)
+	if inpututil.IsKeyJustPressed(ebiten.KeyD) && !ed.Focused && !ss.BotCountEdit {
+		ss.DashboardOn = !ss.DashboardOn
+		if ss.DashboardOn && ss.StatsTracker == nil {
+			ss.StatsTracker = swarm.NewStatsTracker()
+		}
+		logger.Info("SWARM", "Dashboard: %v", ss.DashboardOn)
+	}
+
 	// V key: toggle genome visualization (when editor not focused + evolution on)
 	if inpututil.IsKeyJustPressed(ebiten.KeyV) && !ed.Focused && !ss.BotCountEdit {
 		if ss.EvolutionOn {

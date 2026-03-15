@@ -387,6 +387,10 @@ type SwarmState struct {
 	CollisionCount  int // obstacle collisions this tick (reset per tick)
 	ResetFlashTimer int // counts down from 30 for "RESET" flash
 
+	// Statistics dashboard
+	StatsTracker *StatsTracker
+	DashboardOn  bool // D key toggle
+
 	// Block editor
 	BlockEditorActive bool
 	BlockRules        []BlockRule

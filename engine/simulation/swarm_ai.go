@@ -297,6 +297,19 @@ func (s *Simulation) updateSwarmMode() {
 		swarm.UpdateChallenge(ss)
 	}
 
+	// Phase 4.92: Statistics tracker update
+	if ss.StatsTracker != nil {
+		ss.StatsTracker.Update(ss)
+		// Heatmap update every 100 ticks
+		if ss.Tick%100 == 0 {
+			ss.StatsTracker.UpdateHeatmap(ss)
+		}
+		// Rankings update every 500 ticks
+		if ss.Tick%500 == 0 {
+			ss.StatsTracker.UpdateRankings(ss)
+		}
+	}
+
 	// Phase 4.95: Accumulate lifetime stats (before StuckPrevX/Y is overwritten)
 	for i := range ss.Bots {
 		bot := &ss.Bots[i]
@@ -1365,6 +1378,10 @@ func executeSwarmAction(act swarmscript.Action, bot *swarm.SwarmBot, ss *swarm.S
 					X: bot.X, Y: bot.Y,
 					Color: tpkg.Color, IsPickup: true,
 				})
+				// Stats tracker pickup event
+				if ss.StatsTracker != nil {
+					ss.StatsTracker.AddPickupEvent(botIdx, swarm.DeliveryColorName(tpkg.Color))
+				}
 				// Turn away from ramp (toward arena interior) so bot leaves immediately
 				bot.Angle = (ss.Rng.Float64() - 0.5) * math.Pi / 2 // roughly rightward ±45°
 				bot.Speed = swarm.SwarmBotSpeed
@@ -1385,6 +1402,10 @@ func executeSwarmAction(act swarmscript.Action, bot *swarm.SwarmBot, ss *swarm.S
 				pkg.PickupTick = ss.Tick
 				bot.CarryingPkg = pi
 				bot.Stats.TotalPickups++
+				// Stats tracker pickup event
+				if ss.StatsTracker != nil {
+					ss.StatsTracker.AddPickupEvent(botIdx, swarm.DeliveryColorName(pkg.Color))
+				}
 				logger.InfoBot(botIdx, "DELIVERY", "Bot #%d picked up %s package", botIdx, swarm.DeliveryColorName(pkg.Color))
 				// Emit pickup event for particles
 				ss.DeliveryEvents = append(ss.DeliveryEvents, swarm.SwarmDeliveryEvent{
@@ -1473,6 +1494,11 @@ func executeSwarmAction(act swarmscript.Action, bot *swarm.SwarmBot, ss *swarm.S
 					logger.InfoBot(botIdx, "DELIVERY", "Bot #%d delivered %s CORRECT (%d ticks)", botIdx, swarm.DeliveryColorName(pkg.Color), deliveryTime)
 				} else {
 					logger.WarnBot(botIdx, "DELIVERY", "Bot #%d delivered %s WRONG (%d ticks)", botIdx, swarm.DeliveryColorName(pkg.Color), deliveryTime)
+				}
+				// Stats tracker
+				if ss.StatsTracker != nil {
+					ss.StatsTracker.RecordDelivery(correct, bot.Team)
+					ss.StatsTracker.AddDeliveryEvent(botIdx, swarm.DeliveryColorName(pkg.Color), correct, deliveryTime)
 				}
 				// Truck scoring
 				if ss.TruckToggle && ss.TruckState != nil {
