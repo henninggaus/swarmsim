@@ -510,6 +510,19 @@ func buildSwarmEnvironment(ss *swarm.SwarmState, i int) {
 		}
 	}
 
+	// Exploration timer: increment when carrying but no dropoff/beacon visible
+	if bot.CarryingPkg >= 0 {
+		if bot.DropoffMatch || bot.HeardBeaconDropoffColor > 0 {
+			bot.ExplorationTimer = 0
+			bot.ExplorationAngle = 0
+		} else {
+			bot.ExplorationTimer++
+		}
+	} else {
+		bot.ExplorationTimer = 0
+		bot.ExplorationAngle = 0
+	}
+
 	// Truck sensors: build when truck toggle active
 	bot.TruckHere = false
 	bot.TruckPkgCount = 0
@@ -820,6 +833,13 @@ func evaluateSwarmCondition(cond swarmscript.Condition, bot *swarm.SwarmBot, sna
 
 	case swarmscript.CondHeardBeaconDropoffDist:
 		return compareInt(int(bot.HeardBeaconDropoffDist), cond.Op, cond.Value)
+
+	case swarmscript.CondExploring:
+		v := 0
+		if bot.ExplorationTimer > 60 {
+			v = 1
+		}
+		return compareInt(v, cond.Op, cond.Value)
 	}
 
 	return false
@@ -1374,6 +1394,19 @@ func executeSwarmAction(act swarmscript.Action, bot *swarm.SwarmBot, ss *swarm.S
 			return
 		}
 		bot.Angle = bot.HeardBeaconDropoffAngle
+
+	case swarmscript.ActSpiralFwd:
+		// Spiral outward to explore arena when lost
+		bot.ExplorationAngle += 0.03
+		bot.Angle += bot.ExplorationAngle * 0.1
+		bot.Speed = swarm.SwarmBotSpeed
+		// If near edge, reverse spiral direction to bounce back into arena
+		margin := 40.0
+		if bot.X < margin || bot.X > ss.ArenaW-margin ||
+			bot.Y < margin || bot.Y > ss.ArenaH-margin {
+			bot.ExplorationAngle = -bot.ExplorationAngle
+			bot.Angle += math.Pi * 0.3 // partial turn inward
+		}
 	}
 }
 

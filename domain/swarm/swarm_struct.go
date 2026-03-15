@@ -119,6 +119,10 @@ type SwarmBot struct {
 	HeardBeaconDropoffAngle float64 // angle toward it
 	HeardBeaconDropoffDist  float64 // distance to it
 
+	// Exploration state (for spiral search when carrying but lost)
+	ExplorationTimer int     // ticks since last successful dropoff detection
+	ExplorationAngle float64 // current spiral angle offset
+
 	// Truck sensor cache (rebuilt per tick when TruckToggle)
 	TruckHere           bool
 	TruckPkgCount       int

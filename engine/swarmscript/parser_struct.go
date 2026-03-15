@@ -54,6 +54,7 @@ const (
 	CondNearestTruckPkgDist                      // nearest_truck_pkg
 	CondHeardBeaconDropoff                       // heard_beacon (1 if heard, 0 if not)
 	CondHeardBeaconDropoffDist                   // beacon_dist
+	CondExploring                                // exploring (1 if lost carrier for >60 ticks)
 )
 
 // Condition represents a single boolean check in a rule.
@@ -105,6 +106,7 @@ const (
 	ActTurnToRamp                              // GOTO_RAMP
 	ActTurnToTruckPkg                          // GOTO_TRUCK_PKG
 	ActTurnToBeaconDropoff                     // GOTO_BEACON
+	ActSpiralFwd                               // SPIRAL
 )
 
 // Action represents an action to execute when a rule matches.
@@ -203,6 +205,9 @@ var conditionNames = map[string]ConditionType{
 	"heard_beacon": CondHeardBeaconDropoff,
 	"beacon_dist":  CondHeardBeaconDropoffDist,
 	"beacon":       CondHeardBeaconDropoff,
+	// Exploration
+	"exploring": CondExploring,
+	"lost":      CondExploring,
 	// Extra delivery alias
 	"led_match": CondNearestMatchLEDDist,
 }
@@ -252,6 +257,7 @@ var actionNames = map[string]struct {
 	"GOTO_TRUCK_PKG":     {ActTurnToTruckPkg, 0},
 	// Beacon actions
 	"GOTO_BEACON":        {ActTurnToBeaconDropoff, 0},
+	"SPIRAL":             {ActSpiralFwd, 0},
 	// Extra delivery alias
 	"GOTO_LED_MATCH":     {ActTurnToMatchingLED, 0},
 	// Short aliases for delivery actions (keeps preset lines under 70 chars)
@@ -331,6 +337,7 @@ var highlightConditions = map[string]bool{
 	"nearest_truck_pkg": true, "truck_pkg": true, "t_pkg": true,
 	// Beacon sensors
 	"heard_beacon": true, "beacon_dist": true, "beacon": true, "led_match": true,
+	"exploring": true, "lost": true,
 }
 
 var highlightActions = map[string]bool{
@@ -362,6 +369,7 @@ var highlightActions = map[string]bool{
 	"GOTO_RAMP": true, "GOTO_TRUCK_PKG": true,
 	// Beacon actions
 	"GOTO_BEACON": true, "GOTO_LED_MATCH": true,
+	"SPIRAL": true,
 }
 
 // --- Reverse mapping functions (for block editor / serialization) ---
@@ -445,6 +453,8 @@ func ConditionTypeName(ct ConditionType) string {
 		return "heard_beacon"
 	case CondHeardBeaconDropoffDist:
 		return "beacon_dist"
+	case CondExploring:
+		return "exploring"
 	}
 	return "unknown"
 }
@@ -541,6 +551,8 @@ func ActionTypeName(at ActionType) string {
 		return "GOTO_TRUCK_PKG"
 	case ActTurnToBeaconDropoff:
 		return "GOTO_BEACON"
+	case ActSpiralFwd:
+		return "SPIRAL"
 	}
 	return "UNKNOWN"
 }
@@ -568,7 +580,7 @@ var SensorGrouped = [][]string{
 	{"-- Nachbarn --", "neighbors", "near_dist", "leader", "follower", "chain_len"},
 	{"-- Navigation --", "edge", "obs_ahead", "obs_dist", "light"},
 	{"-- Zufall --", "rnd", "true"},
-	{"-- Delivery --", "carry", "match", "has_pkg", "p_dist", "d_dist", "pickup_color", "dropoff_color", "heard_beacon", "beacon_dist"},
+	{"-- Delivery --", "carry", "match", "has_pkg", "p_dist", "d_dist", "pickup_color", "dropoff_color", "heard_beacon", "beacon_dist", "exploring"},
 	{"-- Kommunikation --", "msg", "heard_pickup", "heard_dropoff", "led_dist"},
 	{"-- LED --", "nearest_led_r", "nearest_led_g", "nearest_led_b"},
 	{"-- Intern --", "state", "counter", "value1", "value2", "timer", "tick"},
@@ -579,7 +591,7 @@ var SensorGrouped = [][]string{
 var ActionGrouped = [][]string{
 	{"-- Bewegung --", "FWD", "FWD_SLOW", "STOP", "TURN_LEFT", "TURN_RIGHT", "TURN_RANDOM"},
 	{"-- Navigation --", "TURN_TO_NEAREST", "TURN_FROM_NEAREST", "TURN_TO_CENTER", "TURN_TO_LIGHT", "AVOID_OBSTACLE"},
-	{"-- Delivery --", "PICKUP", "DROP", "GOTO_PICKUP", "GOTO_DROPOFF", "GOTO_LED", "GOTO_BEACON"},
+	{"-- Delivery --", "PICKUP", "DROP", "GOTO_PICKUP", "GOTO_DROPOFF", "GOTO_LED", "GOTO_BEACON", "SPIRAL"},
 	{"-- Kommunikation --", "SEND_MESSAGE", "SEND_PICKUP", "SEND_DROPOFF", "GOTO_HEARD_PICKUP", "GOTO_HEARD_DROPOFF"},
 	{"-- LED --", "SET_LED", "LED_PICKUP", "LED_DROPOFF", "COPY_LED"},
 	{"-- Intern --", "SET_STATE", "SET_COUNTER", "INC_COUNTER", "DEC_COUNTER", "SET_TIMER", "SET_VALUE1", "SET_VALUE2"},
