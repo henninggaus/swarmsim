@@ -856,8 +856,8 @@ func drawSwarmRamp(screen *ebiten.Image, ss *swarm.SwarmState) {
 	rw := float32(ts.RampW)
 	rh := float32(ts.RampH)
 
-	// Semi-transparent background
-	vector.DrawFilledRect(screen, rx, ry, rw, rh, color.RGBA{60, 50, 30, 80}, false)
+	// Semi-transparent background (brighter)
+	vector.DrawFilledRect(screen, rx, ry, rw, rh, color.RGBA{80, 70, 30, 100}, false)
 
 	// Diagonal hatching lines
 	hatchStep := float32(20)
@@ -874,17 +874,72 @@ func drawSwarmRamp(screen *ebiten.Image, ss *swarm.SwarmState) {
 			x2 += y2 - (ry + rh)
 			y2 = ry + rh
 		}
-		vector.StrokeLine(screen, x1, y1, x2, y2, 1, color.RGBA{100, 80, 40, 60}, false)
+		vector.StrokeLine(screen, x1, y1, x2, y2, 1, color.RGBA{140, 120, 50, 80}, false)
 	}
 
-	// Border
-	vector.StrokeRect(screen, rx, ry, rw, rh, 2, color.RGBA{180, 140, 60, 150}, false)
+	// Bright border (yellow-orange, thick)
+	borderCol := color.RGBA{255, 200, 50, 220}
+	vector.StrokeRect(screen, rx, ry, rw, rh, 3, borderCol, false)
 
-	// "RAMP" label
+	// Pulsing inner border
+	innerCol := color.RGBA{255, 200, 50, 80}
+	vector.StrokeRect(screen, rx+4, ry+4, rw-8, rh-8, 1, innerCol, false)
+
+	// Entrance arrow on the right side (pointing left into ramp)
+	arrowX := rx + rw - 10
+	arrowCY := ry + rh/2
+	arrowCol := color.RGBA{255, 220, 80, 200}
+	// Arrow body (horizontal line)
+	vector.StrokeLine(screen, arrowX, arrowCY, arrowX-30, arrowCY, 3, arrowCol, false)
+	// Arrowhead (chevron pointing left)
+	vector.StrokeLine(screen, arrowX-30, arrowCY, arrowX-20, arrowCY-10, 2.5, arrowCol, false)
+	vector.StrokeLine(screen, arrowX-30, arrowCY, arrowX-20, arrowCY+10, 2.5, arrowCol, false)
+
+	// Second arrow below
+	arrowCY2 := arrowCY + 40
+	vector.StrokeLine(screen, arrowX, arrowCY2, arrowX-30, arrowCY2, 3, arrowCol, false)
+	vector.StrokeLine(screen, arrowX-30, arrowCY2, arrowX-20, arrowCY2-10, 2.5, arrowCol, false)
+	vector.StrokeLine(screen, arrowX-30, arrowCY2, arrowX-20, arrowCY2+10, 2.5, arrowCol, false)
+
+	// Second arrow above
+	arrowCY3 := arrowCY - 40
+	vector.StrokeLine(screen, arrowX, arrowCY3, arrowX-30, arrowCY3, 3, arrowCol, false)
+	vector.StrokeLine(screen, arrowX-30, arrowCY3, arrowX-20, arrowCY3-10, 2.5, arrowCol, false)
+	vector.StrokeLine(screen, arrowX-30, arrowCY3, arrowX-20, arrowCY3+10, 2.5, arrowCol, false)
+
+	// "RAMP" label (larger, brighter)
 	label := "RAMP"
 	lx := int(rx+rw/2) - len(label)*charW/2
-	ly := int(ry + 5)
-	printColoredAt(screen, label, lx, ly, color.RGBA{180, 140, 60, 180})
+	ly := int(ry + 8)
+	printColoredAt(screen, label, lx, ly, color.RGBA{255, 220, 80, 255})
+
+	// Truck count / status below label
+	if ts.CurrentTruck != nil {
+		status := ""
+		switch ts.CurrentTruck.Phase {
+		case swarm.TruckDrivingIn:
+			status = "Truck incoming..."
+		case swarm.TruckParked:
+			remaining := 0
+			for _, p := range ts.CurrentTruck.Packages {
+				if !p.PickedUp {
+					remaining++
+				}
+			}
+			status = fmt.Sprintf("Pkgs: %d left", remaining)
+		case swarm.TruckComplete:
+			status = "All picked up!"
+		case swarm.TruckDrivingOut:
+			status = "Truck leaving..."
+		case swarm.TruckWaiting:
+			status = "Next truck soon"
+		case swarm.TruckRoundDone:
+			status = "Round complete!"
+		}
+		if status != "" {
+			printColoredAt(screen, status, int(rx+5), int(ry+rh-18), color.RGBA{200, 180, 80, 200})
+		}
+	}
 }
 
 // drawSwarmTruckVehicle renders the truck body with packages.

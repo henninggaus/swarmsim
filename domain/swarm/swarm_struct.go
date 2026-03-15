@@ -20,9 +20,9 @@ const (
 
 	// Truck / Ramp constants
 	SwarmRampX      = 0.0
-	SwarmRampY      = 250.0
-	SwarmRampW      = 150.0
-	SwarmRampH      = 300.0
+	SwarmRampY      = 200.0
+	SwarmRampW      = 200.0
+	SwarmRampH      = 350.0
 	SwarmTruckParkX = 20.0
 )
 

@@ -200,15 +200,24 @@ func (ss *SwarmState) resetDeliveryPackages() {
 // --- Maze & Obstacle Generation ---
 
 // GenerateSwarmObstacles creates 10-15 random rectangular obstacles.
+// When TruckToggle is active, obstacles that overlap the ramp area are skipped.
 func GenerateSwarmObstacles(ss *SwarmState) {
 	count := 10 + ss.Rng.Intn(6)
 	margin := 40.0
 	ss.Obstacles = make([]*physics.Obstacle, 0, count)
+	rampMargin := 30.0
 	for i := 0; i < count; i++ {
 		w := 30 + ss.Rng.Float64()*50
 		h := 30 + ss.Rng.Float64()*50
 		x := margin + ss.Rng.Float64()*(ss.ArenaW-2*margin-w)
 		y := margin + ss.Rng.Float64()*(ss.ArenaH-2*margin-h)
+		// Skip obstacles overlapping ramp area when trucks are active
+		if ss.TruckToggle {
+			if x < SwarmRampX+SwarmRampW+rampMargin && x+w > SwarmRampX-rampMargin &&
+				y < SwarmRampY+SwarmRampH+rampMargin && y+h > SwarmRampY-rampMargin {
+				continue
+			}
+		}
 		ss.Obstacles = append(ss.Obstacles, &physics.Obstacle{X: x, Y: y, W: w, H: h})
 	}
 }
@@ -263,30 +272,62 @@ func GenerateSwarmMaze(ss *SwarmState) {
 		stack = append(stack, pos{nc, nr})
 	}
 
-	// Convert to wall obstacles — only internal walls
+	// Ramp exclusion zone (with margin for bots to pass through)
+	rampMargin := 20.0
+	rampExclX := SwarmRampX
+	rampExclY := SwarmRampY - rampMargin
+	rampExclW := SwarmRampW + rampMargin
+	rampExclH := SwarmRampH + 2*rampMargin
+
+	wallOverlapsRamp := func(wx, wy, ww, wh float64) bool {
+		if !ss.TruckToggle {
+			return false
+		}
+		return wx < rampExclX+rampExclW && wx+ww > rampExclX &&
+			wy < rampExclY+rampExclH && wy+wh > rampExclY
+	}
+
+	// Convert to wall obstacles — only internal walls (skip those overlapping ramp)
 	for c := 0; c < mazeCols; c++ {
 		for r := 0; r < mazeRows; r++ {
 			x := float64(c) * cellW
 			y := float64(r) * cellH
 			// Right wall (vertical)
 			if c < mazeCols-1 && cells[c][r].walls[1] {
-				ss.MazeWalls = append(ss.MazeWalls, &physics.Obstacle{
-					X: x + cellW - wallThick/2, Y: y, W: wallThick, H: cellH,
-				})
+				wx := x + cellW - wallThick/2
+				if !wallOverlapsRamp(wx, y, wallThick, cellH) {
+					ss.MazeWalls = append(ss.MazeWalls, &physics.Obstacle{
+						X: wx, Y: y, W: wallThick, H: cellH,
+					})
+				}
 			}
 			// Bottom wall (horizontal)
 			if r < mazeRows-1 && cells[c][r].walls[2] {
-				ss.MazeWalls = append(ss.MazeWalls, &physics.Obstacle{
-					X: x, Y: y + cellH - wallThick/2, W: cellW, H: wallThick,
-				})
+				wy := y + cellH - wallThick/2
+				if !wallOverlapsRamp(x, wy, cellW, wallThick) {
+					ss.MazeWalls = append(ss.MazeWalls, &physics.Obstacle{
+						X: x, Y: wy, W: cellW, H: wallThick,
+					})
+				}
 			}
 		}
 	}
 
-	// Add border walls
+	// Add border walls (split left wall to leave gap for ramp)
 	ss.MazeWalls = append(ss.MazeWalls, &physics.Obstacle{X: 0, Y: 0, W: ss.ArenaW, H: wallThick})                     // top
 	ss.MazeWalls = append(ss.MazeWalls, &physics.Obstacle{X: 0, Y: ss.ArenaH - wallThick, W: ss.ArenaW, H: wallThick}) // bottom
-	ss.MazeWalls = append(ss.MazeWalls, &physics.Obstacle{X: 0, Y: 0, W: wallThick, H: ss.ArenaH})                     // left
+	if ss.TruckToggle {
+		// Left wall with gap for ramp entrance
+		if SwarmRampY > wallThick {
+			ss.MazeWalls = append(ss.MazeWalls, &physics.Obstacle{X: 0, Y: 0, W: wallThick, H: SwarmRampY})
+		}
+		rampBottom := SwarmRampY + SwarmRampH
+		if rampBottom < ss.ArenaH-wallThick {
+			ss.MazeWalls = append(ss.MazeWalls, &physics.Obstacle{X: 0, Y: rampBottom, W: wallThick, H: ss.ArenaH - rampBottom})
+		}
+	} else {
+		ss.MazeWalls = append(ss.MazeWalls, &physics.Obstacle{X: 0, Y: 0, W: wallThick, H: ss.ArenaH}) // left
+	}
 	ss.MazeWalls = append(ss.MazeWalls, &physics.Obstacle{X: ss.ArenaW - wallThick, Y: 0, W: wallThick, H: ss.ArenaH}) // right
 }
 
@@ -301,11 +342,19 @@ func GenerateDeliveryStations(ss *SwarmState) {
 	margin := 60.0
 	stationRadius := 25.0
 
-	// Helper: check if position overlaps any wall
+	// Helper: check if position overlaps any wall or ramp
 	posOK := func(x, y float64) bool {
 		for _, obs := range ss.AllObstacles() {
 			if x+stationRadius > obs.X && x-stationRadius < obs.X+obs.W &&
 				y+stationRadius > obs.Y && y-stationRadius < obs.Y+obs.H {
+				return false
+			}
+		}
+		// Don't place stations inside the ramp area when trucks active
+		if ss.TruckToggle {
+			rampPad := 40.0
+			if x+stationRadius > SwarmRampX-rampPad && x-stationRadius < SwarmRampX+SwarmRampW+rampPad &&
+				y+stationRadius > SwarmRampY-rampPad && y-stationRadius < SwarmRampY+SwarmRampH+rampPad {
 				return false
 			}
 		}
@@ -795,28 +844,31 @@ IF obs_ahead == 1 THEN AVOID_OBSTACLE
 IF edge == 1 THEN TURN_RIGHT 180`
 
 var presetSimpleUnload = `# Simple Unload — enable Trucks!
-# Go to ramp, pick up, deliver
+# Go to ramp, pick up from truck, deliver to dropoff
 # --- Explore (lowest priority) ---
-IF rnd < 8 THEN TURN_RANDOM
+IF rnd < 5 THEN TURN_RANDOM
 IF true THEN FWD
-# --- Separation ---
-IF near_dist < 15 THEN TURN_FROM_NEAREST
-IF near_dist < 15 THEN FWD
+# --- Separation (gentle) ---
+IF near_dist < 12 THEN TURN_FROM_NEAREST
+IF near_dist < 12 THEN FWD_SLOW
 # --- LED gradient ---
 IF d_dist < 200 THEN LED_DROPOFF
 IF d_dist > 200 THEN COPY_LED
-# --- Truck pickup ---
-IF carry == 0 AND truck_here == 1 THEN GOTO_TRUCK_PKG
-IF carry == 0 AND truck_here == 1 THEN FWD
+# --- Carrying: deliver to dropoff ---
+IF carry == 1 AND match == 1 AND d_dist < 25 THEN DROP
+IF carry == 1 AND match == 1 THEN GOTO_DROPOFF
+IF carry == 1 AND match == 1 THEN FWD
+IF carry == 1 AND led_dist < 200 THEN GOTO_LED
+IF carry == 1 AND led_dist < 200 THEN FWD
+IF carry == 1 THEN FWD
+# --- Not carrying: go to ramp and pick up ---
+IF carry == 0 AND on_ramp == 1 AND truck_here == 1 THEN GOTO_TRUCK_PKG
+IF carry == 0 AND on_ramp == 1 AND truck_here == 1 THEN FWD
 IF carry == 0 AND on_ramp == 1 THEN PICKUP
+IF carry == 0 AND truck_pkg > 0 THEN GOTO_RAMP
+IF carry == 0 AND truck_pkg > 0 THEN FWD
 IF carry == 0 THEN GOTO_RAMP
 IF carry == 0 THEN FWD
-# --- Deliver ---
-IF led_dist < 200 THEN GOTO_LED
-IF led_dist < 200 THEN FWD
-IF match == 1 AND d_dist < 25 THEN DROP
-IF match == 1 THEN GOTO_DROPOFF
-IF match == 1 THEN FWD
 # --- Navigation LAST ---
 IF obs_ahead == 1 THEN AVOID_OBSTACLE
 IF edge == 1 THEN TURN_RIGHT 180`
@@ -824,30 +876,32 @@ IF edge == 1 THEN TURN_RIGHT 180`
 var presetCoordinatedUnload = `# Coordinated Unload — enable Trucks!
 # Messages + LED + truck sensors
 # --- Explore (lowest) ---
-IF rnd < 6 THEN TURN_RANDOM
+IF rnd < 4 THEN TURN_RANDOM
 IF true THEN FWD
-# --- Separation ---
-IF near_dist < 15 THEN TURN_FROM_NEAREST
+# --- Separation (gentle) ---
+IF near_dist < 12 THEN TURN_FROM_NEAREST
 # --- LED gradient + broadcast ---
 IF d_dist < 200 THEN LED_DROPOFF
 IF carry == 1 AND d_dist > 200 THEN COPY_LED
 IF d_dist < 200 THEN SEND_DROPOFF 1
-# --- Truck pickup ---
-IF carry == 0 AND truck_here == 1 AND t_pkg < 40 THEN GOTO_TRUCK_PKG
-IF carry == 0 AND truck_here == 1 THEN FWD
+# --- Carrying: deliver ---
+IF carry == 1 AND match == 1 AND d_dist < 25 THEN DROP
+IF carry == 1 AND match == 1 THEN GOTO_DROPOFF
+IF carry == 1 AND match == 1 THEN FWD
+IF carry == 1 AND led_dist < 200 THEN GOTO_LED
+IF carry == 1 AND led_dist < 200 THEN FWD
+IF carry == 1 AND heard_dropoff > 0 THEN GOTO_HEARD_DROPOFF
+IF carry == 1 AND heard_dropoff > 0 THEN FWD
+IF carry == 1 THEN SET_LED 255 99 0
+IF carry == 1 THEN FWD
+# --- Not carrying: go to ramp ---
+IF carry == 0 AND on_ramp == 1 AND truck_here == 1 AND nearest_truck_pkg < 40 THEN GOTO_TRUCK_PKG
+IF carry == 0 AND on_ramp == 1 AND truck_here == 1 THEN FWD
 IF carry == 0 AND on_ramp == 1 THEN PICKUP
 IF carry == 0 AND truck_pkg > 0 THEN GOTO_RAMP
 IF carry == 0 AND truck_pkg > 0 THEN FWD
-IF carry == 0 AND heard_dropoff > 0 THEN GOTO_HEARD_DROPOFF
-# --- Deliver: LED gradient ---
-IF led_dist < 200 THEN GOTO_LED
-IF led_dist < 200 THEN FWD
-# --- Deliver: direct ---
-IF match == 1 AND d_dist < 25 THEN DROP
-IF match == 1 THEN GOTO_DROPOFF
-IF match == 1 THEN FWD
-IF carry == 1 THEN SET_LED 255 99 0
-IF carry == 1 THEN FWD
+IF carry == 0 THEN GOTO_RAMP
+IF carry == 0 THEN FWD
 # --- Navigation LAST ---
 IF obs_ahead == 1 THEN AVOID_OBSTACLE
 IF edge == 1 THEN TURN_RIGHT 180`

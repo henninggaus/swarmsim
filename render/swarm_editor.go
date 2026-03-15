@@ -209,12 +209,19 @@ func drawSwarmEditorBottom(screen *ebiten.Image, ss *swarm.SwarmState, ed *swarm
 	// Separator 1
 	vector.StrokeLine(screen, 5, float32(editorSep1Y), float32(editorPanelW-5), float32(editorSep1Y), 1, ColorSwarmEditorSep, false)
 
-	// Bot count input
+	// Bot count input with +/- buttons
 	botLabel := fmt.Sprintf("Bots: [%s]", ss.BotCountText)
 	if ss.BotCountEdit {
 		botLabel = fmt.Sprintf("Bots: [%s_]", ss.BotCountText)
 	}
 	printColoredAt(screen, botLabel, 10, editorBotCountY, color.RGBA{200, 200, 200, 255})
+
+	// [-] button
+	drawSwarmButton(screen, 160, editorBotCountY-1, 18, 18, "-",
+		color.RGBA{180, 80, 80, 255})
+	// [+] button
+	drawSwarmButton(screen, 182, editorBotCountY-1, 18, 18, "+",
+		color.RGBA{80, 180, 80, 255})
 
 	// Toggle buttons row 1: [Obstacles: OFF] [Maze: OFF]
 	obsLabel := "Obstacles: OFF"
@@ -708,8 +715,19 @@ func SwarmEditorHitTest(mx, my int) string {
 	}
 
 	// Bot count field
-	if my >= editorBotCountY && my < editorBotCountY+18 && mx >= 5 && mx < 200 {
-		return "botcount"
+	if my >= editorBotCountY-1 && my < editorBotCountY+18 {
+		// [-] button
+		if mx >= 160 && mx < 178 {
+			return "bots_minus"
+		}
+		// [+] button
+		if mx >= 182 && mx < 200 {
+			return "bots_plus"
+		}
+		// Text field
+		if mx >= 5 && mx < 160 {
+			return "botcount"
+		}
 	}
 
 	// Toggle row 1: Obstacles / Maze

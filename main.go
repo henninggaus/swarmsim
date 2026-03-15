@@ -724,6 +724,26 @@ func (g *Game) handleSwarmClick(mx, my int) {
 		ed.Focused = false
 		ss.DropdownOpen = false
 
+	case "bots_minus":
+		newCount := ss.BotCount - 10
+		if newCount < swarm.SwarmMinBots {
+			newCount = swarm.SwarmMinBots
+		}
+		ss.RespawnBots(newCount)
+		logger.Info("SWARM", "Bot count decreased to %d", newCount)
+		ed.Focused = false
+		ss.BotCountEdit = false
+
+	case "bots_plus":
+		newCount := ss.BotCount + 10
+		if newCount > swarm.SwarmMaxBots {
+			newCount = swarm.SwarmMaxBots
+		}
+		ss.RespawnBots(newCount)
+		logger.Info("SWARM", "Bot count increased to %d", newCount)
+		ed.Focused = false
+		ss.BotCountEdit = false
+
 	case "text_mode":
 		if ss.BlockEditorActive {
 			// Serialize blocks back to text
@@ -886,19 +906,21 @@ func (g *Game) handleSwarmClick(mx, my int) {
 			if !ss.DeliveryOn {
 				ss.DeliveryOn = true
 			}
-			// Force maze on
-			if !ss.MazeOn {
-				ss.MazeOn = true
-				ss.ObstaclesOn = false
-				ss.Obstacles = nil
-				swarm.GenerateSwarmMaze(ss)
-			}
+			// Force maze on (regenerate to exempt ramp area)
+			ss.MazeOn = true
+			ss.ObstaclesOn = false
+			ss.Obstacles = nil
+			swarm.GenerateSwarmMaze(ss)
 			// Generate stations and truck state
 			swarm.GenerateDeliveryStations(ss)
 			ss.TruckState = swarm.NewSwarmTruckState(ss.Rng)
 			logger.Info("SWARM", "Trucks ON (round %d)", ss.TruckState.RoundNum)
 		} else {
 			ss.TruckState = nil
+			// Regenerate maze without ramp exemption
+			if ss.MazeOn {
+				swarm.GenerateSwarmMaze(ss)
+			}
 			logger.Info("SWARM", "Trucks OFF")
 		}
 		g.autoReset("Trucks toggled")
@@ -1219,6 +1241,13 @@ func (g *Game) loadSwarmPreset(idx int) {
 	if swarm.IsDeliveryPresetIdx(idx) || swarm.IsTruckPresetIdx(idx) {
 		ss.IsDeliveryProgram = swarm.IsDeliveryPresetIdx(idx)
 		ss.IsTruckProgram = swarm.IsTruckPresetIdx(idx)
+		// Set truck toggle BEFORE maze generation so ramp is exempted
+		if swarm.IsTruckPresetIdx(idx) {
+			ss.TruckToggle = true
+		} else {
+			ss.TruckToggle = false
+			ss.TruckState = nil
+		}
 		// Force delivery ON, maze ON, obstacles OFF
 		ss.DeliveryOn = true
 		ss.MazeOn = true
@@ -1229,14 +1258,10 @@ func (g *Game) loadSwarmPreset(idx int) {
 		for i := range ss.Bots {
 			ss.Bots[i].CarryingPkg = -1
 		}
-		// Truck preset: also enable truck system
+		// Truck preset: create truck state
 		if swarm.IsTruckPresetIdx(idx) {
-			ss.TruckToggle = true
 			ss.TruckState = swarm.NewSwarmTruckState(ss.Rng)
 			logger.Info("SWARM", "Truck preset: trucks enabled (round %d)", ss.TruckState.RoundNum)
-		} else {
-			ss.TruckToggle = false
-			ss.TruckState = nil
 		}
 	} else {
 		ss.IsDeliveryProgram = false

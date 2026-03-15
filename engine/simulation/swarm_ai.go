@@ -134,6 +134,53 @@ func (s *Simulation) updateSwarmMode() {
 	// Phase 4.6: Truck system updates
 	if ss.TruckToggle && ss.TruckState != nil {
 		swarm.UpdateSwarmTruck(ss)
+
+		// Debug logging: truck sensor values every 200 ticks
+		if ss.Tick%200 == 0 {
+			onRampCount := 0
+			truckHereCount := 0
+			carryingCount := 0
+			for bi := range ss.Bots {
+				if ss.Bots[bi].OnRamp {
+					onRampCount++
+				}
+				if ss.Bots[bi].TruckHere {
+					truckHereCount++
+				}
+				if ss.Bots[bi].CarryingPkg >= 0 {
+					carryingCount++
+				}
+			}
+			phase := "nil"
+			if ss.TruckState.CurrentTruck != nil {
+				switch ss.TruckState.CurrentTruck.Phase {
+				case swarm.TruckDrivingIn:
+					phase = "DrivingIn"
+				case swarm.TruckParked:
+					phase = "Parked"
+				case swarm.TruckComplete:
+					phase = "Complete"
+				case swarm.TruckDrivingOut:
+					phase = "DrivingOut"
+				case swarm.TruckWaiting:
+					phase = "Waiting"
+				case swarm.TruckRoundDone:
+					phase = "RoundDone"
+				}
+			}
+			logger.Info("TRUCK", "tick=%d truck=%s ramp=%dx%d on_ramp=%d truck_here=%d carrying=%d delivered=%d score=%d",
+				ss.Tick, phase,
+				int(ss.TruckState.RampW), int(ss.TruckState.RampH),
+				onRampCount, truckHereCount, carryingCount,
+				ss.TruckState.DeliveredPkgs, ss.TruckState.Score)
+
+			// Log first 3 bots details
+			for bi := 0; bi < 3 && bi < len(ss.Bots); bi++ {
+				b := &ss.Bots[bi]
+				logger.Info("TRUCK", "  bot#%d pos=(%.0f,%.0f) onRamp=%v truckHere=%v pkgCount=%d nearPkgDist=%.0f carry=%d",
+					bi, b.X, b.Y, b.OnRamp, b.TruckHere, b.TruckPkgCount, b.NearestTruckPkgDist, b.CarryingPkg)
+			}
+		}
 	}
 
 	// Phase 4.9: Accumulate lifetime stats (before StuckPrevX/Y is overwritten)
@@ -288,8 +335,13 @@ func buildSwarmEnvironment(ss *swarm.SwarmState, i int) {
 		bot.NearestDist = 999
 	}
 
-	// On edge check
-	if bot.X < swarm.SwarmEdgeMargin || bot.X > ss.ArenaW-swarm.SwarmEdgeMargin ||
+	// On edge check (exempt bots in the ramp zone from left-edge detection)
+	onLeftEdge := bot.X < swarm.SwarmEdgeMargin
+	if onLeftEdge && ss.TruckToggle && ss.TruckState != nil &&
+		bot.Y >= swarm.SwarmRampY && bot.Y <= swarm.SwarmRampY+swarm.SwarmRampH {
+		onLeftEdge = false // ramp zone: not considered "edge"
+	}
+	if onLeftEdge || bot.X > ss.ArenaW-swarm.SwarmEdgeMargin ||
 		bot.Y < swarm.SwarmEdgeMargin || bot.Y > ss.ArenaH-swarm.SwarmEdgeMargin {
 		bot.OnEdge = true
 	}
@@ -440,25 +492,30 @@ func buildSwarmEnvironment(ss *swarm.SwarmState, i int) {
 			bot.Y >= ts.RampY && bot.Y <= ts.RampY+ts.RampH {
 			bot.OnRamp = true
 		}
-		// Check if truck is parked
-		if ts.CurrentTruck != nil && ts.CurrentTruck.Phase == swarm.TruckParked {
-			bot.TruckHere = true
-			// Count remaining packages and find nearest
+		if ts.CurrentTruck != nil {
+			// Count remaining packages (available in all phases so bots head to ramp early)
 			for pi, pkg := range ts.CurrentTruck.Packages {
 				if pkg.PickedUp {
 					continue
 				}
 				bot.TruckPkgCount++
-				// Package world position
-				wpx := ts.CurrentTruck.X + pkg.RelX + 18 + 4 // cabin offset + center
-				wpy := ts.CurrentTruck.Y + pkg.RelY + 4      // center
-				pdx := bot.X - wpx
-				pdy := bot.Y - wpy
-				pdist := math.Sqrt(pdx*pdx + pdy*pdy)
-				if pdist < bot.NearestTruckPkgDist {
-					bot.NearestTruckPkgDist = pdist
-					bot.NearestTruckPkgIdx = pi
+				// Package world position (only meaningful when truck visible)
+				if ts.CurrentTruck.Phase == swarm.TruckParked ||
+					ts.CurrentTruck.Phase == swarm.TruckDrivingIn {
+					wpx := ts.CurrentTruck.X + pkg.RelX + 18 + 4 // cabin offset + center
+					wpy := ts.CurrentTruck.Y + pkg.RelY + 4      // center
+					pdx := bot.X - wpx
+					pdy := bot.Y - wpy
+					pdist := math.Sqrt(pdx*pdx + pdy*pdy)
+					if pdist < bot.NearestTruckPkgDist {
+						bot.NearestTruckPkgDist = pdist
+						bot.NearestTruckPkgIdx = pi
+					}
 				}
+			}
+			// TruckHere only when parked (packages can be picked up)
+			if ts.CurrentTruck.Phase == swarm.TruckParked {
+				bot.TruckHere = true
 			}
 		}
 	}
@@ -1367,9 +1424,22 @@ func applySwarmPhysics(ss *swarm.SwarmState, i int) {
 	} else {
 		// Bounce — clamp position, then redirect angle (but NOT for followers)
 		hitEdge := false
+
+		// Check if bot is in the ramp entrance zone (exempt from left-edge bounce when trucks active)
+		inRampZone := ss.TruckToggle && ss.TruckState != nil &&
+			bot.Y >= swarm.SwarmRampY-r && bot.Y <= swarm.SwarmRampY+swarm.SwarmRampH+r
+
 		if bot.X < r {
-			bot.X = r
-			hitEdge = true
+			if inRampZone {
+				// Allow bots to reach X=0 (ramp area) — only soft clamp
+				if bot.X < -r {
+					bot.X = -r
+					hitEdge = true
+				}
+			} else {
+				bot.X = r
+				hitEdge = true
+			}
 		}
 		if bot.X > ss.ArenaW-r {
 			bot.X = ss.ArenaW - r
