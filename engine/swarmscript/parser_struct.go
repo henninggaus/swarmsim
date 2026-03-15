@@ -55,6 +55,8 @@ const (
 	CondHeardBeaconDropoff                       // heard_beacon (1 if heard, 0 if not)
 	CondHeardBeaconDropoffDist                   // beacon_dist
 	CondExploring                                // exploring (1 if lost carrier for >60 ticks)
+	CondWallRight                                // wall_right (wall within 25px to the right)
+	CondWallLeft                                 // wall_left (wall within 25px to the left)
 )
 
 // Condition represents a single boolean check in a rule.
@@ -213,6 +215,10 @@ var conditionNames = map[string]ConditionType{
 	"lost":      CondExploring,
 	// Extra delivery alias
 	"led_match": CondNearestMatchLEDDist,
+	// Wall sensors
+	"wall_right": CondWallRight,
+	"wall_left":  CondWallLeft,
+	"wall_front": CondObstacleAhead, // alias for obs_ahead
 }
 
 // actionNames maps action name strings to (ActionType, paramCount).
@@ -341,6 +347,8 @@ var highlightConditions = map[string]bool{
 	// Beacon sensors
 	"heard_beacon": true, "beacon_dist": true, "beacon": true, "led_match": true,
 	"exploring": true, "lost": true,
+	// Wall sensors
+	"wall_right": true, "wall_left": true, "wall_front": true,
 }
 
 var highlightActions = map[string]bool{
@@ -458,6 +466,10 @@ func ConditionTypeName(ct ConditionType) string {
 		return "beacon_dist"
 	case CondExploring:
 		return "exploring"
+	case CondWallRight:
+		return "wall_right"
+	case CondWallLeft:
+		return "wall_left"
 	}
 	return "unknown"
 }
@@ -581,7 +593,7 @@ func ActionParamCountByName(name string) int {
 // SensorGrouped returns sensor names organized in groups for dropdown display.
 var SensorGrouped = [][]string{
 	{"-- Nachbarn --", "neighbors", "near_dist", "leader", "follower", "chain_len"},
-	{"-- Navigation --", "edge", "obs_ahead", "obs_dist", "light"},
+	{"-- Navigation --", "edge", "obs_ahead", "obs_dist", "light", "wall_right", "wall_left", "wall_front"},
 	{"-- Zufall --", "rnd", "true"},
 	{"-- Delivery --", "carry", "match", "has_pkg", "p_dist", "d_dist", "pickup_color", "dropoff_color", "heard_beacon", "beacon_dist", "exploring"},
 	{"-- Kommunikation --", "msg", "heard_pickup", "heard_dropoff", "led_dist"},

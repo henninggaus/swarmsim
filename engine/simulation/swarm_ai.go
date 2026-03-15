@@ -657,6 +657,40 @@ func buildSwarmEnvironment(ss *swarm.SwarmState, i int) {
 			}
 		}
 	}
+
+	// Wall sensors: raycast 25px to the right and left of heading
+	bot.WallRight = false
+	bot.WallLeft = false
+	if len(allObs) > 0 {
+		rightAngle := bot.Angle + math.Pi/2
+		leftAngle := bot.Angle - math.Pi/2
+		for step := 1; step <= 5; step++ {
+			d := float64(step) * 5.0
+			if !bot.WallRight {
+				px := bot.X + math.Cos(rightAngle)*d
+				py := bot.Y + math.Sin(rightAngle)*d
+				for _, obs := range allObs {
+					if pointInRect(px, py, obs) {
+						bot.WallRight = true
+						break
+					}
+				}
+			}
+			if !bot.WallLeft {
+				px := bot.X + math.Cos(leftAngle)*d
+				py := bot.Y + math.Sin(leftAngle)*d
+				for _, obs := range allObs {
+					if pointInRect(px, py, obs) {
+						bot.WallLeft = true
+						break
+					}
+				}
+			}
+			if bot.WallRight && bot.WallLeft {
+				break
+			}
+		}
+	}
 }
 
 // pointInRect checks if a point is inside an obstacle rect.
@@ -907,6 +941,20 @@ func evaluateSwarmCondition(cond swarmscript.Condition, bot *swarm.SwarmBot, sna
 	case swarmscript.CondExploring:
 		v := 0
 		if bot.ExplorationTimer > 60 {
+			v = 1
+		}
+		return compareInt(v, cond.Op, cv)
+
+	case swarmscript.CondWallRight:
+		v := 0
+		if bot.WallRight {
+			v = 1
+		}
+		return compareInt(v, cond.Op, cv)
+
+	case swarmscript.CondWallLeft:
+		v := 0
+		if bot.WallLeft {
 			v = 1
 		}
 		return compareInt(v, cond.Op, cv)

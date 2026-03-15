@@ -78,6 +78,8 @@ type SwarmBot struct {
 	NearestLEDB   uint8
 	ObstacleAhead bool    // obstacle within 50px in facing direction
 	ObstacleDist  float64 // distance to nearest obstacle ahead (999 if none)
+	WallRight     bool    // wall within 25px to the right of heading
+	WallLeft      bool    // wall within 25px to the left of heading
 	NearestIdx    int     // index of nearest neighbor (-1 if none)
 
 	// Anti-stuck tracking
