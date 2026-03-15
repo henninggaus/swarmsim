@@ -94,6 +94,10 @@ type SwarmBot struct {
 	ScatterCooldown int // >0 = cooldown after scatter (counts down)
 	IdleBoostTimer  int // >0 = idle boost active (counts down): faster speed + more turning
 
+	// Idle exploration (carry==0 bots that stopped moving)
+	IdleMoveTicks int // consecutive ticks with carry==0 AND speed<0.5
+	IdleMoveTimer int // >0 = forced random exploration (counts down)
+
 	// Trail history (ring buffer)
 	Trail    [10][2]float64
 	TrailIdx int

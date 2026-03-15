@@ -59,16 +59,13 @@ func (s *Simulation) updateSwarmMode() {
 		}
 	}
 
-	// Phase 2.3: Anti-clustering — scatter, dropoff repulsion, idle boost
+	// Phase 2.3: Anti-clustering — scatter, idle exploration, dropoff repulsion
 	for i := range ss.Bots {
 		bot := &ss.Bots[i]
 
 		// Decrement scatter/idle timers
 		if bot.ScatterCooldown > 0 {
 			bot.ScatterCooldown--
-		}
-		if bot.IdleBoostTimer > 0 {
-			bot.IdleBoostTimer--
 		}
 
 		if bot.AntiStuckTimer > 0 {
@@ -77,7 +74,6 @@ func (s *Simulation) updateSwarmMode() {
 
 		// (A) Scatter: >3 close neighbors → forced TURN_FROM_NEAREST + FWD for 15 ticks
 		if bot.ScatterTimer > 0 {
-			// Currently in scatter mode — override program output
 			if bot.NearestIdx >= 0 {
 				other := &ss.Bots[bot.NearestIdx]
 				dx, dy := swarm.NeighborDelta(bot.X, bot.Y, other.X, other.Y, ss)
@@ -90,9 +86,8 @@ func (s *Simulation) updateSwarmMode() {
 			continue
 		}
 		if bot.CloseNeighbors > 3 && bot.ScatterCooldown == 0 {
-			// Trigger scatter mode
 			bot.ScatterTimer = 15
-			bot.ScatterCooldown = 30 // prevent re-triggering for 30 ticks after scatter ends
+			bot.ScatterCooldown = 30
 			if bot.NearestIdx >= 0 {
 				other := &ss.Bots[bot.NearestIdx]
 				dx, dy := swarm.NeighborDelta(bot.X, bot.Y, other.X, other.Y, ss)
@@ -102,41 +97,35 @@ func (s *Simulation) updateSwarmMode() {
 			continue
 		}
 
-		// (B) Ramp anti-clustering: lower threshold (>3) and force rightward escape
-		if bot.OnRamp && bot.CloseNeighbors > 3 {
-			bot.Angle = (ss.Rng.Float64() - 0.5) * 1.0
+		// (B) Idle exploration: carry==0 bots that stay still for 60 ticks → forced random FWD 30 ticks
+		if bot.IdleMoveTimer > 0 {
+			// Active exploration override
+			if ss.Rng.Float64() < 0.1 {
+				bot.Angle += (ss.Rng.Float64() - 0.5) * 1.5
+			}
 			bot.Speed = swarm.SwarmBotSpeed
+			bot.IdleMoveTimer--
+			if bot.IdleMoveTimer == 0 {
+				bot.IdleMoveTicks = 0
+			}
 			continue
 		}
-
-		// (C) Dropoff repulsion: non-carrying bots within 40px of a dropoff get pushed away
-		if ss.DeliveryOn && bot.CarryingPkg < 0 && bot.NearestDropoffDist < 40 && bot.NearestDropoffIdx >= 0 {
-			st := &ss.Stations[bot.NearestDropoffIdx]
-			dx := bot.X - st.X
-			dy := bot.Y - st.Y
-			dist := math.Sqrt(dx*dx + dy*dy)
-			if dist > 0.1 {
-				bot.Angle = math.Atan2(dy, dx) + (ss.Rng.Float64()-0.5)*0.3
+		if bot.CarryingPkg < 0 && bot.Speed < 0.5 {
+			bot.IdleMoveTicks++
+			if bot.IdleMoveTicks >= 60 {
+				bot.IdleMoveTimer = 30
+				bot.Angle = ss.Rng.Float64() * 2 * math.Pi
 				bot.Speed = swarm.SwarmBotSpeed
+				bot.IdleMoveTicks = 0
 			}
+		} else {
+			bot.IdleMoveTicks = 0
 		}
+	}
 
-		// (D) Idle boost: 200+ ticks idle → faster speed + more random turning for 100 ticks
-		if bot.Stats.TicksIdle > 200 && bot.IdleBoostTimer == 0 {
-			bot.IdleBoostTimer = 100
-			bot.Angle = ss.Rng.Float64() * 2 * math.Pi
-			bot.Speed = swarm.SwarmBotSpeed * 1.5
-			bot.Stats.TicksIdle = 0 // reset idle counter
-		}
-		if bot.IdleBoostTimer > 0 {
-			// During idle boost: double random turn chance and 50% more speed
-			if ss.Rng.Float64() < 0.15 { // 15% per tick random turn
-				bot.Angle += (ss.Rng.Float64() - 0.5) * 2.0
-			}
-			if bot.Speed > 0 && bot.Speed < swarm.SwarmBotSpeed*1.5 {
-				bot.Speed = swarm.SwarmBotSpeed * 1.5
-			}
-		}
+	// Phase 2.4: Cluster breaker — detect large clusters and explode them (every 10 ticks)
+	if ss.Tick%10 == 0 {
+		applyClusterBreaker(ss)
 	}
 
 	// Phase 2.5: Follow behavior override
@@ -178,6 +167,9 @@ func (s *Simulation) updateSwarmMode() {
 
 	// Phase 4.2: Repulsion force — active push when bots are closer than 30px
 	applyRepulsionForce(ss)
+
+	// Phase 4.3: Station repulsion — push non-carrying bots away from dropoffs
+	applyStationRepulsion(ss)
 
 	// Phase 4.5: Delivery system updates (pickup/drop, respawn, carried package position)
 	if ss.DeliveryOn {
@@ -1790,6 +1782,159 @@ func applyRepulsionForce(ss *swarm.SwarmState) {
 			a.Y += ny * halfForce
 			b.X -= nx * halfForce
 			b.Y -= ny * halfForce
+		}
+	}
+}
+
+// applyStationRepulsion pushes non-carrying bots away from dropoff stations.
+// Bots without a matching package within 50px of a dropoff get a force pushing them away.
+// Only bots carrying a matching package may approach.
+func applyStationRepulsion(ss *swarm.SwarmState) {
+	if !ss.DeliveryOn {
+		return
+	}
+	const stationRepRange = 50.0
+	const stationRepStrength = 0.2
+
+	for i := range ss.Bots {
+		bot := &ss.Bots[i]
+
+		// Bots carrying a matching package may approach dropoffs freely
+		if bot.CarryingPkg >= 0 && bot.CarryingPkg < len(ss.Packages) {
+			pkg := &ss.Packages[bot.CarryingPkg]
+			if bot.NearestDropoffIdx >= 0 && bot.NearestDropoffIdx < len(ss.Stations) {
+				st := &ss.Stations[bot.NearestDropoffIdx]
+				if pkg.Color == st.Color {
+					continue // carrying matching package — don't repel
+				}
+			}
+		}
+
+		// Push non-carrying (or wrong-color-carrying) bots away from all nearby dropoffs
+		for si := range ss.Stations {
+			st := &ss.Stations[si]
+			if st.IsPickup {
+				continue
+			}
+			dx := bot.X - st.X
+			dy := bot.Y - st.Y
+			dist := math.Sqrt(dx*dx + dy*dy)
+			if dist >= stationRepRange || dist < 0.1 {
+				continue
+			}
+			// Force = (50 - dist) * 0.2, directed away from station
+			force := (stationRepRange - dist) * stationRepStrength
+			nx := dx / dist
+			ny := dy / dist
+			bot.X += nx * force
+			bot.Y += ny * force
+		}
+	}
+}
+
+// applyClusterBreaker detects large clusters (connected components via 30px radius)
+// and applies an outward explosion impulse to all bots in clusters > 5.
+func applyClusterBreaker(ss *swarm.SwarmState) {
+	n := len(ss.Bots)
+	if n == 0 {
+		return
+	}
+
+	// Union-Find
+	parent := make([]int, n)
+	rank := make([]int, n)
+	for i := range parent {
+		parent[i] = i
+	}
+	var find func(int) int
+	find = func(x int) int {
+		for parent[x] != x {
+			parent[x] = parent[parent[x]]
+			x = parent[x]
+		}
+		return x
+	}
+	union := func(a, b int) {
+		ra, rb := find(a), find(b)
+		if ra == rb {
+			return
+		}
+		if rank[ra] < rank[rb] {
+			ra, rb = rb, ra
+		}
+		parent[rb] = ra
+		if rank[ra] == rank[rb] {
+			rank[ra]++
+		}
+	}
+
+	// Build clusters: bots within 30px are connected
+	const clusterRadius = 30.0
+	for i := range ss.Bots {
+		a := &ss.Bots[i]
+		nearIDs := ss.Hash.Query(a.X, a.Y, clusterRadius+1)
+		for _, j := range nearIDs {
+			if j <= i || j >= n {
+				continue
+			}
+			b := &ss.Bots[j]
+			dx := a.X - b.X
+			dy := a.Y - b.Y
+			if dx*dx+dy*dy < clusterRadius*clusterRadius {
+				union(i, j)
+			}
+		}
+	}
+
+	// Count cluster sizes and find centroids
+	type clusterInfo struct {
+		count    int
+		sumX     float64
+		sumY     float64
+		members  []int
+	}
+	clusters := make(map[int]*clusterInfo)
+	for i := range ss.Bots {
+		root := find(i)
+		ci, ok := clusters[root]
+		if !ok {
+			ci = &clusterInfo{}
+			clusters[root] = ci
+		}
+		ci.count++
+		ci.sumX += ss.Bots[i].X
+		ci.sumY += ss.Bots[i].Y
+		ci.members = append(ci.members, i)
+	}
+
+	// Explode clusters > 5 bots
+	for _, ci := range clusters {
+		if ci.count <= 5 {
+			continue
+		}
+		cx := ci.sumX / float64(ci.count)
+		cy := ci.sumY / float64(ci.count)
+		logger.Info("CLUSTER", "Broke cluster of %d bots at (%.0f, %.0f)", ci.count, cx, cy)
+		for _, idx := range ci.members {
+			bot := &ss.Bots[idx]
+			if bot.AntiStuckTimer > 0 || bot.ScatterTimer > 0 {
+				continue // already being handled
+			}
+			// Random outward impulse from centroid
+			dx := bot.X - cx
+			dy := bot.Y - cy
+			dist := math.Sqrt(dx*dx + dy*dy)
+			if dist < 1.0 {
+				// At centroid — random direction
+				angle := ss.Rng.Float64() * 2 * math.Pi
+				bot.Angle = angle
+			} else {
+				// Away from centroid + random jitter
+				bot.Angle = math.Atan2(dy, dx) + (ss.Rng.Float64()-0.5)*0.8
+			}
+			bot.Speed = swarm.SwarmBotSpeed * 1.3
+			bot.ScatterTimer = 20
+			bot.ScatterCooldown = 40
 		}
 	}
 }
