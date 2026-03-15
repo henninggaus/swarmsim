@@ -22,6 +22,21 @@ func (s *Simulation) updateSwarmMode() {
 	ss.PrevMessages = ss.NextMessages
 	ss.NextMessages = nil
 
+	// Dropoff beacons: stations emit virtual SEND_DROPOFF messages every 30 ticks
+	if ss.DeliveryOn && ss.Tick%30 == 0 {
+		for si := range ss.Stations {
+			st := &ss.Stations[si]
+			if st.IsPickup {
+				continue
+			}
+			ss.PrevMessages = append(ss.PrevMessages, swarm.SwarmMessage{
+				Value: 20 + st.Color,
+				X:     st.X,
+				Y:     st.Y,
+			})
+		}
+	}
+
 	// Rebuild spatial hash
 	ss.Hash.Clear()
 	for i := range ss.Bots {
@@ -368,8 +383,12 @@ func buildSwarmEnvironment(ss *swarm.SwarmState, i int) {
 	bot.ObstacleAhead = false
 	bot.ObstacleDist = 999
 
-	// Query neighbors within sensor range
-	candidateIDs := ss.Hash.Query(bot.X, bot.Y, swarm.SwarmSensorRange)
+	// Query neighbors within sensor range (carrying bots get extended 200px range)
+	sensorRange := swarm.SwarmSensorRange
+	if bot.CarryingPkg >= 0 {
+		sensorRange = swarm.SwarmDeliverySensorRange
+	}
+	candidateIDs := ss.Hash.Query(bot.X, bot.Y, sensorRange)
 	var sumX, sumY float64
 	count := 0
 
@@ -382,7 +401,7 @@ func buildSwarmEnvironment(ss *swarm.SwarmState, i int) {
 		// Compute distance (with wrap-mode support)
 		dx, dy := swarm.NeighborDelta(bot.X, bot.Y, other.X, other.Y, ss)
 		dist := math.Sqrt(dx*dx + dy*dy)
-		if dist > swarm.SwarmSensorRange {
+		if dist > sensorRange {
 			continue
 		}
 		count++
@@ -524,14 +543,12 @@ func buildSwarmEnvironment(ss *swarm.SwarmState, i int) {
 		for _, msg := range ss.PrevMessages {
 			mdx, mdy := swarm.NeighborDelta(bot.X, bot.Y, msg.X, msg.Y, ss)
 			mdist := math.Sqrt(mdx*mdx + mdy*mdy)
-			if mdist > swarm.SwarmCommRange {
-				continue
-			}
-			if msg.Value >= 11 && msg.Value <= 14 && bot.HeardPickupColor == 0 {
+			if msg.Value >= 11 && msg.Value <= 14 && mdist <= swarm.SwarmCommRange && bot.HeardPickupColor == 0 {
 				bot.HeardPickupColor = msg.Value - 10
 				bot.HeardPickupAngle = math.Atan2(mdy, mdx)
 			}
-			if msg.Value >= 21 && msg.Value <= 24 && bot.HeardDropoffColor == 0 {
+			// Dropoff messages use extended beacon range (150px)
+			if msg.Value >= 21 && msg.Value <= 24 && mdist <= swarm.SwarmDropoffBeaconRange && bot.HeardDropoffColor == 0 {
 				bot.HeardDropoffColor = msg.Value - 20
 				bot.HeardDropoffAngle = math.Atan2(mdy, mdx)
 			}
@@ -1306,7 +1323,8 @@ func executeSwarmAction(act swarmscript.Action, bot *swarm.SwarmBot, ss *swarm.S
 			return
 		}
 		pkg := &ss.Packages[bot.CarryingPkg]
-		// Check if at a dropoff station
+		// DROP safety: only allow within 30px of a dropoff station
+		nearStation := false
 		delivered := false
 		for si := range ss.Stations {
 			st := &ss.Stations[si]
@@ -1314,16 +1332,16 @@ func executeSwarmAction(act swarmscript.Action, bot *swarm.SwarmBot, ss *swarm.S
 				continue
 			}
 			sdx, sdy := swarm.NeighborDelta(bot.X, bot.Y, st.X, st.Y, ss)
-			if math.Sqrt(sdx*sdx+sdy*sdy) < 25 {
-				// Guard: refuse drop at wrong-color station — skip and check other stations
-				if pkg.Color != st.Color {
-					logger.WarnBot(botIdx, "DELIVERY", "Bot #%d tried to drop %s at %s station — refused",
+			stDist := math.Sqrt(sdx*sdx + sdy*sdy)
+			if stDist < 30 {
+				nearStation = true
+				correct := pkg.Color == st.Color
+				if !correct {
+					logger.WarnBot(botIdx, "DELIVERY", "Bot #%d dropped %s at wrong %s station",
 						botIdx, swarm.DeliveryColorName(pkg.Color), swarm.DeliveryColorName(st.Color))
-					continue // skip wrong station, maybe correct one is also nearby
 				}
 				// Delivery!
 				ss.DeliveryStats.TotalDelivered++
-				correct := pkg.Color == st.Color
 				if correct {
 					ss.DeliveryStats.CorrectDelivered++
 					st.FlashOK = true
@@ -1404,13 +1422,9 @@ func executeSwarmAction(act swarmscript.Action, bot *swarm.SwarmBot, ss *swarm.S
 				break
 			}
 		}
-		if !delivered {
-			// Drop on ground
-			pkg.CarriedBy = -1
-			pkg.X = bot.X
-			pkg.Y = bot.Y
-			pkg.OnGround = true
-			bot.CarryingPkg = -1
+		if !delivered && !nearStation {
+			// Not near any station — ignore DROP, log warning
+			logger.WarnBot(botIdx, "DELIVERY", "Bot #%d tried DROP without station nearby", botIdx)
 		}
 
 	case swarmscript.ActTurnToPickup:

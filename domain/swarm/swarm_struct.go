@@ -13,6 +13,7 @@ const (
 	SwarmDeliverySensorRange = 200.0 // extended range for delivery station + LED scanning
 	SwarmBeaconRange         = 600.0 // dropoff stations broadcast beacons to carrying bots
 	SwarmCommRange           = 40.0
+	SwarmDropoffBeaconRange  = 150.0 // virtual dropoff beacon broadcast range
 	SwarmArenaSize           = 800.0
 	SwarmEdgeMargin          = 20.0
 	SwarmDefaultBots         = 50
