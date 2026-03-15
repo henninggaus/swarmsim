@@ -188,6 +188,17 @@ func (r *Renderer) DrawSwarmMode(screen *ebiten.Image, s *simulation.Simulation,
 		botCol := color.RGBA{r, g, b, 255}
 		vector.DrawFilledCircle(a, bx, by, radius, botCol, false)
 
+		// Team ring overlay
+		if ss.TeamsEnabled && bot.Team > 0 {
+			var teamCol color.RGBA
+			if bot.Team == 1 {
+				teamCol = color.RGBA{60, 100, 255, 180} // blue
+			} else {
+				teamCol = color.RGBA{255, 60, 60, 180} // red
+			}
+			vector.StrokeCircle(a, bx, by, radius+2, 2, teamCol, false)
+		}
+
 		dirLen := radius * 1.5
 		dx := float32(math.Cos(bot.Angle)) * dirLen
 		dy := float32(math.Sin(bot.Angle)) * dirLen
@@ -319,6 +330,11 @@ func (r *Renderer) DrawSwarmMode(screen *ebiten.Image, s *simulation.Simulation,
 		vector.StrokeRect(screen, float32(rtX-10), float32(rtY-8), float32(rtW+20), 30,
 			2, color.RGBA{255, 200, 50, 200}, false)
 		printColoredAt(screen, roundText, rtX, rtY, color.RGBA{255, 220, 50, 255})
+	}
+
+	// Teams scoreboard
+	if ss.TeamsEnabled {
+		drawTeamsScoreboard(screen, ss, sw)
 	}
 
 	// Follow-cam HUD indicator
@@ -1344,6 +1360,51 @@ func drawSwarmFitnessGraph(screen *ebiten.Image, ss *swarm.SwarmState, gx, gy, g
 		y0a := float32(gy+gh) - float32(history[i-1].Avg/maxFit)*float32(gh)
 		y1a := float32(gy+gh) - float32(history[i].Avg/maxFit)*float32(gh)
 		vector.StrokeLine(screen, x0, y0a, x1, y1a, 1.5, color.RGBA{255, 200, 50, 200}, false)
+	}
+}
+
+// drawTeamsScoreboard renders the team score display at the top center of the arena.
+func drawTeamsScoreboard(screen *ebiten.Image, ss *swarm.SwarmState, sw int) {
+	cx := sw/2 + 100 // offset right (editor panel on left)
+	y := 55
+	w := 300
+	h := 30
+
+	// Background
+	vector.DrawFilledRect(screen, float32(cx-w/2), float32(y), float32(w), float32(h),
+		color.RGBA{20, 20, 30, 220}, false)
+	vector.StrokeRect(screen, float32(cx-w/2), float32(y), float32(w), float32(h), 1,
+		color.RGBA{100, 100, 120, 150}, false)
+
+	// Score text
+	teamA := fmt.Sprintf("Team A: %d", ss.TeamAScore)
+	teamB := fmt.Sprintf("Team B: %d", ss.TeamBScore)
+	printColoredAt(screen, teamA, cx-w/2+10, y+8, color.RGBA{80, 120, 255, 255})
+	printColoredAt(screen, "vs", cx-10, y+8, color.RGBA{200, 200, 200, 200})
+	printColoredAt(screen, teamB, cx+30, y+8, color.RGBA{255, 80, 80, 255})
+
+	// Score bar
+	total := ss.TeamAScore + ss.TeamBScore
+	if total > 0 {
+		barX := float32(cx - w/2 + 5)
+		barY := float32(y + h - 5)
+		barW := float32(w - 10)
+		frac := float32(ss.TeamAScore) / float32(total)
+		vector.DrawFilledRect(screen, barX, barY, barW*frac, 3, color.RGBA{80, 120, 255, 200}, false)
+		vector.DrawFilledRect(screen, barX+barW*frac, barY, barW*(1-frac), 3, color.RGBA{255, 80, 80, 200}, false)
+	}
+
+	// Challenge overlay
+	if ss.ChallengeActive {
+		if ss.ChallengeResult != "" {
+			// Show winner
+			resultCol := color.RGBA{255, 220, 50, 255}
+			printColoredAt(screen, ss.ChallengeResult, cx-len(ss.ChallengeResult)*3, y+h+5, resultCol)
+		} else {
+			// Show remaining ticks
+			chalText := fmt.Sprintf("Challenge: %d ticks left", ss.ChallengeTicks)
+			printColoredAt(screen, chalText, cx-len(chalText)*3, y+h+5, color.RGBA{200, 200, 100, 220})
+		}
 	}
 }
 

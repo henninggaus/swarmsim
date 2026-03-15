@@ -58,6 +58,9 @@ const (
 	CondWallRight                                // wall_right (wall within 25px to the right)
 	CondWallLeft                                 // wall_left (wall within 25px to the left)
 	CondPherAhead                                // pheromone intensity ahead (0-100)
+	CondTeam                                     // team (1=A, 2=B, 0=none)
+	CondTeamScore                                // team_score (own team's score)
+	CondEnemyScore                               // enemy_score (opponent's score)
 )
 
 // Condition represents a single boolean check in a rule.
@@ -227,6 +230,10 @@ var conditionNames = map[string]ConditionType{
 	"pheromone":  CondPherAhead,
 	"pher":       CondPherAhead,
 	"pher_ahead": CondPherAhead,
+	// Team sensors
+	"team":        CondTeam,
+	"team_score":  CondTeamScore,
+	"enemy_score": CondEnemyScore,
 }
 
 // actionNames maps action name strings to (ActionType, paramCount).
@@ -365,6 +372,8 @@ var highlightConditions = map[string]bool{
 	"wall_right": true, "wall_left": true, "wall_front": true,
 	// Pheromone sensors
 	"pheromone": true, "pher": true, "pher_ahead": true,
+	// Team sensors
+	"team": true, "team_score": true, "enemy_score": true,
 }
 
 var highlightActions = map[string]bool{

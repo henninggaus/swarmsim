@@ -292,7 +292,12 @@ func (s *Simulation) updateSwarmMode() {
 		}
 	}
 
-	// Phase 4.9: Accumulate lifetime stats (before StuckPrevX/Y is overwritten)
+	// Phase 4.9: Challenge timer update
+	if ss.TeamsEnabled {
+		swarm.UpdateChallenge(ss)
+	}
+
+	// Phase 4.95: Accumulate lifetime stats (before StuckPrevX/Y is overwritten)
 	for i := range ss.Bots {
 		bot := &ss.Bots[i]
 		ddx := bot.X - bot.StuckPrevX
@@ -826,6 +831,15 @@ func executeSwarmProgram(ss *swarm.SwarmState, i int) {
 		prog = bot.OwnProgram
 	}
 
+	// Teams: use team-specific program if teams enabled
+	if ss.TeamsEnabled {
+		if bot.Team == 1 && ss.TeamAProgram != nil {
+			prog = ss.TeamAProgram
+		} else if bot.Team == 2 && ss.TeamBProgram != nil {
+			prog = ss.TeamBProgram
+		}
+	}
+
 	if prog == nil {
 		return
 	}
@@ -1049,6 +1063,27 @@ func evaluateSwarmCondition(cond swarmscript.Condition, bot *swarm.SwarmBot, sna
 
 	case swarmscript.CondPherAhead:
 		return compareInt(int(bot.PherAhead*100), cond.Op, cv)
+
+	case swarmscript.CondTeam:
+		return compareInt(bot.Team, cond.Op, cv)
+
+	case swarmscript.CondTeamScore:
+		score := 0
+		if bot.Team == 1 {
+			score = ss.TeamAScore
+		} else if bot.Team == 2 {
+			score = ss.TeamBScore
+		}
+		return compareInt(score, cond.Op, cv)
+
+	case swarmscript.CondEnemyScore:
+		score := 0
+		if bot.Team == 1 {
+			score = ss.TeamBScore
+		} else if bot.Team == 2 {
+			score = ss.TeamAScore
+		}
+		return compareInt(score, cond.Op, cv)
 	}
 
 	return false
@@ -1457,6 +1492,14 @@ func executeSwarmAction(act swarmscript.Action, bot *swarm.SwarmBot, ss *swarm.S
 						bot.Fitness += 10
 					} else {
 						bot.Fitness += 3
+					}
+				}
+				// Team scoring
+				if ss.TeamsEnabled {
+					if bot.Team == 1 {
+						ss.TeamAScore++
+					} else if bot.Team == 2 {
+						ss.TeamBScore++
 					}
 				}
 				// Deactivate package, schedule respawn at its pickup station

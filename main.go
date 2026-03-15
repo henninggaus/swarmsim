@@ -634,15 +634,32 @@ func (g *Game) handleSwarmInput() {
 		logger.Info("SWARM", "Trails: %v", ss.ShowTrails)
 	}
 
-	// C key: toggle delivery route lines (when editor not focused)
+	// C key: challenge (teams) or toggle routes (delivery)
 	if inpututil.IsKeyJustPressed(ebiten.KeyC) && !ed.Focused && !ss.BotCountEdit {
-		ss.ShowRoutes = !ss.ShowRoutes
-		logger.Info("SWARM", "Routes: %v", ss.ShowRoutes)
+		if ss.TeamsEnabled {
+			// Start challenge: 5000 ticks
+			ss.ChallengeActive = true
+			ss.ChallengeTicks = 5000
+			ss.ChallengeResult = ""
+			ss.TeamAScore = 0
+			ss.TeamBScore = 0
+			logger.Info("SWARM", "Challenge started! 5000 ticks")
+		} else {
+			ss.ShowRoutes = !ss.ShowRoutes
+			logger.Info("SWARM", "Routes: %v", ss.ShowRoutes)
+		}
 	}
 
-	// N key: force new truck round (when editor not focused and truck mode active)
+	// N key: new round (teams) or new truck round
 	if inpututil.IsKeyJustPressed(ebiten.KeyN) && !ed.Focused && !ss.BotCountEdit {
-		if ss.TruckToggle && ss.TruckState != nil {
+		if ss.TeamsEnabled {
+			swarm.ResetTeamScores(ss)
+			if ss.DeliveryOn {
+				ss.ResetDeliveryState()
+				swarm.GenerateDeliveryStations(ss)
+			}
+			logger.Info("SWARM", "Teams: New round!")
+		} else if ss.TruckToggle && ss.TruckState != nil {
 			// Always allow N to restart trucks (not just in RoundDone)
 			oldRound := ss.TruckState.RoundNum
 			ss.TruckState = swarm.NewSwarmTruckState(ss.Rng)
@@ -952,6 +969,23 @@ func (g *Game) handleSwarmClick(mx, my int) {
 		} else {
 			ss.ShowGenomeViz = false
 			logger.Info("SWARM", "Evolution OFF")
+		}
+		ed.Focused = false
+		ss.BotCountEdit = false
+
+	case "teams":
+		ss.TeamsEnabled = !ss.TeamsEnabled
+		if ss.TeamsEnabled {
+			swarm.InitTeams(ss)
+			// Set team programs from current shared program
+			if ss.Program != nil {
+				ss.TeamAProgram = ss.Program
+				ss.TeamBProgram = ss.Program
+			}
+			logger.Info("SWARM", "Teams ON — %d bots split into two teams", ss.BotCount)
+		} else {
+			swarm.ClearTeams(ss)
+			logger.Info("SWARM", "Teams OFF")
 		}
 		ed.Focused = false
 		ss.BotCountEdit = false

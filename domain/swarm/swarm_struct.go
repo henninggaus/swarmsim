@@ -152,6 +152,9 @@ type SwarmBot struct {
 	OwnProgram       *swarmscript.SwarmProgram // nil when GP OFF
 	LastMatchedRules []int                     // indices of rules that matched last tick
 
+	// Teams (multiplayer mode)
+	Team int // 0=no team, 1=A (blue), 2=B (red)
+
 	// Lifetime statistics (persist across sim reset, cleared on bot count change)
 	Stats BotLifetimeStats
 }
@@ -361,6 +364,18 @@ type SwarmState struct {
 	GPEnabled    bool // GP toggle
 	GPGeneration int  // current GP generation
 	GPTimer      int  // ticks since last GP evolution
+
+	// Multiplayer teams
+	TeamsEnabled     bool
+	TeamAScore       int
+	TeamBScore       int
+	TeamAProgram     *swarmscript.SwarmProgram
+	TeamBProgram     *swarmscript.SwarmProgram
+	TeamAPresetIdx   int // -1 = custom
+	TeamBPresetIdx   int // -1 = custom
+	ChallengeActive  bool
+	ChallengeTicks   int
+	ChallengeResult  string
 
 	// Ramp semaphore (truck mode)
 	RampBotCount int // non-carrying bots currently on ramp (rebuilt per tick)

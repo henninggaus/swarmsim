@@ -49,11 +49,14 @@ const (
 	// Toggle buttons row 4
 	editorToggle4Y = 740
 
+	// Toggle buttons row 5
+	editorToggle5Y = 766
+
 	// Separator 2
-	editorSep2Y = 766
+	editorSep2Y = 792
 
 	// Stats panel
-	editorStatsY = 772
+	editorStatsY = 798
 
 	editorTextX    = 40 // code text start x (after line numbers)
 	editorLineNumX = 5  // line number x
@@ -300,6 +303,15 @@ func drawSwarmEditorBottom(screen *ebiten.Image, ss *swarm.SwarmState, ed *swarm
 		gpColor = color.RGBA{0, 180, 160, 255} // teal
 	}
 	drawSwarmButton(screen, 175, editorToggle4Y, toggleBtnW, toggleBtnH, gpLabel, gpColor)
+
+	// Toggle buttons row 5: [Teams: OFF/ON]
+	teamsLabel := "Teams: OFF"
+	teamsColor := ColorSwarmBtnToggleOff
+	if ss.TeamsEnabled {
+		teamsLabel = "Teams: ON"
+		teamsColor = color.RGBA{100, 100, 255, 255} // blue
+	}
+	drawSwarmButton(screen, 5, editorToggle5Y, toggleBtnW, toggleBtnH, teamsLabel, teamsColor)
 
 	// GP status line (when GP enabled)
 	if ss.GPEnabled {
@@ -791,6 +803,13 @@ func SwarmEditorHitTest(mx, my int) string {
 		}
 		if mx >= 175 && mx < 175+toggleBtnW {
 			return "gp"
+		}
+	}
+
+	// Toggle row 5: Teams
+	if my >= editorToggle5Y && my < editorToggle5Y+toggleBtnH {
+		if mx >= 5 && mx < 5+toggleBtnW {
+			return "teams"
 		}
 	}
 
