@@ -113,6 +113,7 @@ func DrawHelpOverlay(screen *ebiten.Image, isSwarmMode bool, scrollY int) {
 		{"T", "Trails anzeigen"},
 		{"C", "Lieferrouten anzeigen"},
 		{"N", "Neue Runde (Truck-Modus, nach Runden-Ende)"},
+		{"V", "Genom-Visualisierung (Evolution)"},
 		{"M", "Minimap anzeigen"},
 		{"Editor", "Linksklick zum Fokussieren, Tab=4 Spaces"},
 	}
@@ -176,6 +177,10 @@ func DrawHelpOverlay(screen *ebiten.Image, isSwarmMode bool, scrollY int) {
 		{"truck_pkg_count", "Pakete auf LKW"},
 		{"on_ramp", "Bot auf Rampe? (0/1)"},
 		{"nearest_truck_pkg", "Abstand naechstes LKW-Paket"},
+		{"heard_beacon", "Beacon von Dropoff? (0/1)"},
+		{"beacon_dist", "Abstand zum Beacon"},
+		{"exploring", "Bot sucht Dropoff? (0/1)"},
+		{"$A:15 ... $Z:99", "Evolutions-Parameter (Hinweis:Default)"},
 	}
 
 	// Right column: actions
@@ -204,6 +209,8 @@ func DrawHelpOverlay(screen *ebiten.Image, isSwarmMode bool, scrollY int) {
 		{"SEND_DROPOFF N", "Dropoff-Info broadcasten"},
 		{"GOTO_RAMP", "Zur Rampe navigieren"},
 		{"GOTO_TRUCK_PKG", "Zum LKW-Paket navigieren"},
+		{"GOTO_BEACON", "Zum Beacon-Dropoff navigieren"},
+		{"SPIRAL", "Spiralsuche (traegt Paket)"},
 	}
 
 	// Render both columns

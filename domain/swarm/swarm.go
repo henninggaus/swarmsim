@@ -34,12 +34,14 @@ func NewSwarmState(rng *rand.Rand, botCount int) *SwarmState {
 		"Snake Formation", "Obstacle Nav", "Pulse Sync", "Trail Follow", "Ant Colony",
 		"Simple Delivery", "Delivery Comm", "Delivery Roles",
 		"Simple Unload", "Coordinated Unload",
+		"Evolving Delivery", "Evolving Truck",
 	}
 	ss.PresetPrograms = []string{
 		presetAggregation, presetDispersion, presetOrbit, presetColorWave, presetFlocking,
 		presetSnakeFormation, presetObstacleNav, presetPulseSync, presetTrailFollow, presetAntColony,
 		presetSimpleDelivery, presetDeliveryComm, presetDeliveryRoles,
 		presetSimpleUnload, presetCoordinatedUnload,
+		presetEvolvingDelivery, presetEvolvingTruckUnload,
 	}
 
 	// Initialize editor with default preset
@@ -479,7 +481,12 @@ func IsDeliveryPresetIdx(idx int) bool {
 
 // IsTruckPresetIdx returns true if the preset index is a truck program (13-14).
 func IsTruckPresetIdx(idx int) bool {
-	return idx >= 13 && idx <= 14
+	return idx >= 13 && idx <= 14 || idx == 16 // idx 16 = Evolving Truck
+}
+
+// IsEvolutionPresetIdx returns true for evolution presets (idx 15-16).
+func IsEvolutionPresetIdx(idx int) bool {
+	return idx >= 15 && idx <= 16
 }
 
 // ScanUsedParams scans the current program and sets ss.UsedParams for each $A-$Z found.
@@ -922,3 +929,45 @@ IF carry == 0 THEN FWD
 IF near_dist < 12 THEN TURN_FROM_NEAREST
 IF obs_ahead == 1 THEN AVOID_OBSTACLE
 IF edge == 1 THEN TURN_RIGHT 180`
+
+var presetEvolvingDelivery = `# Evolving Delivery — uses $A-$Z params!
+# 1. Carrying + see dropoff: deliver
+IF carry == 1 AND match == 1 AND d_dist < $A:25 THEN DROP
+IF carry == 1 AND match == 1 THEN GOTO_DROPOFF
+# 2. Carrying + hear beacon: follow
+IF carry == 1 AND heard_beacon == 1 THEN GOTO_BEACON
+IF carry == 1 AND heard_beacon == 1 THEN FWD
+# 3. Carrying + lost: spiral
+IF carry == 1 AND exploring == 1 THEN SPIRAL
+IF carry == 1 THEN FWD
+# 4. Not carrying: pickup
+IF carry == 0 AND p_dist < $B:30 AND has_pkg == 1 THEN PICKUP
+IF carry == 0 AND p_dist < $C:200 THEN GOTO_PICKUP
+IF carry == 0 THEN FWD
+# 5. Separation + Navigation
+IF near_dist < $D:20 THEN TURN_FROM_NEAREST
+IF rnd < $E:30 THEN TURN_RANDOM
+IF obs_ahead == 1 THEN AVOID_OBSTACLE
+IF edge == 1 THEN TURN_RIGHT 180
+THEN FWD`
+
+var presetEvolvingTruckUnload = `# Evolving Truck Unload — Trucks + Evolution!
+# 1. Carrying + see dropoff: deliver
+IF carry == 1 AND match == 1 AND d_dist < $A:25 THEN DROP
+IF carry == 1 AND match == 1 THEN GOTO_DROPOFF
+# 2. Carrying + hear beacon: follow
+IF carry == 1 AND heard_beacon == 1 THEN GOTO_BEACON
+IF carry == 1 AND heard_beacon == 1 THEN FWD
+# 3. Carrying + lost: spiral
+IF carry == 1 AND exploring == 1 THEN SPIRAL
+IF carry == 1 THEN FWD
+# 4. Not carrying: pickup from truck
+IF carry == 0 AND on_ramp == 1 AND truck_here == 1 THEN PICKUP
+IF carry == 0 THEN GOTO_RAMP
+IF carry == 0 THEN FWD
+# 5. Separation + Navigation
+IF near_dist < $B:15 THEN TURN_FROM_NEAREST
+IF rnd < $C:20 THEN TURN_RANDOM
+IF obs_ahead == 1 THEN AVOID_OBSTACLE
+IF edge == 1 THEN TURN_RIGHT 180
+THEN FWD`

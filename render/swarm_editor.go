@@ -46,11 +46,14 @@ const (
 	// Toggle buttons row 3
 	editorToggle3Y = 714
 
+	// Toggle buttons row 4
+	editorToggle4Y = 740
+
 	// Separator 2
-	editorSep2Y = 740
+	editorSep2Y = 766
 
 	// Stats panel
-	editorStatsY = 746
+	editorStatsY = 772
 
 	editorTextX    = 40 // code text start x (after line numbers)
 	editorLineNumX = 5  // line number x
@@ -283,6 +286,15 @@ func drawSwarmEditorBottom(screen *ebiten.Image, ss *swarm.SwarmState, ed *swarm
 		}
 		drawSwarmButton(screen, 175, editorToggle3Y, toggleBtnW, toggleBtnH, truckLabel, truckColor)
 	}
+
+	// Toggle buttons row 4: [Evolution: OFF/ON]
+	evoLabel := "Evolution: OFF"
+	evoColor := ColorSwarmBtnToggleOff
+	if ss.EvolutionOn {
+		evoLabel = "Evolution: ON"
+		evoColor = color.RGBA{180, 50, 180, 255} // purple
+	}
+	drawSwarmButton(screen, 5, editorToggle4Y, toggleBtnW, toggleBtnH, evoLabel, evoColor)
 
 	// Separator 2
 	vector.StrokeLine(screen, 5, float32(editorSep2Y), float32(editorPanelW-5), float32(editorSep2Y), 1, ColorSwarmEditorSep, false)
@@ -757,6 +769,13 @@ func SwarmEditorHitTest(mx, my int) string {
 		}
 		if mx >= 175 && mx < 175+toggleBtnW {
 			return "trucks"
+		}
+	}
+
+	// Toggle row 4: Evolution
+	if my >= editorToggle4Y && my < editorToggle4Y+toggleBtnH {
+		if mx >= 5 && mx < 5+toggleBtnW {
+			return "evolution"
 		}
 	}
 

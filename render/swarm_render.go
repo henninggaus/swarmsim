@@ -295,6 +295,18 @@ func (r *Renderer) DrawSwarmMode(screen *ebiten.Image, s *simulation.Simulation,
 		printColoredAt(screen, label, 500, 855, color.RGBA{0, 255, 255, 220})
 	}
 
+	// Evolution HUD
+	if ss.EvolutionOn {
+		evoInfo := fmt.Sprintf("Gen: %d | Best: %.0f | Avg: %.1f | Timer: %d/1500",
+			ss.Generation, ss.BestFitness, ss.AvgFitness, ss.EvolutionTimer)
+		printColoredAt(screen, evoInfo, 420, 48, color.RGBA{180, 50, 180, 255})
+	}
+
+	// Genome visualization overlay (V key)
+	if ss.ShowGenomeViz && ss.EvolutionOn {
+		drawGenomeVisualization(screen, ss)
+	}
+
 	// Minimap
 	if r.ShowMinimap {
 		r.drawSwarmMinimap(screen, ss)
@@ -1070,5 +1082,117 @@ func drawSelectedBotOverlays(target *ebiten.Image, ss *swarm.SwarmState) {
 	lx := int(bx) - len(label)*charW/2
 	ly := int(by) - int(swarm.SwarmBotRadius) - 16
 	printColoredAt(target, label, lx, ly, color.RGBA{255, 255, 0, 220})
+}
+
+// drawGenomeVisualization draws a semi-transparent overlay showing parameter distributions.
+func drawGenomeVisualization(screen *ebiten.Image, ss *swarm.SwarmState) {
+	panelW := 300
+	panelH := 320
+	panelX := 700
+	panelY := 80
+
+	// Background
+	vector.DrawFilledRect(screen, float32(panelX), float32(panelY),
+		float32(panelW), float32(panelH), color.RGBA{20, 10, 30, 220}, false)
+	vector.StrokeRect(screen, float32(panelX), float32(panelY),
+		float32(panelW), float32(panelH), 2, color.RGBA{180, 50, 180, 200}, false)
+
+	// Title
+	title := fmt.Sprintf("Genome (Gen %d)", ss.Generation)
+	printColoredAt(screen, title, panelX+10, panelY+8, color.RGBA{220, 150, 255, 255})
+
+	// Parameter bars
+	y := panelY + 28
+	barW := 200
+	for p := 0; p < 26; p++ {
+		if !ss.UsedParams[p] {
+			continue
+		}
+		if y > panelY+panelH-40 {
+			break
+		}
+		letter := string(rune('A' + p))
+
+		// Compute min/avg/max across all bots
+		minVal := math.MaxFloat64
+		maxVal := -math.MaxFloat64
+		total := 0.0
+		for i := range ss.Bots {
+			v := ss.Bots[i].ParamValues[p]
+			if v < minVal {
+				minVal = v
+			}
+			if v > maxVal {
+				maxVal = v
+			}
+			total += v
+		}
+		avg := total / float64(len(ss.Bots))
+		spread := maxVal - minVal
+		if spread < 1 {
+			spread = 1
+		}
+
+		// Label
+		paramLabel := fmt.Sprintf("%s: %.1f (%.0f..%.0f)", letter, avg, minVal, maxVal)
+		printColoredAt(screen, paramLabel, panelX+10, y, color.RGBA{200, 200, 220, 255})
+
+		// Bar background
+		barX := panelX + 10
+		barY := y + 14
+		vector.DrawFilledRect(screen, float32(barX), float32(barY),
+			float32(barW), 8, color.RGBA{40, 30, 50, 255}, false)
+
+		// Draw individual bot parameter dots
+		for i := range ss.Bots {
+			v := ss.Bots[i].ParamValues[p]
+			frac := (v - minVal) / spread
+			if frac < 0 {
+				frac = 0
+			}
+			if frac > 1 {
+				frac = 1
+			}
+			dx := float32(float64(barW) * frac)
+			dotColor := color.RGBA{120, 60, 180, 100}
+			vector.DrawFilledRect(screen, float32(barX)+dx-1, float32(barY), 2, 8, dotColor, false)
+		}
+
+		// Average marker
+		avgFrac := (avg - minVal) / spread
+		avgX := float32(barX) + float32(float64(barW)*avgFrac)
+		vector.DrawFilledRect(screen, avgX-2, float32(barY-1), 4, 10, color.RGBA{255, 200, 50, 255}, false)
+
+		y += 28
+	}
+
+	// Top 3 bots by fitness
+	y += 4
+	printColoredAt(screen, "Top Bots:", panelX+10, y, color.RGBA{180, 180, 200, 255})
+	y += 14
+	type botFit struct {
+		idx int
+		fit float64
+	}
+	bots := make([]botFit, len(ss.Bots))
+	for i := range ss.Bots {
+		bots[i] = botFit{i, ss.Bots[i].Fitness}
+	}
+	// Simple top-3 selection
+	for rank := 0; rank < 3 && rank < len(bots); rank++ {
+		bestIdx := rank
+		for j := rank + 1; j < len(bots); j++ {
+			if bots[j].fit > bots[bestIdx].fit {
+				bestIdx = j
+			}
+		}
+		bots[rank], bots[bestIdx] = bots[bestIdx], bots[rank]
+		if y > panelY+panelH-14 {
+			break
+		}
+		info := fmt.Sprintf("#%d fit=%.0f", bots[rank].idx, bots[rank].fit)
+		printColoredAt(screen, info, panelX+10, y, color.RGBA{160, 160, 180, 255})
+		y += 14
+	}
 }
 

@@ -661,6 +661,14 @@ func (g *Game) handleSwarmInput() {
 		logger.Info("SWARM", "Minimap: %v", g.renderer.ShowMinimap)
 	}
 
+	// V key: toggle genome visualization (when editor not focused + evolution on)
+	if inpututil.IsKeyJustPressed(ebiten.KeyV) && !ed.Focused && !ss.BotCountEdit {
+		if ss.EvolutionOn {
+			ss.ShowGenomeViz = !ss.ShowGenomeViz
+			logger.Info("SWARM", "Genome viz: %v", ss.ShowGenomeViz)
+		}
+	}
+
 	// Tab key: toggle console bot filter (when editor not focused)
 	if inpututil.IsKeyJustPressed(ebiten.KeyTab) && !ed.Focused && !ss.BotCountEdit {
 		if g.consoleFilterBot >= 0 {
@@ -928,6 +936,20 @@ func (g *Game) handleSwarmClick(mx, my int) {
 			logger.Info("SWARM", "Trucks OFF")
 		}
 		g.autoReset("Trucks toggled")
+		ed.Focused = false
+		ss.BotCountEdit = false
+
+	case "evolution":
+		ss.EvolutionOn = !ss.EvolutionOn
+		if ss.EvolutionOn {
+			swarm.InitBotParams(ss)
+			ss.Generation = 0
+			ss.EvolutionTimer = 0
+			logger.Info("SWARM", "Evolution ON — %d used params", countUsedParams(ss))
+		} else {
+			ss.ShowGenomeViz = false
+			logger.Info("SWARM", "Evolution OFF")
+		}
 		ed.Focused = false
 		ss.BotCountEdit = false
 
@@ -1212,6 +1234,16 @@ func (g *Game) deploySwarmProgram() {
 }
 
 // autoReset resets bots and regenerates delivery state on toggle changes.
+func countUsedParams(ss *swarm.SwarmState) int {
+	n := 0
+	for _, used := range ss.UsedParams {
+		if used {
+			n++
+		}
+	}
+	return n
+}
+
 func (g *Game) autoReset(reason string) {
 	ss := g.sim.SwarmState
 	if ss == nil {
@@ -1294,6 +1326,15 @@ func (g *Game) loadSwarmPreset(idx int) {
 		}
 	}
 
+	// Evolution-program coupling
+	if swarm.IsEvolutionPresetIdx(idx) {
+		ss.EvolutionOn = true
+		ss.Generation = 0
+		ss.EvolutionTimer = 0
+	} else {
+		ss.EvolutionOn = false
+	}
+
 	// Auto-deploy the preset
 	prog, err := swarmscript.ParseSwarmScript(presetText)
 	if err == nil {
@@ -1302,6 +1343,11 @@ func (g *Game) loadSwarmPreset(idx int) {
 
 		// Reset delivery state so counters/packages start fresh
 		ss.ResetDeliveryState()
+
+		// Initialize evolution params after program is parsed (needs UsedParams scan)
+		if ss.EvolutionOn {
+			swarm.InitBotParams(ss)
+		}
 
 		for i := range ss.Bots {
 			ss.Bots[i].BlinkTimer = 30

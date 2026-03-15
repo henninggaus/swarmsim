@@ -330,6 +330,7 @@ type SwarmState struct {
 	BestFitness    float64
 	AvgFitness     float64
 	UsedParams     [26]bool // which $A-$Z are used in current program
+	ShowGenomeViz  bool     // V key toggle: show genome visualization overlay
 
 	CollisionCount  int // obstacle collisions this tick (reset per tick)
 	ResetFlashTimer int // counts down from 30 for "RESET" flash
