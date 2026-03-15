@@ -387,16 +387,21 @@ func buildSwarmEnvironment(ss *swarm.SwarmState, i int) {
 
 	if ss.DeliveryOn {
 		// Use extended sensor range for delivery station scanning
+		// Carrying bots get beacon range for dropoff detection
 		delivRange := swarm.SwarmDeliverySensorRange
+		dropoffRange := swarm.SwarmDeliverySensorRange
+		if bot.CarryingPkg >= 0 {
+			dropoffRange = swarm.SwarmBeaconRange
+		}
 
 		for si := range ss.Stations {
 			st := &ss.Stations[si]
 			sdx, sdy := swarm.NeighborDelta(bot.X, bot.Y, st.X, st.Y, ss)
 			sdist := math.Sqrt(sdx*sdx + sdy*sdy)
-			if sdist > delivRange {
-				continue
-			}
 			if st.IsPickup {
+				if sdist > delivRange {
+					continue
+				}
 				if sdist < bot.NearestPickupDist {
 					bot.NearestPickupDist = sdist
 					bot.NearestPickupColor = st.Color
@@ -404,6 +409,9 @@ func buildSwarmEnvironment(ss *swarm.SwarmState, i int) {
 					bot.NearestPickupIdx = si
 				}
 			} else {
+				if sdist > dropoffRange {
+					continue
+				}
 				if sdist < bot.NearestDropoffDist {
 					bot.NearestDropoffDist = sdist
 					bot.NearestDropoffColor = st.Color
@@ -478,6 +486,30 @@ func buildSwarmEnvironment(ss *swarm.SwarmState, i int) {
 		}
 	}
 
+	// Beacon sensors: dropoff stations broadcast to carrying bots within BeaconRange
+	bot.HeardBeaconDropoffColor = 0
+	bot.HeardBeaconDropoffDist = 9999
+	bot.HeardBeaconDropoffAngle = 0
+	if ss.DeliveryOn && bot.CarryingPkg >= 0 && bot.CarryingPkg < len(ss.Packages) {
+		pkg := &ss.Packages[bot.CarryingPkg]
+		for si := range ss.Stations {
+			st := &ss.Stations[si]
+			if st.IsPickup {
+				continue
+			}
+			if st.Color != pkg.Color {
+				continue // only matching color beacons
+			}
+			bdx, bdy := swarm.NeighborDelta(bot.X, bot.Y, st.X, st.Y, ss)
+			bdist := math.Sqrt(bdx*bdx + bdy*bdy)
+			if bdist < swarm.SwarmBeaconRange && bdist < bot.HeardBeaconDropoffDist {
+				bot.HeardBeaconDropoffColor = st.Color
+				bot.HeardBeaconDropoffDist = bdist
+				bot.HeardBeaconDropoffAngle = math.Atan2(bdy, bdx)
+			}
+		}
+	}
+
 	// Truck sensors: build when truck toggle active
 	bot.TruckHere = false
 	bot.TruckPkgCount = 0
@@ -488,10 +520,10 @@ func buildSwarmEnvironment(ss *swarm.SwarmState, i int) {
 	if ss.TruckToggle && ss.TruckState != nil {
 		ts := ss.TruckState
 		// OnRamp = bot is near the right edge of the ramp (ready for crane pickup)
-		// Bots don't enter the ramp; they wait at the edge
+		// Bots don't enter the ramp; they wait at the edge (doubled zone: 100px wide)
 		rampEdgeX := ts.RampX + ts.RampW // right edge (200)
 		if bot.Y >= ts.RampY && bot.Y <= ts.RampY+ts.RampH &&
-			bot.X >= rampEdgeX && bot.X <= rampEdgeX+50 {
+			bot.X >= rampEdgeX-50 && bot.X <= rampEdgeX+50 {
 			bot.OnRamp = true
 		}
 		if ts.CurrentTruck != nil {
@@ -778,6 +810,16 @@ func evaluateSwarmCondition(cond swarmscript.Condition, bot *swarm.SwarmBot, sna
 
 	case swarmscript.CondNearestTruckPkgDist:
 		return compareInt(int(bot.NearestTruckPkgDist), cond.Op, cond.Value)
+
+	case swarmscript.CondHeardBeaconDropoff:
+		v := 0
+		if bot.HeardBeaconDropoffColor > 0 {
+			v = 1
+		}
+		return compareInt(v, cond.Op, cond.Value)
+
+	case swarmscript.CondHeardBeaconDropoffDist:
+		return compareInt(int(bot.HeardBeaconDropoffDist), cond.Op, cond.Value)
 	}
 
 	return false
@@ -1050,6 +1092,9 @@ func executeSwarmAction(act swarmscript.Action, bot *swarm.SwarmBot, ss *swarm.S
 					X: bot.X, Y: bot.Y,
 					Color: tpkg.Color, IsPickup: true,
 				})
+				// Turn away from ramp (toward arena interior) so bot leaves immediately
+				bot.Angle = (ss.Rng.Float64() - 0.5) * math.Pi / 2 // roughly rightward ±45°
+				bot.Speed = swarm.SwarmBotSpeed
 				logger.InfoBot(botIdx, "TRUCK", "Bot #%d crane-pickup %s from truck", botIdx, swarm.DeliveryColorName(tpkg.Color))
 				return
 			}
@@ -1211,7 +1256,8 @@ func executeSwarmAction(act swarmscript.Action, bot *swarm.SwarmBot, ss *swarm.S
 			return
 		}
 		pkg := &ss.Packages[bot.CarryingPkg]
-		// Find nearest visible dropoff matching package color (extended range)
+		// Find nearest visible dropoff matching package color (beacon range for carrying bots)
+		scanRange := swarm.SwarmBeaconRange
 		bestDist := 1e9
 		bestAngle := bot.Angle
 		for si := range ss.Stations {
@@ -1221,7 +1267,7 @@ func executeSwarmAction(act swarmscript.Action, bot *swarm.SwarmBot, ss *swarm.S
 			}
 			dx, dy := swarm.NeighborDelta(bot.X, bot.Y, st.X, st.Y, ss)
 			d := math.Sqrt(dx*dx + dy*dy)
-			if d <= swarm.SwarmDeliverySensorRange && d < bestDist {
+			if d <= scanRange && d < bestDist {
 				bestDist = d
 				bestAngle = math.Atan2(dy, dx)
 			}
@@ -1296,9 +1342,13 @@ func executeSwarmAction(act swarmscript.Action, bot *swarm.SwarmBot, ss *swarm.S
 			return
 		}
 		ts := ss.TruckState
-		// Target the right edge of the ramp (bots wait outside, not inside)
+		// Target the right edge of the ramp, spread bots along Y axis
 		cx := ts.RampX + ts.RampW + 20 // just outside ramp right edge
-		cy := ts.RampY + ts.RampH/2
+		// Distribute bots evenly along ramp height (use bot index for offset)
+		slots := 20
+		slot := botIdx % slots
+		yFrac := (float64(slot) + 0.5) / float64(slots) // 0.025 .. 0.975
+		cy := ts.RampY + ts.RampH*0.1 + ts.RampH*0.8*yFrac
 		dx := cx - bot.X
 		dy := cy - bot.Y
 		bot.Angle = math.Atan2(dy, dx)
@@ -1317,6 +1367,13 @@ func executeSwarmAction(act swarmscript.Action, bot *swarm.SwarmBot, ss *swarm.S
 		dx := wpx - bot.X
 		dy := wpy - bot.Y
 		bot.Angle = math.Atan2(dy, dx)
+
+	case swarmscript.ActTurnToBeaconDropoff:
+		// Turn toward nearest beacon-heard matching dropoff station
+		if !ss.DeliveryOn || bot.HeardBeaconDropoffColor == 0 {
+			return
+		}
+		bot.Angle = bot.HeardBeaconDropoffAngle
 	}
 }
 

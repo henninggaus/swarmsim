@@ -52,6 +52,8 @@ const (
 	CondTruckPkgCount                            // truck_pkg_count
 	CondOnRamp                                   // on_ramp
 	CondNearestTruckPkgDist                      // nearest_truck_pkg
+	CondHeardBeaconDropoff                       // heard_beacon (1 if heard, 0 if not)
+	CondHeardBeaconDropoffDist                   // beacon_dist
 )
 
 // Condition represents a single boolean check in a rule.
@@ -102,6 +104,7 @@ const (
 	ActSetLEDDropoffColor                      // SET_LED_DROPOFF_COLOR
 	ActTurnToRamp                              // GOTO_RAMP
 	ActTurnToTruckPkg                          // GOTO_TRUCK_PKG
+	ActTurnToBeaconDropoff                     // GOTO_BEACON
 )
 
 // Action represents an action to execute when a rule matches.
@@ -196,6 +199,12 @@ var conditionNames = map[string]ConditionType{
 	// Short aliases for truck conditions
 	"truck_pkg": CondTruckPkgCount,
 	"t_pkg":     CondNearestTruckPkgDist,
+	// Beacon conditions
+	"heard_beacon": CondHeardBeaconDropoff,
+	"beacon_dist":  CondHeardBeaconDropoffDist,
+	"beacon":       CondHeardBeaconDropoff,
+	// Extra delivery alias
+	"led_match": CondNearestMatchLEDDist,
 }
 
 // actionNames maps action name strings to (ActionType, paramCount).
@@ -241,6 +250,10 @@ var actionNames = map[string]struct {
 	// Truck actions
 	"GOTO_RAMP":          {ActTurnToRamp, 0},
 	"GOTO_TRUCK_PKG":     {ActTurnToTruckPkg, 0},
+	// Beacon actions
+	"GOTO_BEACON":        {ActTurnToBeaconDropoff, 0},
+	// Extra delivery alias
+	"GOTO_LED_MATCH":     {ActTurnToMatchingLED, 0},
 	// Short aliases for delivery actions (keeps preset lines under 70 chars)
 	"GOTO_PICKUP":        {ActTurnToPickup, 0},
 	"GOTO_DROPOFF":       {ActTurnToMatchingDropoff, 0},
@@ -316,6 +329,8 @@ var highlightConditions = map[string]bool{
 	// Truck sensors
 	"truck_here": true, "truck_pkg_count": true, "on_ramp": true,
 	"nearest_truck_pkg": true, "truck_pkg": true, "t_pkg": true,
+	// Beacon sensors
+	"heard_beacon": true, "beacon_dist": true, "beacon": true, "led_match": true,
 }
 
 var highlightActions = map[string]bool{
@@ -345,6 +360,8 @@ var highlightActions = map[string]bool{
 	"FWD": true, "FWD_SLOW": true, "GOTO_MATCH": true,
 	// Truck actions
 	"GOTO_RAMP": true, "GOTO_TRUCK_PKG": true,
+	// Beacon actions
+	"GOTO_BEACON": true, "GOTO_LED_MATCH": true,
 }
 
 // --- Reverse mapping functions (for block editor / serialization) ---
@@ -424,6 +441,10 @@ func ConditionTypeName(ct ConditionType) string {
 		return "on_ramp"
 	case CondNearestTruckPkgDist:
 		return "nearest_truck_pkg"
+	case CondHeardBeaconDropoff:
+		return "heard_beacon"
+	case CondHeardBeaconDropoffDist:
+		return "beacon_dist"
 	}
 	return "unknown"
 }
@@ -518,6 +539,8 @@ func ActionTypeName(at ActionType) string {
 		return "GOTO_RAMP"
 	case ActTurnToTruckPkg:
 		return "GOTO_TRUCK_PKG"
+	case ActTurnToBeaconDropoff:
+		return "GOTO_BEACON"
 	}
 	return "UNKNOWN"
 }
@@ -545,7 +568,7 @@ var SensorGrouped = [][]string{
 	{"-- Nachbarn --", "neighbors", "near_dist", "leader", "follower", "chain_len"},
 	{"-- Navigation --", "edge", "obs_ahead", "obs_dist", "light"},
 	{"-- Zufall --", "rnd", "true"},
-	{"-- Delivery --", "carry", "match", "has_pkg", "p_dist", "d_dist", "pickup_color", "dropoff_color"},
+	{"-- Delivery --", "carry", "match", "has_pkg", "p_dist", "d_dist", "pickup_color", "dropoff_color", "heard_beacon", "beacon_dist"},
 	{"-- Kommunikation --", "msg", "heard_pickup", "heard_dropoff", "led_dist"},
 	{"-- LED --", "nearest_led_r", "nearest_led_g", "nearest_led_b"},
 	{"-- Intern --", "state", "counter", "value1", "value2", "timer", "tick"},
@@ -556,7 +579,7 @@ var SensorGrouped = [][]string{
 var ActionGrouped = [][]string{
 	{"-- Bewegung --", "FWD", "FWD_SLOW", "STOP", "TURN_LEFT", "TURN_RIGHT", "TURN_RANDOM"},
 	{"-- Navigation --", "TURN_TO_NEAREST", "TURN_FROM_NEAREST", "TURN_TO_CENTER", "TURN_TO_LIGHT", "AVOID_OBSTACLE"},
-	{"-- Delivery --", "PICKUP", "DROP", "GOTO_PICKUP", "GOTO_DROPOFF", "GOTO_LED"},
+	{"-- Delivery --", "PICKUP", "DROP", "GOTO_PICKUP", "GOTO_DROPOFF", "GOTO_LED", "GOTO_BEACON"},
 	{"-- Kommunikation --", "SEND_MESSAGE", "SEND_PICKUP", "SEND_DROPOFF", "GOTO_HEARD_PICKUP", "GOTO_HEARD_DROPOFF"},
 	{"-- LED --", "SET_LED", "LED_PICKUP", "LED_DROPOFF", "COPY_LED"},
 	{"-- Intern --", "SET_STATE", "SET_COUNTER", "INC_COUNTER", "DEC_COUNTER", "SET_TIMER", "SET_VALUE1", "SET_VALUE2"},

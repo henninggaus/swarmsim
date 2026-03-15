@@ -11,6 +11,7 @@ const (
 	SwarmBotSpeed            = 1.5
 	SwarmSensorRange         = 60.0
 	SwarmDeliverySensorRange = 200.0 // extended range for delivery station + LED scanning
+	SwarmBeaconRange         = 600.0 // dropoff stations broadcast beacons to carrying bots
 	SwarmCommRange           = 40.0
 	SwarmArenaSize           = 800.0
 	SwarmEdgeMargin          = 20.0
@@ -112,6 +113,11 @@ type SwarmBot struct {
 	// LED pheromone matching (for delivery navigation gradient)
 	NearestMatchLEDDist  float64 // dist to nearest bot whose LED matches carrying color
 	NearestMatchLEDAngle float64 // angle to that bot
+
+	// Beacon sensor cache (rebuilt per tick when carrying)
+	HeardBeaconDropoffColor int     // color of nearest beacon-heard dropoff (0=none)
+	HeardBeaconDropoffAngle float64 // angle toward it
+	HeardBeaconDropoffDist  float64 // distance to it
 
 	// Truck sensor cache (rebuilt per tick when TruckToggle)
 	TruckHere           bool
