@@ -942,6 +942,8 @@ func (g *Game) handleSwarmClick(mx, my int) {
 	case "evolution":
 		ss.EvolutionOn = !ss.EvolutionOn
 		if ss.EvolutionOn {
+			ss.GPEnabled = false // mutually exclusive
+			swarm.ClearGP(ss)
 			swarm.InitBotParams(ss)
 			ss.Generation = 0
 			ss.EvolutionTimer = 0
@@ -950,6 +952,21 @@ func (g *Game) handleSwarmClick(mx, my int) {
 		} else {
 			ss.ShowGenomeViz = false
 			logger.Info("SWARM", "Evolution OFF")
+		}
+		ed.Focused = false
+		ss.BotCountEdit = false
+
+	case "gp":
+		ss.GPEnabled = !ss.GPEnabled
+		if ss.GPEnabled {
+			// Turn off regular evolution (mutually exclusive)
+			ss.EvolutionOn = false
+			ss.ShowGenomeViz = false
+			swarm.InitGP(ss)
+			logger.Info("SWARM", "GP ON — %d bots, each with own random program", ss.BotCount)
+		} else {
+			swarm.ClearGP(ss)
+			logger.Info("SWARM", "GP OFF")
 		}
 		ed.Focused = false
 		ss.BotCountEdit = false
@@ -1338,6 +1355,17 @@ func (g *Game) loadSwarmPreset(idx int) {
 		ss.EvolutionOn = false
 	}
 
+	// GP-program coupling
+	if swarm.IsGPPresetIdx(idx) {
+		ss.GPEnabled = true
+		ss.EvolutionOn = false // mutually exclusive
+		g.sim.Speed = 5.0     // auto 5x speed
+	} else {
+		if ss.GPEnabled {
+			swarm.ClearGP(ss)
+		}
+	}
+
 	// Auto-deploy the preset
 	prog, err := swarmscript.ParseSwarmScript(presetText)
 	if err == nil {
@@ -1350,6 +1378,16 @@ func (g *Game) loadSwarmPreset(idx int) {
 		// Initialize evolution params after program is parsed (needs UsedParams scan)
 		if ss.EvolutionOn {
 			swarm.InitBotParams(ss)
+		}
+
+		// Initialize GP after program is parsed (seed program for GP:Seeded)
+		if ss.GPEnabled {
+			if idx == 19 {
+				// GP: Seeded Start — use the parsed program as seed
+				swarm.InitGPSeeded(ss, prog)
+			} else {
+				swarm.InitGP(ss)
+			}
 		}
 
 		for i := range ss.Bots {

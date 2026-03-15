@@ -283,6 +283,15 @@ func (s *Simulation) updateSwarmMode() {
 		}
 	}
 
+	// Phase 4.85: Genetic Programming evolution
+	if ss.GPEnabled {
+		ss.GPTimer++
+		if ss.GPTimer >= 2000 {
+			swarm.RunGPEvolution(ss)
+			ss.GPTimer = 0
+		}
+	}
+
 	// Phase 4.9: Accumulate lifetime stats (before StuckPrevX/Y is overwritten)
 	for i := range ss.Bots {
 		bot := &ss.Bots[i]
@@ -812,6 +821,15 @@ func executeSwarmProgram(ss *swarm.SwarmState, i int) {
 	bot := &ss.Bots[i]
 	prog := ss.Program
 
+	// Genetic Programming: use bot's own program if GP is ON
+	if ss.GPEnabled && bot.OwnProgram != nil {
+		prog = bot.OwnProgram
+	}
+
+	if prog == nil {
+		return
+	}
+
 	// Snapshot mutable vars for condition evaluation
 	snapState := bot.State
 	snapCounter := bot.Counter
@@ -821,7 +839,12 @@ func executeSwarmProgram(ss *swarm.SwarmState, i int) {
 	bot.Speed = 0
 	bot.PendingMsg = 0
 
-	for _, rule := range prog.Rules {
+	// Track matched rules for GP visualization
+	if ss.GPEnabled {
+		bot.LastMatchedRules = bot.LastMatchedRules[:0]
+	}
+
+	for ri, rule := range prog.Rules {
 		// Evaluate all conditions
 		allMatch := true
 		for _, cond := range rule.Conditions {
@@ -832,6 +855,9 @@ func executeSwarmProgram(ss *swarm.SwarmState, i int) {
 		}
 		if allMatch {
 			executeSwarmAction(rule.Action, bot, ss, i)
+			if ss.GPEnabled {
+				bot.LastMatchedRules = append(bot.LastMatchedRules, ri)
+			}
 		}
 	}
 }

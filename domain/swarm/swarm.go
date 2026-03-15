@@ -36,6 +36,8 @@ func NewSwarmState(rng *rand.Rand, botCount int) *SwarmState {
 		"Simple Unload", "Coordinated Unload",
 		"Evolving Delivery", "Evolving Truck",
 		"Maze Explorer",
+		"GP: Random Start",
+		"GP: Seeded Start",
 	}
 	ss.PresetPrograms = []string{
 		presetAggregation, presetDispersion, presetOrbit, presetColorWave, presetFlocking,
@@ -44,6 +46,7 @@ func NewSwarmState(rng *rand.Rand, botCount int) *SwarmState {
 		presetSimpleUnload, presetCoordinatedUnload,
 		presetEvolvingDelivery, presetEvolvingTruckUnload,
 		presetMazeExplorer,
+		presetGPRandomStart, presetGPSeededStart,
 	}
 
 	// Initialize editor with default preset
@@ -483,9 +486,9 @@ func DeliveryColorName(c int) string {
 	return "?"
 }
 
-// IsDeliveryPresetIdx returns true if the preset index is a delivery program (10-12, 15, 17).
+// IsDeliveryPresetIdx returns true if the preset index is a delivery program (10-12, 15, 17-19).
 func IsDeliveryPresetIdx(idx int) bool {
-	return idx >= 10 && idx <= 12 || idx == 15 || idx == 17 // idx 15 = Evolving Delivery, 17 = Maze Explorer
+	return idx >= 10 && idx <= 12 || idx == 15 || idx >= 17 && idx <= 19
 }
 
 // IsTruckPresetIdx returns true if the preset index is a truck program (13-14).
@@ -496,6 +499,11 @@ func IsTruckPresetIdx(idx int) bool {
 // IsEvolutionPresetIdx returns true for evolution presets (idx 15-16).
 func IsEvolutionPresetIdx(idx int) bool {
 	return idx >= 15 && idx <= 16
+}
+
+// IsGPPresetIdx returns true for genetic programming presets (idx 18-19).
+func IsGPPresetIdx(idx int) bool {
+	return idx >= 18 && idx <= 19
 }
 
 // ScanUsedParams scans the current program and sets ss.UsedParams for each $A-$Z found.
@@ -1001,4 +1009,28 @@ IF carry == 0 AND has_pkg == 1 THEN FWD
 IF near_dist < 12 THEN TURN_FROM_NEAREST
 IF wall_front == 1 THEN TURN_LEFT 90
 IF wall_right == 0 THEN TURN_RIGHT 90
+IF true THEN FWD`
+
+var presetGPRandomStart = `# GP: Random Start
+# Genetic Programming — jeder Bot bekommt ein eigenes
+# zufaellig generiertes Programm.
+# Schalte GP ON und Delivery ON!
+# Dieses Programm wird ignoriert wenn GP aktiv ist.
+IF carry == 0 AND has_pkg == 1 THEN PICKUP
+IF carry == 1 AND match == 1 THEN GOTO_DROPOFF
+IF carry == 1 AND d_dist < 30 THEN DROP
+IF obs_ahead == 1 THEN AVOID_OBSTACLE
+IF true THEN FWD`
+
+var presetGPSeededStart = `# GP: Seeded Start
+# 50% der Bots starten mit mutiertem Simple Delivery
+# 50% starten komplett zufaellig
+# So hat die Evolution einen Vorsprung!
+IF near_dist < 12 THEN TURN_FROM_NEAREST
+IF carry == 0 AND has_pkg == 1 AND p_dist < 20 THEN PICKUP
+IF carry == 0 AND has_pkg == 1 THEN GOTO_PICKUP
+IF carry == 1 AND match == 1 AND d_dist < 30 THEN DROP
+IF carry == 1 AND match == 1 THEN GOTO_DROPOFF
+IF carry == 1 THEN FWD
+IF obs_ahead == 1 THEN AVOID_OBSTACLE
 IF true THEN FWD`

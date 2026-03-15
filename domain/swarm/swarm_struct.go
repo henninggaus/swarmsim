@@ -148,6 +148,10 @@ type SwarmBot struct {
 	ParamValues [26]float64
 	Fitness     float64
 
+	// Genetic Programming (per-bot program, used when GPEnabled)
+	OwnProgram       *swarmscript.SwarmProgram // nil when GP OFF
+	LastMatchedRules []int                     // indices of rules that matched last tick
+
 	// Lifetime statistics (persist across sim reset, cleared on bot count change)
 	Stats BotLifetimeStats
 }
@@ -352,6 +356,11 @@ type SwarmState struct {
 	UsedParams       [26]bool // which $A-$Z are used in current program
 	ShowGenomeViz    bool     // V key toggle: show genome visualization overlay
 	FitnessHistory   []FitnessRecord // per-generation fitness history for graph
+
+	// Genetic Programming (each bot evolves its own program)
+	GPEnabled    bool // GP toggle
+	GPGeneration int  // current GP generation
+	GPTimer      int  // ticks since last GP evolution
 
 	// Ramp semaphore (truck mode)
 	RampBotCount int // non-carrying bots currently on ramp (rebuilt per tick)

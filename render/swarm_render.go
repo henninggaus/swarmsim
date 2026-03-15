@@ -7,6 +7,7 @@ import (
 	"math"
 	"swarmsim/domain/swarm"
 	"swarmsim/engine/simulation"
+	"swarmsim/engine/swarmscript"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/vector"
@@ -337,6 +338,16 @@ func (r *Renderer) DrawSwarmMode(screen *ebiten.Image, s *simulation.Simulation,
 		}
 	}
 
+	// GP HUD + fitness graph
+	if ss.GPEnabled {
+		gpInfo := fmt.Sprintf("GP Gen:%d | Best:%.0f | Avg:%.0f | %d/2000",
+			ss.GPGeneration, ss.BestFitness, ss.AvgFitness, ss.GPTimer)
+		printColoredAt(screen, gpInfo, 420, 48, color.RGBA{0, 180, 160, 255})
+		if len(ss.FitnessHistory) > 1 {
+			drawSwarmFitnessGraph(screen, ss, 420, 60, 150, 50)
+		}
+	}
+
 	// Genome visualization overlay (V key)
 	if ss.ShowGenomeViz && ss.EvolutionOn {
 		drawGenomeVisualization(screen, ss)
@@ -358,6 +369,9 @@ func drawSelectedBotInfo(screen *ebiten.Image, ss *swarm.SwarmState) {
 	y := 60
 	w := 220
 	h := 380
+	if ss.GPEnabled && bot.OwnProgram != nil {
+		h = 520 // taller to fit GP program info
+	}
 	valCol := color.RGBA{200, 200, 220, 255}
 	dimCol := color.RGBA{140, 140, 160, 255}
 	headerCol := color.RGBA{0, 220, 255, 255}
@@ -468,6 +482,52 @@ func drawSelectedBotInfo(screen *ebiten.Image, ss *swarm.SwarmState) {
 	printColoredAt(screen, fmt.Sprintf("Msg TX:%d RX:%d", bot.Stats.MessagesSent, bot.Stats.MessagesReceived), lx, ly, dimCol)
 	ly += lineH
 	printColoredAt(screen, fmt.Sprintf("Stuck:%d Idle:%d", bot.Stats.AntiStuckCount, bot.Stats.TicksIdle), lx, ly, dimCol)
+	ly += lineH + 2
+
+	// --- GP Program (when GP enabled) ---
+	if ss.GPEnabled && bot.OwnProgram != nil {
+		gpCol := color.RGBA{0, 180, 160, 255}
+		printColoredAt(screen, "GP Program", lx, ly, gpCol)
+		ly += lineH
+		fit := EvaluateGPFitnessRender(bot)
+		printColoredAt(screen, fmt.Sprintf("%d rules gen:%d fit:%.0f",
+			len(bot.OwnProgram.Rules), ss.GPGeneration, fit), lx, ly, dimCol)
+		ly += lineH
+		// Show first 5 rules, highlight matched ones
+		maxShow := 5
+		if maxShow > len(bot.OwnProgram.Rules) {
+			maxShow = len(bot.OwnProgram.Rules)
+		}
+		for ri := 0; ri < maxShow; ri++ {
+			ruleCol := color.RGBA{120, 120, 140, 200}
+			// Check if this rule matched last tick
+			for _, mi := range bot.LastMatchedRules {
+				if mi == ri {
+					ruleCol = color.RGBA{80, 255, 80, 255} // green = matched
+					break
+				}
+			}
+			rule := &bot.OwnProgram.Rules[ri]
+			ruleText := swarmscript.RuleToShortText(rule)
+			if len(ruleText) > 35 {
+				ruleText = ruleText[:35]
+			}
+			printColoredAt(screen, ruleText, lx, ly, ruleCol)
+			ly += lineH - 2
+		}
+		if len(bot.OwnProgram.Rules) > maxShow {
+			printColoredAt(screen, fmt.Sprintf("  ...+%d more", len(bot.OwnProgram.Rules)-maxShow), lx, ly, dimCol)
+		}
+	}
+}
+
+// EvaluateGPFitnessRender computes GP fitness for rendering (same formula as domain).
+func EvaluateGPFitnessRender(bot *swarm.SwarmBot) float64 {
+	return float64(bot.Stats.TotalDeliveries)*30 +
+		float64(bot.Stats.TotalPickups)*15 +
+		bot.Stats.TotalDistance*0.01 -
+		float64(bot.Stats.AntiStuckCount)*10 -
+		float64(bot.Stats.TicksIdle)*0.05
 }
 
 // drawBotComparisonPanel renders a side-by-side comparison of two bots.

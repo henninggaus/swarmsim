@@ -284,7 +284,7 @@ func drawSwarmEditorBottom(screen *ebiten.Image, ss *swarm.SwarmState, ed *swarm
 		drawSwarmButton(screen, 175, editorToggle3Y, toggleBtnW, toggleBtnH, truckLabel, truckColor)
 	}
 
-	// Toggle buttons row 4: [Evolution: OFF/ON]
+	// Toggle buttons row 4: [Evolution: OFF/ON] [GP: OFF/ON]
 	evoLabel := "Evolution: OFF"
 	evoColor := ColorSwarmBtnToggleOff
 	if ss.EvolutionOn {
@@ -292,6 +292,21 @@ func drawSwarmEditorBottom(screen *ebiten.Image, ss *swarm.SwarmState, ed *swarm
 		evoColor = color.RGBA{180, 50, 180, 255} // purple
 	}
 	drawSwarmButton(screen, 5, editorToggle4Y, toggleBtnW, toggleBtnH, evoLabel, evoColor)
+
+	gpLabel := "GP: OFF"
+	gpColor := ColorSwarmBtnToggleOff
+	if ss.GPEnabled {
+		gpLabel = "GP: ON"
+		gpColor = color.RGBA{0, 180, 160, 255} // teal
+	}
+	drawSwarmButton(screen, 175, editorToggle4Y, toggleBtnW, toggleBtnH, gpLabel, gpColor)
+
+	// GP status line (when GP enabled)
+	if ss.GPEnabled {
+		gpInfo := fmt.Sprintf("Gen:%d Best:%.0f Avg:%.0f T:%d/2000",
+			ss.GPGeneration, ss.BestFitness, ss.AvgFitness, ss.GPTimer)
+		printColoredAt(screen, gpInfo, 5, editorSep2Y+2, color.RGBA{0, 180, 160, 200})
+	}
 
 	// Separator 2
 	vector.StrokeLine(screen, 5, float32(editorSep2Y), float32(editorPanelW-5), float32(editorSep2Y), 1, ColorSwarmEditorSep, false)
@@ -769,10 +784,13 @@ func SwarmEditorHitTest(mx, my int) string {
 		}
 	}
 
-	// Toggle row 4: Evolution
+	// Toggle row 4: Evolution / GP
 	if my >= editorToggle4Y && my < editorToggle4Y+toggleBtnH {
 		if mx >= 5 && mx < 5+toggleBtnW {
 			return "evolution"
+		}
+		if mx >= 175 && mx < 175+toggleBtnW {
+			return "gp"
 		}
 	}
 
