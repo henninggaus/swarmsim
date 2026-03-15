@@ -2004,29 +2004,41 @@ func applyClusterBreaker(ss *swarm.SwarmState) {
 		ci.members = append(ci.members, i)
 	}
 
-	// Explode clusters > 5 bots
+	// Explode clusters > 5 bots (only if avg speed is low)
 	for _, ci := range clusters {
 		if ci.count <= 5 {
 			continue
 		}
+		// Check average speed — only break slow-moving clusters
+		var avgSpeed float64
+		for _, idx := range ci.members {
+			avgSpeed += ss.Bots[idx].Speed
+		}
+		avgSpeed /= float64(ci.count)
+		if avgSpeed > 0.3 {
+			continue // cluster is moving, leave it alone
+		}
+
 		cx := ci.sumX / float64(ci.count)
 		cy := ci.sumY / float64(ci.count)
-		logger.Info("CLUSTER", "Broke cluster of %d bots at (%.0f, %.0f)", ci.count, cx, cy)
+		logger.Info("CLUSTER", "Broke cluster of %d bots at (%.0f, %.0f) avgSpeed=%.2f", ci.count, cx, cy, avgSpeed)
 		for _, idx := range ci.members {
 			bot := &ss.Bots[idx]
 			if bot.AntiStuckTimer > 0 || bot.ScatterTimer > 0 {
 				continue // already being handled
+			}
+			// Exempt bots actively delivering (carry + match)
+			if bot.CarryingPkg >= 0 && bot.DropoffMatch {
+				continue
 			}
 			// Random outward impulse from centroid
 			dx := bot.X - cx
 			dy := bot.Y - cy
 			dist := math.Sqrt(dx*dx + dy*dy)
 			if dist < 1.0 {
-				// At centroid — random direction
 				angle := ss.Rng.Float64() * 2 * math.Pi
 				bot.Angle = angle
 			} else {
-				// Away from centroid + random jitter
 				bot.Angle = math.Atan2(dy, dx) + (ss.Rng.Float64()-0.5)*0.8
 			}
 			bot.Speed = swarm.SwarmBotSpeed * 1.3
