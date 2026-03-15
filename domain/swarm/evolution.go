@@ -53,6 +53,12 @@ func RunEvolution(ss *SwarmState) {
 	}
 	ss.AvgFitness = total / float64(n)
 
+	// Record fitness history for graph
+	ss.FitnessHistory = append(ss.FitnessHistory, FitnessRecord{
+		Best: ss.BestFitness,
+		Avg:  ss.AvgFitness,
+	})
+
 	// 4. Bottom 70% get crossover + mutation from parents
 	for _, childIdx := range indices[parentCount:] {
 		p1 := parents[ss.Rng.Intn(parentCount)]

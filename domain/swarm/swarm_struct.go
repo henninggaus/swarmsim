@@ -173,6 +173,12 @@ type LightSource struct {
 	X, Y   float64
 }
 
+// FitnessRecord stores per-generation fitness data for graphing.
+type FitnessRecord struct {
+	Best float64
+	Avg  float64
+}
+
 // SwarmMessage is a broadcast int message with position.
 type SwarmMessage struct {
 	Value int
@@ -337,13 +343,14 @@ type SwarmState struct {
 	DeliveryEvents []SwarmDeliveryEvent // consumed by renderer for particle effects
 
 	// Evolution system
-	EvolutionOn    bool
-	Generation     int
-	EvolutionTimer int     // ticks since last evolution
-	BestFitness    float64
-	AvgFitness     float64
-	UsedParams     [26]bool // which $A-$Z are used in current program
-	ShowGenomeViz  bool     // V key toggle: show genome visualization overlay
+	EvolutionOn      bool
+	Generation       int
+	EvolutionTimer   int     // ticks since last evolution
+	BestFitness      float64
+	AvgFitness       float64
+	UsedParams       [26]bool // which $A-$Z are used in current program
+	ShowGenomeViz    bool     // V key toggle: show genome visualization overlay
+	FitnessHistory   []FitnessRecord // per-generation fitness history for graph
 
 	// Pheromone system (carrying bots leave trails)
 	PherGrid *SwarmPheromoneGrid

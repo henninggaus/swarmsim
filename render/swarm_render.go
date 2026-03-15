@@ -326,11 +326,15 @@ func (r *Renderer) DrawSwarmMode(screen *ebiten.Image, s *simulation.Simulation,
 		printColoredAt(screen, label, 500, 855, color.RGBA{0, 255, 255, 220})
 	}
 
-	// Evolution HUD
+	// Evolution HUD + fitness graph
 	if ss.EvolutionOn {
 		evoInfo := fmt.Sprintf("Gen: %d | Best: %.0f | Avg: %.1f | Timer: %d/1500",
 			ss.Generation, ss.BestFitness, ss.AvgFitness, ss.EvolutionTimer)
 		printColoredAt(screen, evoInfo, 420, 48, color.RGBA{180, 50, 180, 255})
+		// Fitness graph (150x50px)
+		if len(ss.FitnessHistory) > 1 {
+			drawSwarmFitnessGraph(screen, ss, 420, 60, 150, 50)
+		}
 	}
 
 	// Genome visualization overlay (V key)
@@ -1224,6 +1228,41 @@ func drawGenomeVisualization(screen *ebiten.Image, ss *swarm.SwarmState) {
 		info := fmt.Sprintf("#%d fit=%.0f", bots[rank].idx, bots[rank].fit)
 		printColoredAt(screen, info, panelX+10, y, color.RGBA{160, 160, 180, 255})
 		y += 14
+	}
+}
+
+// drawSwarmFitnessGraph renders a small fitness-over-generations line chart.
+func drawSwarmFitnessGraph(screen *ebiten.Image, ss *swarm.SwarmState, gx, gy, gw, gh int) {
+	history := ss.FitnessHistory
+	n := len(history)
+	if n < 2 {
+		return
+	}
+
+	// Background
+	vector.DrawFilledRect(screen, float32(gx), float32(gy), float32(gw), float32(gh),
+		color.RGBA{0, 0, 0, 160}, false)
+
+	// Find max fitness for scaling
+	maxFit := 1.0
+	for _, r := range history {
+		if r.Best > maxFit {
+			maxFit = r.Best
+		}
+	}
+
+	// Draw lines: best (green) and avg (yellow)
+	for i := 1; i < n; i++ {
+		x0 := float32(gx) + float32(i-1)/float32(n-1)*float32(gw)
+		x1 := float32(gx) + float32(i)/float32(n-1)*float32(gw)
+		// Best fitness line (green)
+		y0b := float32(gy+gh) - float32(history[i-1].Best/maxFit)*float32(gh)
+		y1b := float32(gy+gh) - float32(history[i].Best/maxFit)*float32(gh)
+		vector.StrokeLine(screen, x0, y0b, x1, y1b, 1.5, color.RGBA{80, 255, 80, 220}, false)
+		// Avg fitness line (yellow)
+		y0a := float32(gy+gh) - float32(history[i-1].Avg/maxFit)*float32(gh)
+		y1a := float32(gy+gh) - float32(history[i].Avg/maxFit)*float32(gh)
+		vector.StrokeLine(screen, x0, y0a, x1, y1a, 1.5, color.RGBA{255, 200, 50, 200}, false)
 	}
 }
 

@@ -945,6 +945,7 @@ func (g *Game) handleSwarmClick(mx, my int) {
 			swarm.InitBotParams(ss)
 			ss.Generation = 0
 			ss.EvolutionTimer = 0
+			ss.FitnessHistory = nil
 			logger.Info("SWARM", "Evolution ON — %d used params", countUsedParams(ss))
 		} else {
 			ss.ShowGenomeViz = false
@@ -1331,6 +1332,8 @@ func (g *Game) loadSwarmPreset(idx int) {
 		ss.EvolutionOn = true
 		ss.Generation = 0
 		ss.EvolutionTimer = 0
+		ss.FitnessHistory = nil
+		g.sim.Speed = 5.0 // auto 5x speed for evolution
 	} else {
 		ss.EvolutionOn = false
 	}
