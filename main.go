@@ -68,6 +68,9 @@ type Game struct {
 	// Panic recovery overlay
 	panicMsg   string
 	panicTimer int
+
+	// Tutorial
+	tutorial render.TutorialState
 }
 
 // NewGame creates a new game instance.
@@ -152,6 +155,7 @@ func (g *Game) Update() (retErr error) {
 			g.sim.LoadSwarmScenario()
 			g.tickAcc = 0
 			g.showWelcome = false
+			g.maybeStartTutorial()
 			return nil
 		}
 		// Any key press (except ESC which is handled above)
@@ -160,6 +164,7 @@ func (g *Game) Update() (retErr error) {
 				g.sim.LoadSwarmScenario()
 				g.tickAcc = 0
 				g.showWelcome = false
+				g.maybeStartTutorial()
 				return nil
 			}
 		}
@@ -202,6 +207,11 @@ func (g *Game) Update() (retErr error) {
 			}
 		}
 		return nil
+	}
+
+	// Tutorial update
+	if g.tutorial.Active {
+		g.updateTutorial()
 	}
 
 	// Global keys: SPACE, +/-, F1-F7 work in all modes
@@ -319,6 +329,16 @@ func (g *Game) handleGlobalInput() {
 			g.sim.LoadSwarmScenario()
 			g.tickAcc = 0
 		}
+	}
+
+	// F3: start tutorial
+	if inpututil.IsKeyJustPressed(ebiten.KeyF3) {
+		g.tutorial.Active = true
+		g.tutorial.Step = 0
+		g.tutorial.InputDone = false
+		g.tutorial.WaitTimer = 0
+		g.tutorial.Dismissed = false
+		logger.Info("KEY", "F3 pressed -> Tutorial started")
 	}
 
 	// F10: screenshot
@@ -1654,6 +1674,130 @@ func isKeyRepeating(key ebiten.Key) bool {
 	return false
 }
 
+func (g *Game) updateTutorial() {
+	tut := &g.tutorial
+	if !tut.Active || tut.Step < 0 || tut.Step >= len(render.TutorialSteps) {
+		return
+	}
+	tut.PulseTimer++
+	step := render.TutorialSteps[tut.Step]
+
+	mx, my := ebiten.CursorPosition()
+
+	// ESC to skip tutorial
+	if inpututil.IsKeyJustPressed(ebiten.KeyEscape) {
+		tut.Active = false
+		tut.Dismissed = true
+		render.MarkTutorialDone()
+		logger.Info("TUTORIAL", "Skipped at step %d", tut.Step+1)
+		return
+	}
+
+	// Click handling for Weiter/Skip buttons
+	if inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) {
+		hit := render.TutorialWeiterHitTest(mx, my, screenW, screenH, tut)
+		if hit == "skip" {
+			tut.Active = false
+			tut.Dismissed = true
+			render.MarkTutorialDone()
+			logger.Info("TUTORIAL", "Skipped via button at step %d", tut.Step+1)
+			return
+		}
+		if hit == "weiter" {
+			g.advanceTutorial()
+			return
+		}
+	}
+
+	// Enter/Space to advance (if no input needed or input done)
+	if step.WaitInput == "" || tut.InputDone {
+		if inpututil.IsKeyJustPressed(ebiten.KeyEnter) || inpututil.IsKeyJustPressed(ebiten.KeySpace) {
+			g.advanceTutorial()
+			return
+		}
+	}
+
+	// Check step-specific input
+	switch step.WaitInput {
+	case "timer:300":
+		tut.WaitTimer++
+		if tut.WaitTimer >= 300 {
+			tut.InputDone = true
+		}
+	case "key:F2":
+		if inpututil.IsKeyJustPressed(ebiten.KeyF2) {
+			tut.InputDone = true
+		}
+	case "key:F":
+		if inpututil.IsKeyJustPressed(ebiten.KeyF) {
+			tut.InputDone = true
+		}
+	case "key:H":
+		if inpututil.IsKeyJustPressed(ebiten.KeyH) {
+			tut.InputDone = true
+		}
+	case "click:deploy_any":
+		// Detected by handleSwarmClick when deploy is clicked
+		// We check if it was just deployed by looking at blink timer
+		if g.sim.SwarmMode && g.sim.SwarmState != nil {
+			for _, b := range g.sim.SwarmState.Bots {
+				if b.BlinkTimer == 30 {
+					tut.InputDone = true
+					break
+				}
+			}
+		}
+	case "click:delivery":
+		if g.sim.SwarmMode && g.sim.SwarmState != nil && g.sim.SwarmState.DeliveryOn {
+			tut.InputDone = true
+		}
+	case "click:bot":
+		if g.sim.SwarmMode && g.sim.SwarmState != nil && g.sim.SwarmState.SelectedBot >= 0 {
+			tut.InputDone = true
+		}
+	case "click:blocks":
+		if g.sim.SwarmMode && g.sim.SwarmState != nil && g.sim.SwarmState.BlockEditorActive {
+			tut.InputDone = true
+		}
+	}
+
+	// Auto-advance when input done
+	if tut.InputDone && step.WaitInput != "" {
+		// Small delay before auto-advance for some step types
+		if step.WaitInput == "key:H" {
+			// Close help overlay that was just opened
+			g.showHelp = false
+		}
+		g.advanceTutorial()
+	}
+}
+
+func (g *Game) maybeStartTutorial() {
+	if !render.IsTutorialDone() {
+		g.tutorial.Active = true
+		g.tutorial.Step = 0
+		g.tutorial.InputDone = false
+		g.tutorial.WaitTimer = 0
+		g.tutorial.Dismissed = false
+		logger.Info("TUTORIAL", "Auto-started (first launch)")
+	}
+}
+
+func (g *Game) advanceTutorial() {
+	tut := &g.tutorial
+	tut.Step++
+	tut.InputDone = false
+	tut.WaitTimer = 0
+	if tut.Step >= len(render.TutorialSteps) {
+		tut.Active = false
+		tut.Dismissed = true
+		render.MarkTutorialDone()
+		logger.Info("TUTORIAL", "Completed!")
+	} else {
+		logger.Info("TUTORIAL", "Step %d/%d", tut.Step+1, len(render.TutorialSteps))
+	}
+}
+
 // Draw renders the simulation.
 func (g *Game) Draw(screen *ebiten.Image) {
 	// Welcome screen
@@ -1727,6 +1871,11 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	// Help overlay (drawn on top of everything, including console)
 	if g.showHelp {
 		render.DrawHelpOverlay(screen, g.sim.SwarmMode, g.helpScrollY)
+	}
+
+	// Tutorial overlay (on top of everything)
+	if g.tutorial.Active {
+		render.DrawTutorial(screen, &g.tutorial, 0)
 	}
 
 	// Panic error banner
