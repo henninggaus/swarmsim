@@ -4,7 +4,6 @@ import (
 	"math"
 	"math/rand"
 	"swarmsim/domain/comm"
-	"swarmsim/engine/pheromone"
 )
 
 // Scout has a large sensor radius, is fast, but cannot carry resources.
@@ -28,10 +27,7 @@ func (s *Scout) Update(ctx *UpdateContext) []comm.Message {
 	}
 
 	if !s.HasEnergy() {
-		s.State = StateNoEnergy
-		s.FitZeroEnergyTicks++
-		s.Vel = Vec2{}
-		return []comm.Message{comm.NewHelpNeeded(s.BotID, s.Pos.X, s.Pos.Y)}
+		return s.HandleNoEnergy()
 	}
 
 	var outbox []comm.Message
@@ -47,10 +43,7 @@ func (s *Scout) Update(ctx *UpdateContext) []comm.Message {
 		}
 	}
 
-	// Danger pheromone if health low
-	if s.Hp < 30 && ctx.Pheromones != nil {
-		s.DepositPheromone(ctx.Pheromones, pheromone.PherDanger, 0.3, ctx.ECfg)
-	}
+	s.DepositDangerPheromone(ctx)
 
 	if s.Hp < 50 {
 		outbox = append(outbox, comm.NewHelpNeeded(s.BotID, s.Pos.X, s.Pos.Y))
@@ -71,7 +64,7 @@ func (s *Scout) Update(ctx *UpdateContext) []comm.Message {
 
 	// Deposit SEARCH pheromone
 	if ctx.Pheromones != nil {
-		s.DepositPheromone(ctx.Pheromones, pheromone.PherSearch, 0.1, ctx.ECfg)
+		s.DepositPheromone(ctx.Pheromones, PherSearch, 0.1, ctx.ECfg)
 	}
 
 	// Wander — avoid areas with high SEARCH pheromone
@@ -82,12 +75,12 @@ func (s *Scout) Update(ctx *UpdateContext) []comm.Message {
 
 	if ctx.Pheromones != nil {
 		// Avoid SEARCH pheromone (already explored)
-		gx, gy := ctx.Pheromones.Gradient(s.Pos.X, s.Pos.Y, pheromone.PherSearch)
+		gx, gy := ctx.Pheromones.Gradient(s.Pos.X, s.Pos.Y, PherSearch)
 		avoidStr := s.Genome.ExplorationDrive * 3.0
 		steer = steer.Add(Vec2{-gx * avoidStr, -gy * avoidStr})
 
 		// Avoid DANGER pheromone
-		dx, dy := ctx.Pheromones.Gradient(s.Pos.X, s.Pos.Y, pheromone.PherDanger)
+		dx, dy := ctx.Pheromones.Gradient(s.Pos.X, s.Pos.Y, PherDanger)
 		steer = steer.Add(Vec2{-dx * 5, -dy * 5})
 	}
 

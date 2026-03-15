@@ -4,7 +4,6 @@ import (
 	"math"
 	"math/rand"
 	"swarmsim/domain/comm"
-	"swarmsim/engine/pheromone"
 )
 
 // Healer repairs damaged bots and recharges energy of nearby bots.
@@ -28,18 +27,12 @@ func (h *Healer) Update(ctx *UpdateContext) []comm.Message {
 	}
 
 	if !h.HasEnergy() {
-		h.State = StateNoEnergy
-		h.FitZeroEnergyTicks++
-		h.Vel = Vec2{}
-		return []comm.Message{comm.NewHelpNeeded(h.BotID, h.Pos.X, h.Pos.Y)}
+		return h.HandleNoEnergy()
 	}
 
 	var outbox []comm.Message
 
-	// Danger pheromone if health low
-	if h.Hp < 30 && ctx.Pheromones != nil {
-		h.DepositPheromone(ctx.Pheromones, pheromone.PherDanger, 0.3, ctx.ECfg)
-	}
+	h.DepositDangerPheromone(ctx)
 
 	// Return for energy if needed
 	if h.ShouldReturnForEnergy() {
@@ -128,7 +121,7 @@ func (h *Healer) Update(ctx *UpdateContext) []comm.Message {
 
 	// Avoid danger pheromone? Healers should actually go TOWARD danger
 	if ctx.Pheromones != nil && h.Genome.CooperationBias > 0.3 {
-		dx, dy := ctx.Pheromones.Gradient(h.Pos.X, h.Pos.Y, pheromone.PherDanger)
+		dx, dy := ctx.Pheromones.Gradient(h.Pos.X, h.Pos.Y, PherDanger)
 		steer = steer.Add(Vec2{dx * 2 * h.Genome.CooperationBias, dy * 2 * h.Genome.CooperationBias})
 	}
 

@@ -115,8 +115,6 @@ func drawTextEditor(screen *ebiten.Image, ss *swarm.SwarmState, ed *swarm.Editor
 		endLine = len(ed.Lines)
 	}
 
-	// Calculate visible column range
-	maxVisibleCols := (editorPanelW - 2 - editorTextX) / charW
 	scrollXOff := ed.ScrollX * charW // pixel offset for horizontal scroll
 
 	for li := startLine; li < endLine; li++ {
@@ -166,8 +164,7 @@ func drawTextEditor(screen *ebiten.Image, ss *swarm.SwarmState, ed *swarm.Editor
 		}
 	}
 
-	// Horizontal scroll indicator (shows "<<" or ">>" if content is scrolled)
-	_ = maxVisibleCols
+	// Horizontal scroll indicator
 	if ed.ScrollX > 0 {
 		printColoredAt(screen, "«", editorTextX-1, editorCodeY+editorCodeH-lineH, ColorSwarmLineNum)
 	}

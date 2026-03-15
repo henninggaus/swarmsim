@@ -4,7 +4,6 @@ import (
 	"math"
 	"math/rand"
 	"swarmsim/domain/comm"
-	"swarmsim/engine/pheromone"
 )
 
 // Worker can carry resources and transport them to the home base.
@@ -29,10 +28,7 @@ func (w *Worker) Update(ctx *UpdateContext) []comm.Message {
 	}
 
 	if !w.HasEnergy() {
-		w.State = StateNoEnergy
-		w.FitZeroEnergyTicks++
-		w.Vel = Vec2{}
-		return []comm.Message{comm.NewHelpNeeded(w.BotID, w.Pos.X, w.Pos.Y)}
+		return w.HandleNoEnergy()
 	}
 
 	var outbox []comm.Message
@@ -42,6 +38,10 @@ func (w *Worker) Update(ctx *UpdateContext) []comm.Message {
 		for _, msg := range ctx.Inbox {
 			if msg.Type == comm.MsgResourceFound || msg.Type == comm.MsgHeavyResourceFound {
 				w.knownResources = append(w.knownResources, Vec2{msg.X, msg.Y})
+				// Cap at 50 entries to prevent unbounded growth
+				if len(w.knownResources) > 50 {
+					w.knownResources = w.knownResources[len(w.knownResources)-50:]
+				}
 				// Relay heavy resource messages more eagerly based on CooperationBias
 				if msg.Type == comm.MsgHeavyResourceFound {
 					if w.Genome.CooperationBias > 0.3 {
@@ -58,10 +58,7 @@ func (w *Worker) Update(ctx *UpdateContext) []comm.Message {
 		}
 	}
 
-	// Danger pheromone if health low
-	if w.Hp < 30 && ctx.Pheromones != nil {
-		w.DepositPheromone(ctx.Pheromones, pheromone.PherDanger, 0.3, ctx.ECfg)
-	}
+	w.DepositDangerPheromone(ctx)
 
 	home := Vec2{ctx.HomeX, ctx.HomeY}
 
@@ -84,7 +81,7 @@ func (w *Worker) Update(ctx *UpdateContext) []comm.Message {
 
 		// Deposit FOUND_RESOURCE pheromone on return path
 		if ctx.Pheromones != nil {
-			w.DepositPheromone(ctx.Pheromones, pheromone.PherFoundResource, 0.15, ctx.ECfg)
+			w.DepositPheromone(ctx.Pheromones, PherFoundResource, 0.15, ctx.ECfg)
 		}
 
 		w.ApplyVelocity(ctx.ECfg)
@@ -155,7 +152,7 @@ func (w *Worker) Update(ctx *UpdateContext) []comm.Message {
 
 	// Follow FOUND_RESOURCE pheromone gradient
 	if ctx.Pheromones != nil && w.Genome.PheromoneFollow > 0.1 {
-		gx, gy := ctx.Pheromones.Gradient(w.Pos.X, w.Pos.Y, pheromone.PherFoundResource)
+		gx, gy := ctx.Pheromones.Gradient(w.Pos.X, w.Pos.Y, PherFoundResource)
 		pherSteer := Vec2{gx, gy}
 		if pherSteer.Len() > 0.001 {
 			w.State = StateForaging
@@ -163,7 +160,7 @@ func (w *Worker) Update(ctx *UpdateContext) []comm.Message {
 			sep := Separation(w, ctx.Nearby, 20)
 
 			// Avoid danger pheromone
-			dx, dy := ctx.Pheromones.Gradient(w.Pos.X, w.Pos.Y, pheromone.PherDanger)
+			dx, dy := ctx.Pheromones.Gradient(w.Pos.X, w.Pos.Y, PherDanger)
 			dangerAvoid := Vec2{-dx * 3, -dy * 3}
 
 			w.Vel = w.Vel.Add(steer.Scale(0.2)).Add(sep.Scale(1.0)).Add(dangerAvoid.Scale(0.3))

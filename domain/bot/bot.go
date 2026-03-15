@@ -2,9 +2,9 @@ package bot
 
 import (
 	"math"
+	"swarmsim/domain/comm"
 	"swarmsim/domain/genetics"
 	"swarmsim/domain/resource"
-	"swarmsim/engine/pheromone"
 )
 
 func (v Vec2) Add(o Vec2) Vec2      { return Vec2{v.X + o.X, v.Y + o.Y} }
@@ -200,7 +200,7 @@ func (b *BaseBot) DeliverResources() int {
 }
 
 // DepositPheromone deposits pheromone and consumes energy.
-func (b *BaseBot) DepositPheromone(grid *pheromone.PheromoneGrid, pType pheromone.PheromoneType, amount float64, eCfg EnergyCfg) {
+func (b *BaseBot) DepositPheromone(grid PheromoneGrid, pType PheromoneType, amount float64, eCfg EnergyCfg) {
 	if !b.HasEnergy() || grid == nil {
 		return
 	}
@@ -210,6 +210,22 @@ func (b *BaseBot) DepositPheromone(grid *pheromone.PheromoneGrid, pType pheromon
 	}
 	grid.Deposit(b.Pos.X, b.Pos.Y, pType, depositAmount)
 	b.ConsumeEnergy(eCfg.PherCost, eCfg.DecayMult)
+}
+
+// HandleNoEnergy handles the common no-energy pattern: set state, track fitness, stop.
+// Returns the help message to send. Callers should return immediately after this.
+func (b *BaseBot) HandleNoEnergy() []comm.Message {
+	b.State = StateNoEnergy
+	b.FitZeroEnergyTicks++
+	b.Vel = Vec2{}
+	return []comm.Message{comm.NewHelpNeeded(b.BotID, b.Pos.X, b.Pos.Y)}
+}
+
+// DepositDangerPheromone deposits danger pheromone if health is low.
+func (b *BaseBot) DepositDangerPheromone(ctx *UpdateContext) {
+	if b.Hp < 30 && ctx.Pheromones != nil {
+		b.DepositPheromone(ctx.Pheromones, PherDanger, 0.3, ctx.ECfg)
+	}
 }
 
 // ShouldCommunicate returns true based on genome CommFrequency.

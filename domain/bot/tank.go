@@ -4,14 +4,12 @@ import (
 	"math"
 	"math/rand"
 	"swarmsim/domain/comm"
-	"swarmsim/engine/pheromone"
 )
 
 // Tank is slow with a large body, can push obstacles.
 type Tank struct {
 	*BaseBot
 	wanderAngle float64
-	pushing     bool
 }
 
 func NewTank(id int, x, y float64) *Tank {
@@ -31,18 +29,12 @@ func (t *Tank) Update(ctx *UpdateContext) []comm.Message {
 	}
 
 	if !t.HasEnergy() {
-		t.State = StateNoEnergy
-		t.FitZeroEnergyTicks++
-		t.Vel = Vec2{}
-		return []comm.Message{comm.NewHelpNeeded(t.BotID, t.Pos.X, t.Pos.Y)}
+		return t.HandleNoEnergy()
 	}
 
 	var outbox []comm.Message
 
-	// Danger pheromone if health low
-	if t.Hp < 30 && ctx.Pheromones != nil {
-		t.DepositPheromone(ctx.Pheromones, pheromone.PherDanger, 0.3, ctx.ECfg)
-	}
+	t.DepositDangerPheromone(ctx)
 
 	// Return for energy if needed
 	if t.ShouldReturnForEnergy() {
@@ -87,7 +79,7 @@ func (t *Tank) Update(ctx *UpdateContext) []comm.Message {
 
 	// Avoid danger pheromone
 	if ctx.Pheromones != nil {
-		dx, dy := ctx.Pheromones.Gradient(t.Pos.X, t.Pos.Y, pheromone.PherDanger)
+		dx, dy := ctx.Pheromones.Gradient(t.Pos.X, t.Pos.Y, PherDanger)
 		steer = steer.Add(Vec2{-dx * 3, -dy * 3})
 	}
 

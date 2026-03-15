@@ -4,8 +4,22 @@ import (
 	"swarmsim/domain/comm"
 	"swarmsim/domain/genetics"
 	"swarmsim/domain/resource"
-	"swarmsim/engine/pheromone"
 )
+
+// PheromoneType identifies a pheromone channel (mirrors engine/pheromone constants).
+type PheromoneType int
+
+const (
+	PherSearch        PheromoneType = 0 // blue — scouts exploring
+	PherFoundResource PheromoneType = 1 // green — path to resource
+	PherDanger        PheromoneType = 2 // red — low-health warning
+)
+
+// PheromoneGrid abstracts pheromone operations so domain doesn't import engine/.
+type PheromoneGrid interface {
+	Deposit(x, y float64, pType PheromoneType, amount float64)
+	Gradient(x, y float64, pType PheromoneType) (float64, float64)
+}
 
 // Genome is an alias for genetics.Genome so consumers can use bot.Genome.
 type Genome = genetics.Genome
@@ -104,7 +118,7 @@ type UpdateContext struct {
 	Inbox      []comm.Message
 	HomeX      float64
 	HomeY      float64
-	Pheromones *pheromone.PheromoneGrid
+	Pheromones PheromoneGrid
 	ECfg       EnergyCfg
 	Tick       int
 }

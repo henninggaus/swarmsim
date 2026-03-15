@@ -256,13 +256,17 @@ func (s *Simulation) Update() {
 
 		inbox := s.Channel.Deliver(pos.X, pos.Y)
 
+		var pherGrid bot.PheromoneGrid
+		if s.Pheromones != nil {
+			pherGrid = &pherAdapter{grid: s.Pheromones}
+		}
 		ctx := &bot.UpdateContext{
 			Nearby:     nearby,
 			Resources:  nearbyRes,
 			Inbox:      inbox,
 			HomeX:      s.Cfg.HomeBaseX,
 			HomeY:      s.Cfg.HomeBaseY,
-			Pheromones: s.Pheromones,
+			Pheromones: pherGrid,
 			ECfg:       eCfg,
 			Tick:       s.Tick,
 		}
@@ -489,5 +493,18 @@ func (s *Simulation) LoadSwarmScenario() {
 
 	s.SwarmMode = true
 	s.SwarmState = swarm.NewSwarmState(s.Rng, swarm.SwarmDefaultBots)
+}
+
+// pherAdapter wraps *pheromone.PheromoneGrid to satisfy bot.PheromoneGrid interface.
+type pherAdapter struct {
+	grid *pheromone.PheromoneGrid
+}
+
+func (a *pherAdapter) Deposit(x, y float64, pType bot.PheromoneType, amount float64) {
+	a.grid.Deposit(x, y, pheromone.PheromoneType(pType), amount)
+}
+
+func (a *pherAdapter) Gradient(x, y float64, pType bot.PheromoneType) (float64, float64) {
+	return a.grid.Gradient(x, y, pheromone.PheromoneType(pType))
 }
 

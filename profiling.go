@@ -44,7 +44,9 @@ func StopProfile() {
 		return
 	}
 	pprof.StopCPUProfile()
-	cpuProfileFile.Close()
+	if err := cpuProfileFile.Close(); err != nil {
+		fmt.Println("[PROFILE] Error closing cpu.prof:", err)
+	}
 	cpuProfileFile = nil
 	profiling = false
 	fmt.Println("[PROFILE] CPU profiling STOPPED")

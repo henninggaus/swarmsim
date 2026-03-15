@@ -4,7 +4,6 @@ import (
 	"math"
 	"math/rand"
 	"swarmsim/domain/comm"
-	"swarmsim/engine/pheromone"
 )
 
 // Leader coordinates worker groups with an extended communication radius.
@@ -31,19 +30,13 @@ func (l *Leader) Update(ctx *UpdateContext) []comm.Message {
 	}
 
 	if !l.HasEnergy() {
-		l.State = StateNoEnergy
-		l.FitZeroEnergyTicks++
-		l.Vel = Vec2{}
-		return []comm.Message{comm.NewHelpNeeded(l.BotID, l.Pos.X, l.Pos.Y)}
+		return l.HandleNoEnergy()
 	}
 
 	l.tickCounter++
 	var outbox []comm.Message
 
-	// Danger pheromone if health low
-	if l.Hp < 30 && ctx.Pheromones != nil {
-		l.DepositPheromone(ctx.Pheromones, pheromone.PherDanger, 0.3, ctx.ECfg)
-	}
+	l.DepositDangerPheromone(ctx)
 
 	// Return for energy if needed
 	if l.ShouldReturnForEnergy() {
