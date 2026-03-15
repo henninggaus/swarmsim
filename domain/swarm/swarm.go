@@ -988,19 +988,15 @@ IF edge == 1 THEN TURN_RIGHT 180
 IF true THEN FWD`
 
 var presetMazeExplorer = `# Maze Explorer — right-hand wall following!
-# Enable Delivery + Maze for best results
-# 1. Separation
-IF near_dist < 12 THEN TURN_FROM_NEAREST
-IF near_dist < 12 THEN FWD
-# 2. Carrying + match: deliver
+# Wall-following + Delivery im Labyrinth
+# Schalte Maze + Delivery ein!
 IF carry == 1 AND match == 1 AND d_dist < 25 THEN DROP
 IF carry == 1 AND match == 1 THEN GOTO_DROPOFF
 IF carry == 1 AND match == 1 THEN FWD
-# 3. Not carrying: pickup
 IF carry == 0 AND p_dist < 20 AND has_pkg == 1 THEN PICKUP
 IF carry == 0 AND has_pkg == 1 THEN GOTO_PICKUP
 IF carry == 0 AND has_pkg == 1 THEN FWD
-# 4. Right-hand wall following
+IF near_dist < 12 THEN TURN_FROM_NEAREST
 IF wall_front == 1 THEN TURN_LEFT 90
 IF wall_right == 0 THEN TURN_RIGHT 90
 IF true THEN FWD`

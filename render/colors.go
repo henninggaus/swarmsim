@@ -116,8 +116,8 @@ var (
 	ColorSwarmObstacle   = color.RGBA{100, 100, 110, 255} // obstacle body
 	ColorSwarmObstacleHi = color.RGBA{130, 130, 140, 255} // obstacle highlight (top-left)
 	ColorSwarmObstacleLo = color.RGBA{60, 60, 70, 255}    // obstacle shadow (bottom-right)
-	ColorSwarmMazeWall   = color.RGBA{220, 220, 240, 255} // maze wall color (bright)
-	ColorSwarmMazeBorder = color.RGBA{240, 240, 255, 255} // maze wall border stroke
+	ColorSwarmMazeWall   = color.RGBA{150, 150, 150, 255} // maze wall color
+	ColorSwarmMazeBorder = color.RGBA{180, 180, 180, 255} // maze wall border stroke
 
 	// Swarm mode - toggle buttons
 	ColorSwarmBtnToggleOn  = color.RGBA{40, 140, 40, 255} // toggle on (green)
