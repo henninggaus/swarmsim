@@ -89,6 +89,11 @@ type SwarmBot struct {
 	AntiStuckAngle  float64
 	CloseNeighbors  int // neighbors within 30px (rebuilt per tick)
 
+	// Scatter mechanics
+	ScatterTimer    int // >0 = forced scatter mode (TURN_FROM_NEAREST + FWD, counts down)
+	ScatterCooldown int // >0 = cooldown after scatter (counts down)
+	IdleBoostTimer  int // >0 = idle boost active (counts down): faster speed + more turning
+
 	// Trail history (ring buffer)
 	Trail    [10][2]float64
 	TrailIdx int

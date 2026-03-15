@@ -883,52 +883,58 @@ IF obs_ahead == 1 THEN AVOID_OBSTACLE
 IF edge == 1 THEN TURN_RIGHT 180`
 
 var presetSimpleUnload = `# Simple Unload — enable Trucks!
-# 1. Carrying + see dropoff: deliver
+# 1. Separation (prevents clustering)
+IF near_dist < 15 THEN TURN_FROM_NEAREST
+IF near_dist < 15 THEN FWD
+# 2. Carrying + match: deliver at correct dropoff
 IF carry == 1 AND match == 1 AND d_dist < 25 THEN DROP
 IF carry == 1 AND match == 1 THEN GOTO_DROPOFF
 IF carry == 1 AND match == 1 THEN FWD
-# 2. Carrying + hear beacon: follow beacon
+# 3. Carrying + hear beacon: follow beacon
 IF carry == 1 AND heard_beacon == 1 THEN GOTO_BEACON
 IF carry == 1 AND heard_beacon == 1 THEN FWD
-# 3. Carrying + lost: spiral search
+# 4. Carrying + lost: spiral search
 IF carry == 1 AND exploring == 1 THEN SPIRAL
 IF carry == 1 THEN FWD
-# 4. Not carrying + truck here: pickup
+# 5. Not carrying: pickup from truck
 IF carry == 0 AND on_ramp == 1 AND truck_here == 1 THEN PICKUP
 IF carry == 0 THEN GOTO_RAMP
 IF carry == 0 THEN FWD
-# --- Separation + Navigation ---
-IF near_dist < 12 THEN TURN_FROM_NEAREST
+# 6. Navigation fallback
 IF obs_ahead == 1 THEN AVOID_OBSTACLE
-IF edge == 1 THEN TURN_RIGHT 180`
+IF edge == 1 THEN TURN_RIGHT 180
+IF rnd < 5 THEN TURN_RANDOM
+IF true THEN FWD`
 
 var presetCoordinatedUnload = `# Coordinated Unload — enable Trucks!
-# 1. Carrying + see dropoff: deliver + broadcast
+# 1. Separation (highest priority — prevents clustering)
+IF near_dist < 15 THEN TURN_FROM_NEAREST
+IF near_dist < 15 THEN FWD
+# 2. Carrying + match: deliver at correct dropoff
 IF carry == 1 AND match == 1 AND d_dist < 25 THEN DROP
 IF carry == 1 AND match == 1 THEN GOTO_DROPOFF
 IF carry == 1 AND match == 1 THEN SEND_DROPOFF 1
 IF carry == 1 AND match == 1 THEN LED_DROPOFF
 IF carry == 1 AND match == 1 THEN FWD
-# 2. Carrying + heard dropoff msg: follow
-IF carry == 1 AND heard_dropoff > 0 THEN GOTO_HEARD_DROPOFF
-IF carry == 1 AND heard_dropoff > 0 THEN FWD
-# 3. Carrying + hear beacon: follow beacon
+# 3. Carrying + beacon/LED/heard: navigate to dropoff
 IF carry == 1 AND heard_beacon == 1 THEN GOTO_BEACON
 IF carry == 1 AND heard_beacon == 1 THEN FWD
-# 4. Carrying + follow LED gradient
+IF carry == 1 AND heard_dropoff > 0 THEN GOTO_HEARD_DROPOFF
+IF carry == 1 AND heard_dropoff > 0 THEN FWD
 IF carry == 1 AND led_match < 200 THEN GOTO_LED_MATCH
 IF carry == 1 AND led_match < 200 THEN FWD
-# 5. Carrying + lost: spiral
+# 4. Carrying + lost: spiral search
 IF carry == 1 AND exploring == 1 THEN SPIRAL
 IF carry == 1 THEN FWD
-# 6. Not carrying: pickup from truck
+# 5. Not carrying: pickup from truck
 IF carry == 0 AND on_ramp == 1 AND truck_here == 1 THEN PICKUP
 IF carry == 0 THEN GOTO_RAMP
 IF carry == 0 THEN FWD
-# --- Separation + Navigation ---
-IF near_dist < 12 THEN TURN_FROM_NEAREST
+# 6. Navigation fallback
 IF obs_ahead == 1 THEN AVOID_OBSTACLE
-IF edge == 1 THEN TURN_RIGHT 180`
+IF edge == 1 THEN TURN_RIGHT 180
+IF rnd < 5 THEN TURN_RANDOM
+IF true THEN FWD`
 
 var presetEvolvingDelivery = `# Evolving Delivery — uses $A-$Z params!
 # 1. Carrying + see dropoff: deliver

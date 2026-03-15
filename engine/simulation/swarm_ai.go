@@ -59,25 +59,83 @@ func (s *Simulation) updateSwarmMode() {
 		}
 	}
 
-	// Phase 2.3: Max neighbors cap — force scatter when too crowded
+	// Phase 2.3: Anti-clustering — scatter, dropoff repulsion, idle boost
 	for i := range ss.Bots {
 		bot := &ss.Bots[i]
+
+		// Decrement scatter/idle timers
+		if bot.ScatterCooldown > 0 {
+			bot.ScatterCooldown--
+		}
+		if bot.IdleBoostTimer > 0 {
+			bot.IdleBoostTimer--
+		}
+
 		if bot.AntiStuckTimer > 0 {
 			continue // already in breakout
 		}
-		// Ramp anti-clustering: lower threshold (>3) and force rightward escape
-		if bot.OnRamp && bot.CloseNeighbors > 3 {
-			// Force escape from ramp: angle toward arena center (rightward + slight random)
-			bot.Angle = (ss.Rng.Float64() - 0.5) * 1.0 // roughly rightward (0 = east)
+
+		// (A) Scatter: >3 close neighbors → forced TURN_FROM_NEAREST + FWD for 15 ticks
+		if bot.ScatterTimer > 0 {
+			// Currently in scatter mode — override program output
+			if bot.NearestIdx >= 0 {
+				other := &ss.Bots[bot.NearestIdx]
+				dx, dy := swarm.NeighborDelta(bot.X, bot.Y, other.X, other.Y, ss)
+				bot.Angle = math.Atan2(-dy, -dx) + (ss.Rng.Float64()-0.5)*0.4
+			} else {
+				bot.Angle += (ss.Rng.Float64() - 0.5) * 1.0
+			}
+			bot.Speed = swarm.SwarmBotSpeed
+			bot.ScatterTimer--
+			continue
+		}
+		if bot.CloseNeighbors > 3 && bot.ScatterCooldown == 0 {
+			// Trigger scatter mode
+			bot.ScatterTimer = 15
+			bot.ScatterCooldown = 30 // prevent re-triggering for 30 ticks after scatter ends
+			if bot.NearestIdx >= 0 {
+				other := &ss.Bots[bot.NearestIdx]
+				dx, dy := swarm.NeighborDelta(bot.X, bot.Y, other.X, other.Y, ss)
+				bot.Angle = math.Atan2(-dy, -dx) + (ss.Rng.Float64()-0.5)*0.4
+			}
 			bot.Speed = swarm.SwarmBotSpeed
 			continue
 		}
-		if bot.CloseNeighbors > 4 && bot.NearestIdx >= 0 {
-			// Force turn away from nearest + full speed
-			other := &ss.Bots[bot.NearestIdx]
-			dx, dy := swarm.NeighborDelta(bot.X, bot.Y, other.X, other.Y, ss)
-			bot.Angle = math.Atan2(-dy, -dx) + (ss.Rng.Float64()-0.5)*0.6
+
+		// (B) Ramp anti-clustering: lower threshold (>3) and force rightward escape
+		if bot.OnRamp && bot.CloseNeighbors > 3 {
+			bot.Angle = (ss.Rng.Float64() - 0.5) * 1.0
 			bot.Speed = swarm.SwarmBotSpeed
+			continue
+		}
+
+		// (C) Dropoff repulsion: non-carrying bots within 40px of a dropoff get pushed away
+		if ss.DeliveryOn && bot.CarryingPkg < 0 && bot.NearestDropoffDist < 40 && bot.NearestDropoffIdx >= 0 {
+			st := &ss.Stations[bot.NearestDropoffIdx]
+			dx := bot.X - st.X
+			dy := bot.Y - st.Y
+			dist := math.Sqrt(dx*dx + dy*dy)
+			if dist > 0.1 {
+				bot.Angle = math.Atan2(dy, dx) + (ss.Rng.Float64()-0.5)*0.3
+				bot.Speed = swarm.SwarmBotSpeed
+			}
+		}
+
+		// (D) Idle boost: 200+ ticks idle → faster speed + more random turning for 100 ticks
+		if bot.Stats.TicksIdle > 200 && bot.IdleBoostTimer == 0 {
+			bot.IdleBoostTimer = 100
+			bot.Angle = ss.Rng.Float64() * 2 * math.Pi
+			bot.Speed = swarm.SwarmBotSpeed * 1.5
+			bot.Stats.TicksIdle = 0 // reset idle counter
+		}
+		if bot.IdleBoostTimer > 0 {
+			// During idle boost: double random turn chance and 50% more speed
+			if ss.Rng.Float64() < 0.15 { // 15% per tick random turn
+				bot.Angle += (ss.Rng.Float64() - 0.5) * 2.0
+			}
+			if bot.Speed > 0 && bot.Speed < swarm.SwarmBotSpeed*1.5 {
+				bot.Speed = swarm.SwarmBotSpeed * 1.5
+			}
 		}
 	}
 
@@ -1196,6 +1254,12 @@ func executeSwarmAction(act swarmscript.Action, bot *swarm.SwarmBot, ss *swarm.S
 			}
 			sdx, sdy := swarm.NeighborDelta(bot.X, bot.Y, st.X, st.Y, ss)
 			if math.Sqrt(sdx*sdx+sdy*sdy) < 25 {
+				// Guard: refuse drop at wrong-color station — skip and check other stations
+				if pkg.Color != st.Color {
+					logger.WarnBot(botIdx, "DELIVERY", "Bot #%d tried to drop %s at %s station — refused",
+						botIdx, swarm.DeliveryColorName(pkg.Color), swarm.DeliveryColorName(st.Color))
+					continue // skip wrong station, maybe correct one is also nearby
+				}
 				// Delivery!
 				ss.DeliveryStats.TotalDelivered++
 				correct := pkg.Color == st.Color
