@@ -183,6 +183,14 @@ func (s *Simulation) updateSwarmMode() {
 		}
 	}
 
+	// Phase 4.8: Evolution system
+	if ss.EvolutionOn {
+		ss.EvolutionTimer++
+		if ss.EvolutionTimer >= 1500 {
+			swarm.RunEvolution(ss)
+		}
+	}
+
 	// Phase 4.9: Accumulate lifetime stats (before StuckPrevX/Y is overwritten)
 	for i := range ss.Bots {
 		bot := &ss.Bots[i]
@@ -1234,6 +1242,14 @@ func executeSwarmAction(act swarmscript.Action, bot *swarm.SwarmBot, ss *swarm.S
 					} else {
 						ts.Score += 3
 						ts.WrongPkgs++
+					}
+				}
+				// Evolution fitness
+				if ss.EvolutionOn {
+					if correct {
+						bot.Fitness += 10
+					} else {
+						bot.Fitness += 3
 					}
 				}
 				// Deactivate package, schedule respawn at its pickup station
