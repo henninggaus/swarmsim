@@ -846,48 +846,49 @@ IF obs_ahead == 1 THEN AVOID_OBSTACLE
 IF edge == 1 THEN TURN_RIGHT 180`
 
 var presetSimpleUnload = `# Simple Unload — enable Trucks!
-# Bots wait at ramp edge, crane transfers packages
-# --- Not carrying: wait at ramp for truck ---
-IF carry == 0 AND on_ramp == 1 AND truck_here == 1 THEN PICKUP
-IF carry == 0 THEN GOTO_RAMP
-IF carry == 0 THEN FWD
-# --- Carrying: deliver to matching dropoff ---
+# 1. Carrying + see dropoff: deliver
 IF carry == 1 AND match == 1 AND d_dist < 25 THEN DROP
 IF carry == 1 AND match == 1 THEN GOTO_DROPOFF
 IF carry == 1 AND match == 1 THEN FWD
-IF carry == 1 AND d_dist < 200 THEN LED_DROPOFF
-IF carry == 1 AND led_dist < 200 THEN GOTO_LED
-IF carry == 1 AND led_dist < 200 THEN FWD
-IF carry == 1 THEN SET_LED 255 99 0
-IF carry == 1 AND rnd < 8 THEN TURN_RANDOM
+# 2. Carrying + hear beacon: follow beacon
+IF carry == 1 AND heard_beacon == 1 THEN GOTO_BEACON
+IF carry == 1 AND heard_beacon == 1 THEN FWD
+# 3. Carrying + lost: spiral search
+IF carry == 1 AND exploring == 1 THEN SPIRAL
 IF carry == 1 THEN FWD
-# --- Separation ---
+# 4. Not carrying + truck here: pickup
+IF carry == 0 AND on_ramp == 1 AND truck_here == 1 THEN PICKUP
+IF carry == 0 THEN GOTO_RAMP
+IF carry == 0 THEN FWD
+# --- Separation + Navigation ---
 IF near_dist < 12 THEN TURN_FROM_NEAREST
-# --- Navigation LAST ---
 IF obs_ahead == 1 THEN AVOID_OBSTACLE
 IF edge == 1 THEN TURN_RIGHT 180`
 
 var presetCoordinatedUnload = `# Coordinated Unload — enable Trucks!
-# Messages + LED + crane pickup at ramp
-# --- Not carrying: wait at ramp for truck ---
+# 1. Carrying + see dropoff: deliver + broadcast
+IF carry == 1 AND match == 1 AND d_dist < 25 THEN DROP
+IF carry == 1 AND match == 1 THEN GOTO_DROPOFF
+IF carry == 1 AND match == 1 THEN SEND_DROPOFF 1
+IF carry == 1 AND match == 1 THEN LED_DROPOFF
+IF carry == 1 AND match == 1 THEN FWD
+# 2. Carrying + heard dropoff msg: follow
+IF carry == 1 AND heard_dropoff > 0 THEN GOTO_HEARD_DROPOFF
+IF carry == 1 AND heard_dropoff > 0 THEN FWD
+# 3. Carrying + hear beacon: follow beacon
+IF carry == 1 AND heard_beacon == 1 THEN GOTO_BEACON
+IF carry == 1 AND heard_beacon == 1 THEN FWD
+# 4. Carrying + follow LED gradient
+IF carry == 1 AND led_match < 200 THEN GOTO_LED_MATCH
+IF carry == 1 AND led_match < 200 THEN FWD
+# 5. Carrying + lost: spiral
+IF carry == 1 AND exploring == 1 THEN SPIRAL
+IF carry == 1 THEN FWD
+# 6. Not carrying: pickup from truck
 IF carry == 0 AND on_ramp == 1 AND truck_here == 1 THEN PICKUP
 IF carry == 0 THEN GOTO_RAMP
 IF carry == 0 THEN FWD
-# --- Carrying: deliver ---
-IF carry == 1 AND match == 1 AND d_dist < 25 THEN DROP
-IF carry == 1 AND match == 1 THEN GOTO_DROPOFF
-IF carry == 1 AND match == 1 THEN FWD
-IF carry == 1 AND d_dist < 200 THEN LED_DROPOFF
-IF carry == 1 AND d_dist < 200 THEN SEND_DROPOFF 1
-IF carry == 1 AND led_dist < 200 THEN GOTO_LED
-IF carry == 1 AND led_dist < 200 THEN FWD
-IF carry == 1 AND heard_dropoff > 0 THEN GOTO_HEARD_DROPOFF
-IF carry == 1 AND heard_dropoff > 0 THEN FWD
-IF carry == 1 THEN SET_LED 255 99 0
-IF carry == 1 AND rnd < 6 THEN TURN_RANDOM
-IF carry == 1 THEN FWD
-# --- Separation ---
+# --- Separation + Navigation ---
 IF near_dist < 12 THEN TURN_FROM_NEAREST
-# --- Navigation LAST ---
 IF obs_ahead == 1 THEN AVOID_OBSTACLE
 IF edge == 1 THEN TURN_RIGHT 180`
