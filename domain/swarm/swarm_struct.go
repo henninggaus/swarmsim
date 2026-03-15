@@ -130,6 +130,10 @@ type SwarmBot struct {
 	NearestTruckPkgDist float64
 	NearestTruckPkgIdx  int // index in SwarmTruck.Packages (-1 if none)
 
+	// Evolution parameters (per-bot, used when $A-$Z syntax and EvolutionOn)
+	ParamValues [26]float64
+	Fitness     float64
+
 	// Lifetime statistics (persist across sim reset, cleared on bot count change)
 	Stats BotLifetimeStats
 }
@@ -318,6 +322,14 @@ type SwarmState struct {
 	ShowRoutes     bool                 // 'C' key toggle: show pickup→dropoff route lines
 	ScorePopups    []ScorePopup         // floating score text on delivery
 	DeliveryEvents []SwarmDeliveryEvent // consumed by renderer for particle effects
+
+	// Evolution system
+	EvolutionOn    bool
+	Generation     int
+	EvolutionTimer int     // ticks since last evolution
+	BestFitness    float64
+	AvgFitness     float64
+	UsedParams     [26]bool // which $A-$Z are used in current program
 
 	CollisionCount  int // obstacle collisions this tick (reset per tick)
 	ResetFlashTimer int // counts down from 30 for "RESET" flash

@@ -673,173 +673,174 @@ func executeSwarmProgram(ss *swarm.SwarmState, i int) {
 
 // evaluateSwarmCondition checks a single condition against bot sensors.
 func evaluateSwarmCondition(cond swarmscript.Condition, bot *swarm.SwarmBot, snapState, snapCounter, snapTimer int, rng *rand.Rand, ss *swarm.SwarmState, botIdx int) bool {
+	cv := resolveCondValue(cond, bot, ss)
 	switch cond.Type {
 	case swarmscript.CondTrue:
 		return true
 
 	case swarmscript.CondNeighborsCount:
-		return compareInt(bot.NeighborCount, cond.Op, cond.Value)
+		return compareInt(bot.NeighborCount, cond.Op, cv)
 
 	case swarmscript.CondNearestDistance:
-		return compareInt(int(bot.NearestDist), cond.Op, cond.Value)
+		return compareInt(int(bot.NearestDist), cond.Op, cv)
 
 	case swarmscript.CondState, swarmscript.CondMyState:
-		return compareInt(snapState, cond.Op, cond.Value)
+		return compareInt(snapState, cond.Op, cv)
 
 	case swarmscript.CondCounter:
-		return compareInt(snapCounter, cond.Op, cond.Value)
+		return compareInt(snapCounter, cond.Op, cv)
 
 	case swarmscript.CondTimer:
-		return compareInt(snapTimer, cond.Op, cond.Value)
+		return compareInt(snapTimer, cond.Op, cv)
 
 	case swarmscript.CondOnEdge:
 		onEdgeVal := 0
 		if bot.OnEdge {
 			onEdgeVal = 1
 		}
-		return compareInt(onEdgeVal, cond.Op, cond.Value)
+		return compareInt(onEdgeVal, cond.Op, cv)
 
 	case swarmscript.CondReceivedMessage:
-		return compareInt(bot.ReceivedMsg, cond.Op, cond.Value)
+		return compareInt(bot.ReceivedMsg, cond.Op, cv)
 
 	case swarmscript.CondLightValue:
-		return compareInt(bot.LightValue, cond.Op, cond.Value)
+		return compareInt(bot.LightValue, cond.Op, cv)
 
 	case swarmscript.CondRandom:
 		// random < N means N% chance
-		return rng.Intn(100) < cond.Value
+		return rng.Intn(100) < cv
 
 	case swarmscript.CondHasLeader:
 		hasLeader := 0
 		if bot.FollowTargetIdx >= 0 {
 			hasLeader = 1
 		}
-		return compareInt(hasLeader, cond.Op, cond.Value)
+		return compareInt(hasLeader, cond.Op, cv)
 
 	case swarmscript.CondHasFollower:
 		hasFollower := 0
 		if bot.FollowerIdx >= 0 {
 			hasFollower = 1
 		}
-		return compareInt(hasFollower, cond.Op, cond.Value)
+		return compareInt(hasFollower, cond.Op, cv)
 
 	case swarmscript.CondChainLength:
 		cl := computeChainLength(ss, botIdx)
-		return compareInt(cl, cond.Op, cond.Value)
+		return compareInt(cl, cond.Op, cv)
 
 	case swarmscript.CondNearestLEDR:
-		return compareInt(int(bot.NearestLEDR), cond.Op, cond.Value)
+		return compareInt(int(bot.NearestLEDR), cond.Op, cv)
 
 	case swarmscript.CondNearestLEDG:
-		return compareInt(int(bot.NearestLEDG), cond.Op, cond.Value)
+		return compareInt(int(bot.NearestLEDG), cond.Op, cv)
 
 	case swarmscript.CondNearestLEDB:
-		return compareInt(int(bot.NearestLEDB), cond.Op, cond.Value)
+		return compareInt(int(bot.NearestLEDB), cond.Op, cv)
 
 	case swarmscript.CondTick:
-		return compareInt(ss.Tick, cond.Op, cond.Value)
+		return compareInt(ss.Tick, cond.Op, cv)
 
 	case swarmscript.CondObstacleAhead:
 		obsVal := 0
 		if bot.ObstacleAhead {
 			obsVal = 1
 		}
-		return compareInt(obsVal, cond.Op, cond.Value)
+		return compareInt(obsVal, cond.Op, cv)
 
 	case swarmscript.CondObstacleDist:
-		return compareInt(int(bot.ObstacleDist), cond.Op, cond.Value)
+		return compareInt(int(bot.ObstacleDist), cond.Op, cv)
 
 	case swarmscript.CondValue1:
-		return compareInt(bot.Value1, cond.Op, cond.Value)
+		return compareInt(bot.Value1, cond.Op, cv)
 
 	case swarmscript.CondValue2:
-		return compareInt(bot.Value2, cond.Op, cond.Value)
+		return compareInt(bot.Value2, cond.Op, cv)
 
 	case swarmscript.CondCarrying:
 		carryVal := 0
 		if bot.CarryingPkg >= 0 {
 			carryVal = 1
 		}
-		return compareInt(carryVal, cond.Op, cond.Value)
+		return compareInt(carryVal, cond.Op, cv)
 
 	case swarmscript.CondCarryingColor:
 		cc := 0
 		if bot.CarryingPkg >= 0 && bot.CarryingPkg < len(ss.Packages) {
 			cc = ss.Packages[bot.CarryingPkg].Color
 		}
-		return compareInt(cc, cond.Op, cond.Value)
+		return compareInt(cc, cond.Op, cv)
 
 	case swarmscript.CondNearestPickupDist:
-		return compareInt(int(bot.NearestPickupDist), cond.Op, cond.Value)
+		return compareInt(int(bot.NearestPickupDist), cond.Op, cv)
 
 	case swarmscript.CondNearestPickupColor:
-		return compareInt(bot.NearestPickupColor, cond.Op, cond.Value)
+		return compareInt(bot.NearestPickupColor, cond.Op, cv)
 
 	case swarmscript.CondNearestPickupHasPkg:
 		v := 0
 		if bot.NearestPickupHasPkg {
 			v = 1
 		}
-		return compareInt(v, cond.Op, cond.Value)
+		return compareInt(v, cond.Op, cv)
 
 	case swarmscript.CondNearestDropoffDist:
-		return compareInt(int(bot.NearestDropoffDist), cond.Op, cond.Value)
+		return compareInt(int(bot.NearestDropoffDist), cond.Op, cv)
 
 	case swarmscript.CondNearestDropoffColor:
-		return compareInt(bot.NearestDropoffColor, cond.Op, cond.Value)
+		return compareInt(bot.NearestDropoffColor, cond.Op, cv)
 
 	case swarmscript.CondDropoffMatch:
 		v := 0
 		if bot.DropoffMatch {
 			v = 1
 		}
-		return compareInt(v, cond.Op, cond.Value)
+		return compareInt(v, cond.Op, cv)
 
 	case swarmscript.CondHeardPickupColor:
-		return compareInt(bot.HeardPickupColor, cond.Op, cond.Value)
+		return compareInt(bot.HeardPickupColor, cond.Op, cv)
 
 	case swarmscript.CondHeardDropoffColor:
-		return compareInt(bot.HeardDropoffColor, cond.Op, cond.Value)
+		return compareInt(bot.HeardDropoffColor, cond.Op, cv)
 
 	case swarmscript.CondNearestMatchLEDDist:
-		return compareInt(int(bot.NearestMatchLEDDist), cond.Op, cond.Value)
+		return compareInt(int(bot.NearestMatchLEDDist), cond.Op, cv)
 
 	case swarmscript.CondTruckHere:
 		v := 0
 		if bot.TruckHere {
 			v = 1
 		}
-		return compareInt(v, cond.Op, cond.Value)
+		return compareInt(v, cond.Op, cv)
 
 	case swarmscript.CondTruckPkgCount:
-		return compareInt(bot.TruckPkgCount, cond.Op, cond.Value)
+		return compareInt(bot.TruckPkgCount, cond.Op, cv)
 
 	case swarmscript.CondOnRamp:
 		v := 0
 		if bot.OnRamp {
 			v = 1
 		}
-		return compareInt(v, cond.Op, cond.Value)
+		return compareInt(v, cond.Op, cv)
 
 	case swarmscript.CondNearestTruckPkgDist:
-		return compareInt(int(bot.NearestTruckPkgDist), cond.Op, cond.Value)
+		return compareInt(int(bot.NearestTruckPkgDist), cond.Op, cv)
 
 	case swarmscript.CondHeardBeaconDropoff:
 		v := 0
 		if bot.HeardBeaconDropoffColor > 0 {
 			v = 1
 		}
-		return compareInt(v, cond.Op, cond.Value)
+		return compareInt(v, cond.Op, cv)
 
 	case swarmscript.CondHeardBeaconDropoffDist:
-		return compareInt(int(bot.HeardBeaconDropoffDist), cond.Op, cond.Value)
+		return compareInt(int(bot.HeardBeaconDropoffDist), cond.Op, cv)
 
 	case swarmscript.CondExploring:
 		v := 0
 		if bot.ExplorationTimer > 60 {
 			v = 1
 		}
-		return compareInt(v, cond.Op, cond.Value)
+		return compareInt(v, cond.Op, cv)
 	}
 
 	return false
@@ -868,6 +869,15 @@ func computeChainLength(ss *swarm.SwarmState, i int) int {
 	}
 
 	return count
+}
+
+// resolveCondValue returns the effective comparison value for a condition,
+// using per-bot evolved parameters when IsParamRef and EvolutionOn.
+func resolveCondValue(cond swarmscript.Condition, bot *swarm.SwarmBot, ss *swarm.SwarmState) int {
+	if cond.IsParamRef && ss.EvolutionOn {
+		return int(bot.ParamValues[cond.ParamIdx])
+	}
+	return cond.Value
 }
 
 // compareInt compares two ints with the given operator.

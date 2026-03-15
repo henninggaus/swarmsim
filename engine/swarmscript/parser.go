@@ -164,7 +164,27 @@ func parseSingleCondition(s string, lineNo int) (Condition, error) {
 		return Condition{}, fmt.Errorf("line %d: unknown operator '%s' (use >, <, or ==)", lineNo, opStr)
 	}
 
-	// Parse value
+	// Parse value — check for $A-$Z parameter reference first
+	cond := Condition{Type: condType, Op: op}
+	if strings.HasPrefix(valueStr, "$") {
+		paramPart := valueStr[1:] // remove $
+		parts := strings.SplitN(paramPart, ":", 2)
+		letter := strings.ToUpper(parts[0])
+		if len(letter) == 1 && letter[0] >= 'A' && letter[0] <= 'Z' {
+			cond.IsParamRef = true
+			cond.ParamIdx = int(letter[0] - 'A')
+			if len(parts) > 1 {
+				hint, hErr := strconv.ParseFloat(parts[1], 64)
+				if hErr == nil {
+					cond.ParamHint = hint
+					cond.Value = int(hint) // fallback for non-evolution mode
+				}
+			}
+			return cond, nil
+		}
+		return Condition{}, fmt.Errorf("line %d: invalid parameter reference '%s' (use $A-$Z or $A:15)", lineNo, valueStr)
+	}
+
 	val, err := strconv.Atoi(valueStr)
 	if err != nil {
 		// Handle "true"/"false" for on_edge
@@ -177,7 +197,8 @@ func parseSingleCondition(s string, lineNo int) (Condition, error) {
 		}
 	}
 
-	return Condition{Type: condType, Op: op, Value: val}, nil
+	cond.Value = val
+	return cond, nil
 }
 
 // parseAction parses an action string like "MOVE_FORWARD" or "SET_LED 255 0 0".

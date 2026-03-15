@@ -59,9 +59,12 @@ const (
 
 // Condition represents a single boolean check in a rule.
 type Condition struct {
-	Type  ConditionType
-	Op    ConditionOp
-	Value int
+	Type       ConditionType
+	Op         ConditionOp
+	Value      int
+	IsParamRef bool    // true if value is $A-$Z reference
+	ParamIdx   int     // 0-25 for A-Z
+	ParamHint  float64 // default/initial value from $X:NNN
 }
 
 // ActionType identifies what action a rule performs.

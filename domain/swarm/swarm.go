@@ -482,6 +482,36 @@ func IsTruckPresetIdx(idx int) bool {
 	return idx >= 13 && idx <= 14
 }
 
+// ScanUsedParams scans the current program and sets ss.UsedParams for each $A-$Z found.
+func ScanUsedParams(ss *SwarmState) {
+	ss.UsedParams = [26]bool{}
+	if ss.Program == nil {
+		return
+	}
+	for _, rule := range ss.Program.Rules {
+		for _, cond := range rule.Conditions {
+			if cond.IsParamRef {
+				ss.UsedParams[cond.ParamIdx] = true
+			}
+		}
+	}
+}
+
+// GetParamHint returns the hint value for a given parameter index from the program.
+func GetParamHint(ss *SwarmState, paramIdx int) float64 {
+	if ss.Program == nil {
+		return 0
+	}
+	for _, rule := range ss.Program.Rules {
+		for _, cond := range rule.Conditions {
+			if cond.IsParamRef && cond.ParamIdx == paramIdx {
+				return cond.ParamHint
+			}
+		}
+	}
+	return 0
+}
+
 // NewSwarmTruckState creates a fresh truck unloading round.
 func NewSwarmTruckState(rng *rand.Rand) *SwarmTruckState {
 	ts := &SwarmTruckState{
