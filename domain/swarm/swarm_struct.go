@@ -142,6 +142,7 @@ type SwarmBot struct {
 	OnRamp              bool
 	NearestTruckPkgDist float64
 	NearestTruckPkgIdx  int // index in SwarmTruck.Packages (-1 if none)
+	RampCooldown        int // >0 = ticks until bot can try GOTO_RAMP again
 
 	// Evolution parameters (per-bot, used when $A-$Z syntax and EvolutionOn)
 	ParamValues [26]float64
@@ -351,6 +352,10 @@ type SwarmState struct {
 	UsedParams       [26]bool // which $A-$Z are used in current program
 	ShowGenomeViz    bool     // V key toggle: show genome visualization overlay
 	FitnessHistory   []FitnessRecord // per-generation fitness history for graph
+
+	// Ramp semaphore (truck mode)
+	RampBotCount int // non-carrying bots currently on ramp (rebuilt per tick)
+	RampMaxBots  int // max concurrent bots on ramp (default 3)
 
 	// Pheromone system (carrying bots leave trails)
 	PherGrid *SwarmPheromoneGrid

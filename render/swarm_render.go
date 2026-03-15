@@ -679,8 +679,28 @@ func drawDeliveryPackages(screen *ebiten.Image, ss *swarm.SwarmState, offX, offY
 
 // drawStationLabels renders "PR","PB","PY","PG" / "DR","DB","DY","DG" labels
 // above each station, plus respawn timer bars and delivery counters.
+// Labels shift left/right when two stations are closer than 100px to avoid overlap.
 func drawStationLabels(screen *ebiten.Image, ss *swarm.SwarmState, offX, offY float64) {
 	colorLetters := [5]string{"", "R", "B", "Y", "G"}
+
+	// Pre-compute label X offsets to avoid overlap for nearby stations
+	labelOffsetX := make([]int, len(ss.Stations))
+	for i := range ss.Stations {
+		for j := i + 1; j < len(ss.Stations); j++ {
+			dx := ss.Stations[i].X - ss.Stations[j].X
+			dy := ss.Stations[i].Y - ss.Stations[j].Y
+			if math.Abs(dx) < 100 && math.Abs(dy) < 60 {
+				if dx <= 0 { // i is left of j
+					labelOffsetX[i] -= 20
+					labelOffsetX[j] += 20
+				} else {
+					labelOffsetX[i] += 20
+					labelOffsetX[j] -= 20
+				}
+			}
+		}
+	}
+
 	for si := range ss.Stations {
 		st := &ss.Stations[si]
 		sx := int(offX + st.X)
@@ -695,16 +715,17 @@ func drawStationLabels(screen *ebiten.Image, ss *swarm.SwarmState, offX, offY fl
 		}
 		label := prefix + letter
 		col := deliveryColor(st.Color)
-		// Label above station
-		printColoredAt(screen, label, sx-6, sy-40, col)
+		// Label above station (with horizontal offset for nearby stations)
+		lx := sx - 6 + labelOffsetX[si]
+		printColoredAt(screen, label, lx, sy-40, col)
 
 		if st.IsPickup {
-			// Respawn timer bar below empty pickup stations
+			// Respawn timer bar below pickup station (15px gap from edge: radius 25 + 15 = 40)
 			if !st.HasPackage && st.RespawnIn > 0 {
 				barW := 30
 				barH := 4
 				bx := float32(sx - barW/2)
-				by := float32(sy + 30)
+				by := float32(sy + 40)
 				// Background
 				vector.DrawFilledRect(screen, bx, by, float32(barW), float32(barH),
 					color.RGBA{40, 40, 40, 180}, false)
@@ -714,10 +735,10 @@ func drawStationLabels(screen *ebiten.Image, ss *swarm.SwarmState, offX, offY fl
 				vector.DrawFilledRect(screen, bx, by, fillW, float32(barH), col, false)
 			}
 		} else {
-			// Delivery counter below dropoff
+			// Delivery counter below dropoff (15px gap from edge: radius 25 + 15 = 40)
 			if st.DeliverCount > 0 {
 				countStr := fmt.Sprintf("%d", st.DeliverCount)
-				printColoredAt(screen, countStr, sx-len(countStr)*3, sy+30,
+				printColoredAt(screen, countStr, sx-len(countStr)*3, sy+40,
 					color.RGBA{255, 255, 255, 220})
 			}
 		}

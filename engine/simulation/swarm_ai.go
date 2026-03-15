@@ -58,6 +58,16 @@ func (s *Simulation) updateSwarmMode() {
 		buildSwarmEnvironment(ss, i)
 	}
 
+	// Phase 1.5: Rebuild ramp semaphore count
+	if ss.TruckToggle {
+		ss.RampBotCount = 0
+		for i := range ss.Bots {
+			if ss.Bots[i].OnRamp && ss.Bots[i].CarryingPkg < 0 {
+				ss.RampBotCount++
+			}
+		}
+	}
+
 	// Phase 2: Execute program on each bot (skip if anti-stuck breakout active)
 	if ss.Program != nil {
 		for i := range ss.Bots {
@@ -295,6 +305,10 @@ func (s *Simulation) updateSwarmMode() {
 		// Decrement stuck cooldown
 		if bot.StuckCooldown > 0 {
 			bot.StuckCooldown--
+		}
+		// Decrement ramp cooldown
+		if bot.RampCooldown > 0 {
+			bot.RampCooldown--
 		}
 
 		// Skip stuck detection if already in breakout
@@ -1373,7 +1387,7 @@ func executeSwarmAction(act swarmscript.Action, bot *swarm.SwarmBot, ss *swarm.S
 					scoreColor = [3]uint8{80, 255, 80}
 				}
 				ss.ScorePopups = append(ss.ScorePopups, swarm.ScorePopup{
-					X: st.X, Y: st.Y - 30,
+					X: st.X + 35, Y: st.Y,
 					Text: scoreText, Timer: 60, Color: scoreColor,
 				})
 				// Emit delivery event for particles
@@ -1549,6 +1563,26 @@ func executeSwarmAction(act swarmscript.Action, bot *swarm.SwarmBot, ss *swarm.S
 	case swarmscript.ActTurnToRamp:
 		if !ss.TruckToggle || ss.TruckState == nil {
 			return
+		}
+		// Ramp semaphore: limit concurrent non-carrying bots on ramp
+		if !bot.OnRamp {
+			if bot.RampCooldown > 0 {
+				// Cooldown active — turn random instead
+				bot.Angle += (ss.Rng.Float64() - 0.5) * math.Pi
+				bot.Speed = swarm.SwarmBotSpeed
+				return
+			}
+			maxBots := ss.RampMaxBots
+			if maxBots <= 0 {
+				maxBots = 3
+			}
+			if ss.RampBotCount >= maxBots {
+				// Ramp full — turn random, cooldown 60 ticks
+				bot.Angle += (ss.Rng.Float64() - 0.5) * math.Pi
+				bot.Speed = swarm.SwarmBotSpeed
+				bot.RampCooldown = 60
+				return
+			}
 		}
 		ts := ss.TruckState
 		// Target the right edge of the ramp, spread bots along Y axis
