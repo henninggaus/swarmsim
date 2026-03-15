@@ -35,6 +35,7 @@ func NewSwarmState(rng *rand.Rand, botCount int) *SwarmState {
 		"Simple Delivery", "Delivery Comm", "Delivery Roles",
 		"Simple Unload", "Coordinated Unload",
 		"Evolving Delivery", "Evolving Truck",
+		"Maze Explorer",
 	}
 	ss.PresetPrograms = []string{
 		presetAggregation, presetDispersion, presetOrbit, presetColorWave, presetFlocking,
@@ -42,6 +43,7 @@ func NewSwarmState(rng *rand.Rand, botCount int) *SwarmState {
 		presetSimpleDelivery, presetDeliveryComm, presetDeliveryRoles,
 		presetSimpleUnload, presetCoordinatedUnload,
 		presetEvolvingDelivery, presetEvolvingTruckUnload,
+		presetMazeExplorer,
 	}
 
 	// Initialize editor with default preset
@@ -474,9 +476,9 @@ func DeliveryColorName(c int) string {
 	return "?"
 }
 
-// IsDeliveryPresetIdx returns true if the preset index is a delivery program (10-12, 15).
+// IsDeliveryPresetIdx returns true if the preset index is a delivery program (10-12, 15, 17).
 func IsDeliveryPresetIdx(idx int) bool {
-	return idx >= 10 && idx <= 12 || idx == 15 // idx 15 = Evolving Delivery
+	return idx >= 10 && idx <= 12 || idx == 15 || idx == 17 // idx 15 = Evolving Delivery, 17 = Maze Explorer
 }
 
 // IsTruckPresetIdx returns true if the preset index is a truck program (13-14).
@@ -976,4 +978,22 @@ IF near_dist < $B:15 THEN TURN_FROM_NEAREST
 IF rnd < $C:20 THEN TURN_RANDOM
 IF obs_ahead == 1 THEN AVOID_OBSTACLE
 IF edge == 1 THEN TURN_RIGHT 180
+IF true THEN FWD`
+
+var presetMazeExplorer = `# Maze Explorer — right-hand wall following!
+# Enable Delivery + Maze for best results
+# 1. Separation
+IF near_dist < 12 THEN TURN_FROM_NEAREST
+IF near_dist < 12 THEN FWD
+# 2. Carrying + match: deliver
+IF carry == 1 AND match == 1 AND d_dist < 25 THEN DROP
+IF carry == 1 AND match == 1 THEN GOTO_DROPOFF
+IF carry == 1 AND match == 1 THEN FWD
+# 3. Not carrying: pickup
+IF carry == 0 AND p_dist < 20 AND has_pkg == 1 THEN PICKUP
+IF carry == 0 AND has_pkg == 1 THEN GOTO_PICKUP
+IF carry == 0 AND has_pkg == 1 THEN FWD
+# 4. Right-hand wall following
+IF wall_front == 1 THEN TURN_LEFT 90
+IF wall_right == 0 THEN TURN_RIGHT 90
 IF true THEN FWD`
