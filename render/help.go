@@ -184,6 +184,7 @@ func DrawHelpOverlay(screen *ebiten.Image, isSwarmMode bool, scrollY int) {
 		{"wall_right", "Wand innerhalb 25px rechts? (0/1)"},
 		{"wall_left", "Wand innerhalb 25px links? (0/1)"},
 		{"wall_front", "Alias fuer obs_ahead"},
+		{"pher / pheromone", "Pheromon-Intensitaet voraus (0-100)"},
 	}
 
 	// Right column: actions
@@ -216,6 +217,7 @@ func DrawHelpOverlay(screen *ebiten.Image, isSwarmMode bool, scrollY int) {
 		{"SPIRAL", "Spiralsuche (traegt Paket)"},
 		{"WALL_FOLLOW_RIGHT", "Rechte-Hand-Regel (Wand rechts)"},
 		{"WALL_FOLLOW_LEFT", "Linke-Hand-Regel (Wand links)"},
+		{"FOLLOW_PHER", "Pheromon-Gradient folgen"},
 	}
 
 	// Render both columns

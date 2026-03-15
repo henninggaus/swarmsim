@@ -57,6 +57,7 @@ const (
 	CondExploring                                // exploring (1 if lost carrier for >60 ticks)
 	CondWallRight                                // wall_right (wall within 25px to the right)
 	CondWallLeft                                 // wall_left (wall within 25px to the left)
+	CondPherAhead                                // pheromone intensity ahead (0-100)
 )
 
 // Condition represents a single boolean check in a rule.
@@ -114,6 +115,7 @@ const (
 	ActSpiralFwd                               // SPIRAL
 	ActWallFollowRight                         // WALL_FOLLOW_RIGHT (right-hand rule)
 	ActWallFollowLeft                          // WALL_FOLLOW_LEFT (left-hand rule)
+	ActFollowPheromone                         // FOLLOW_PHER (follow pheromone gradient)
 )
 
 // Action represents an action to execute when a rule matches.
@@ -221,6 +223,10 @@ var conditionNames = map[string]ConditionType{
 	"wall_right": CondWallRight,
 	"wall_left":  CondWallLeft,
 	"wall_front": CondObstacleAhead, // alias for obs_ahead
+	// Pheromone sensors
+	"pheromone":  CondPherAhead,
+	"pher":       CondPherAhead,
+	"pher_ahead": CondPherAhead,
 }
 
 // actionNames maps action name strings to (ActionType, paramCount).
@@ -272,6 +278,9 @@ var actionNames = map[string]struct {
 	// Wall-follow actions
 	"WALL_FOLLOW_RIGHT":  {ActWallFollowRight, 0},
 	"WALL_FOLLOW_LEFT":   {ActWallFollowLeft, 0},
+	// Pheromone actions
+	"FOLLOW_PHER":        {ActFollowPheromone, 0},
+	"GOTO_PHER":          {ActFollowPheromone, 0},
 	// Extra delivery alias
 	"GOTO_LED_MATCH":     {ActTurnToMatchingLED, 0},
 	// Short aliases for delivery actions (keeps preset lines under 70 chars)
@@ -354,6 +363,8 @@ var highlightConditions = map[string]bool{
 	"exploring": true, "lost": true,
 	// Wall sensors
 	"wall_right": true, "wall_left": true, "wall_front": true,
+	// Pheromone sensors
+	"pheromone": true, "pher": true, "pher_ahead": true,
 }
 
 var highlightActions = map[string]bool{
@@ -388,6 +399,8 @@ var highlightActions = map[string]bool{
 	"SPIRAL": true,
 	// Wall-follow
 	"WALL_FOLLOW_RIGHT": true, "WALL_FOLLOW_LEFT": true,
+	// Pheromone
+	"FOLLOW_PHER": true, "GOTO_PHER": true,
 }
 
 // --- Reverse mapping functions (for block editor / serialization) ---
@@ -477,6 +490,8 @@ func ConditionTypeName(ct ConditionType) string {
 		return "wall_right"
 	case CondWallLeft:
 		return "wall_left"
+	case CondPherAhead:
+		return "pher"
 	}
 	return "unknown"
 }
@@ -579,6 +594,8 @@ func ActionTypeName(at ActionType) string {
 		return "WALL_FOLLOW_RIGHT"
 	case ActWallFollowLeft:
 		return "WALL_FOLLOW_LEFT"
+	case ActFollowPheromone:
+		return "FOLLOW_PHER"
 	}
 	return "UNKNOWN"
 }
@@ -604,7 +621,7 @@ func ActionParamCountByName(name string) int {
 // SensorGrouped returns sensor names organized in groups for dropdown display.
 var SensorGrouped = [][]string{
 	{"-- Nachbarn --", "neighbors", "near_dist", "leader", "follower", "chain_len"},
-	{"-- Navigation --", "edge", "obs_ahead", "obs_dist", "light", "wall_right", "wall_left", "wall_front"},
+	{"-- Navigation --", "edge", "obs_ahead", "obs_dist", "light", "wall_right", "wall_left", "wall_front", "pher"},
 	{"-- Zufall --", "rnd", "true"},
 	{"-- Delivery --", "carry", "match", "has_pkg", "p_dist", "d_dist", "pickup_color", "dropoff_color", "heard_beacon", "beacon_dist", "exploring"},
 	{"-- Kommunikation --", "msg", "heard_pickup", "heard_dropoff", "led_dist"},
@@ -616,7 +633,7 @@ var SensorGrouped = [][]string{
 // ActionGrouped returns action names organized in groups for dropdown display.
 var ActionGrouped = [][]string{
 	{"-- Bewegung --", "FWD", "FWD_SLOW", "STOP", "TURN_LEFT", "TURN_RIGHT", "TURN_RANDOM"},
-	{"-- Navigation --", "TURN_TO_NEAREST", "TURN_FROM_NEAREST", "TURN_TO_CENTER", "TURN_TO_LIGHT", "AVOID_OBSTACLE", "WALL_FOLLOW_RIGHT", "WALL_FOLLOW_LEFT"},
+	{"-- Navigation --", "TURN_TO_NEAREST", "TURN_FROM_NEAREST", "TURN_TO_CENTER", "TURN_TO_LIGHT", "AVOID_OBSTACLE", "WALL_FOLLOW_RIGHT", "WALL_FOLLOW_LEFT", "FOLLOW_PHER"},
 	{"-- Delivery --", "PICKUP", "DROP", "GOTO_PICKUP", "GOTO_DROPOFF", "GOTO_LED", "GOTO_BEACON", "SPIRAL"},
 	{"-- Kommunikation --", "SEND_MESSAGE", "SEND_PICKUP", "SEND_DROPOFF", "GOTO_HEARD_PICKUP", "GOTO_HEARD_DROPOFF"},
 	{"-- LED --", "SET_LED", "LED_PICKUP", "LED_DROPOFF", "COPY_LED"},

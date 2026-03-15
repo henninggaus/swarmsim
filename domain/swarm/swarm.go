@@ -343,6 +343,13 @@ func GenerateDeliveryStations(ss *SwarmState) {
 	ss.Packages = nil
 	ss.DeliveryStats = DeliveryStats{}
 
+	// Initialize pheromone grid if not already present
+	if ss.PherGrid == nil {
+		ss.PherGrid = NewSwarmPheromoneGrid(ss.ArenaW, ss.ArenaH)
+	} else {
+		ss.PherGrid.Clear()
+	}
+
 	colors := []int{1, 2, 3, 4} // red, blue, yellow, green
 	margin := 60.0
 	stationRadius := 25.0

@@ -81,6 +81,7 @@ type SwarmBot struct {
 	WallRight     bool    // wall within 25px to the right of heading
 	WallLeft      bool    // wall within 25px to the left of heading
 	NearestIdx    int     // index of nearest neighbor (-1 if none)
+	PherAhead     float64 // pheromone intensity 20px ahead (0.0-1.0)
 
 	// Anti-stuck tracking
 	StuckTicks      int     // how many ticks bot barely moved
@@ -342,6 +343,9 @@ type SwarmState struct {
 	AvgFitness     float64
 	UsedParams     [26]bool // which $A-$Z are used in current program
 	ShowGenomeViz  bool     // V key toggle: show genome visualization overlay
+
+	// Pheromone system (carrying bots leave trails)
+	PherGrid *SwarmPheromoneGrid
 
 	CollisionCount  int // obstacle collisions this tick (reset per tick)
 	ResetFlashTimer int // counts down from 30 for "RESET" flash

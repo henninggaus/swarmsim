@@ -188,6 +188,16 @@ func (s *Simulation) updateSwarmMode() {
 		}
 	}
 
+	// Phase 4.55: Pheromone trails — carrying bots deposit, grid decays
+	if ss.PherGrid != nil {
+		for i := range ss.Bots {
+			if ss.Bots[i].CarryingPkg >= 0 {
+				ss.PherGrid.Deposit(ss.Bots[i].X, ss.Bots[i].Y, 0.3)
+			}
+		}
+		ss.PherGrid.Update()
+	}
+
 	// Phase 4.6: Truck system updates
 	if ss.TruckToggle && ss.TruckState != nil {
 		swarm.UpdateSwarmTruck(ss)
@@ -691,6 +701,14 @@ func buildSwarmEnvironment(ss *swarm.SwarmState, i int) {
 			}
 		}
 	}
+
+	// Pheromone sensor: sample 20px ahead
+	bot.PherAhead = 0
+	if ss.PherGrid != nil {
+		px := bot.X + math.Cos(bot.Angle)*20
+		py := bot.Y + math.Sin(bot.Angle)*20
+		bot.PherAhead = ss.PherGrid.Get(px, py)
+	}
 }
 
 // pointInRect checks if a point is inside an obstacle rect.
@@ -958,6 +976,9 @@ func evaluateSwarmCondition(cond swarmscript.Condition, bot *swarm.SwarmBot, sna
 			v = 1
 		}
 		return compareInt(v, cond.Op, cv)
+
+	case swarmscript.CondPherAhead:
+		return compareInt(int(bot.PherAhead*100), cond.Op, cv)
 	}
 
 	return false
@@ -1564,6 +1585,16 @@ func executeSwarmAction(act swarmscript.Action, bot *swarm.SwarmBot, ss *swarm.S
 			bot.Angle += math.Pi / 2 // wall in front → turn right 90°
 		} else if !bot.WallLeft {
 			bot.Angle -= math.Pi / 2 // lost wall on left → turn left 90° to refind
+		}
+		bot.Speed = swarm.SwarmBotSpeed
+
+	case swarmscript.ActFollowPheromone:
+		// Follow pheromone gradient uphill
+		if ss.PherGrid != nil {
+			gx, gy := ss.PherGrid.Gradient(bot.X, bot.Y)
+			if gx != 0 || gy != 0 {
+				bot.Angle = math.Atan2(gy, gx)
+			}
 		}
 		bot.Speed = swarm.SwarmBotSpeed
 	}
