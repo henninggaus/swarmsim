@@ -65,6 +65,13 @@ func (s *Simulation) updateSwarmMode() {
 		if bot.AntiStuckTimer > 0 {
 			continue // already in breakout
 		}
+		// Ramp anti-clustering: lower threshold (>3) and force rightward escape
+		if bot.OnRamp && bot.CloseNeighbors > 3 {
+			// Force escape from ramp: angle toward arena center (rightward + slight random)
+			bot.Angle = (ss.Rng.Float64() - 0.5) * 1.0 // roughly rightward (0 = east)
+			bot.Speed = swarm.SwarmBotSpeed
+			continue
+		}
 		if bot.CloseNeighbors > 4 && bot.NearestIdx >= 0 {
 			// Force turn away from nearest + full speed
 			other := &ss.Bots[bot.NearestIdx]
@@ -319,7 +326,11 @@ func buildSwarmEnvironment(ss *swarm.SwarmState, i int) {
 			continue
 		}
 		count++
-		if dist < 30 {
+		closeRange := 30.0
+		if bot.OnRamp {
+			closeRange = 40.0 // wider detection on ramp to prevent clustering
+		}
+		if dist < closeRange {
 			bot.CloseNeighbors++
 		}
 		sumX += dx
@@ -1674,12 +1685,18 @@ func applyHardSeparation(ss *swarm.SwarmState) {
 // Unlike hard separation (which resolves overlap), this creates an active
 // force field that prevents clustering before contact.
 func applyRepulsionForce(ss *swarm.SwarmState) {
-	const repulsionRange = 30.0
+	const baseRepulsionRange = 30.0
+	const rampRepulsionRange = 40.0
 	const repulsionStrength = 0.15
 
 	for i := range ss.Bots {
 		a := &ss.Bots[i]
-		nearIDs := ss.Hash.Query(a.X, a.Y, repulsionRange+1)
+		// Use wider repulsion range on ramp to prevent clustering
+		repRange := baseRepulsionRange
+		if a.OnRamp {
+			repRange = rampRepulsionRange
+		}
+		nearIDs := ss.Hash.Query(a.X, a.Y, repRange+1)
 		for _, j := range nearIDs {
 			if j <= i || j >= len(ss.Bots) {
 				continue
@@ -1692,11 +1709,16 @@ func applyRepulsionForce(ss *swarm.SwarmState) {
 			dx := a.X - b.X
 			dy := a.Y - b.Y
 			dist := math.Sqrt(dx*dx + dy*dy)
-			if dist >= repulsionRange || dist < 0.001 {
+			// Use wider range if either bot is on ramp
+			effectiveRange := baseRepulsionRange
+			if a.OnRamp || b.OnRamp {
+				effectiveRange = rampRepulsionRange
+			}
+			if dist >= effectiveRange || dist < 0.001 {
 				continue
 			}
-			// Force = (30 - dist) * 0.15, applied symmetrically
-			force := (repulsionRange - dist) * repulsionStrength
+			// Force = (range - dist) * strength, applied symmetrically
+			force := (effectiveRange - dist) * repulsionStrength
 			nx := dx / dist
 			ny := dy / dist
 			halfForce := force * 0.5

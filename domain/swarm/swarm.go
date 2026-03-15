@@ -474,9 +474,9 @@ func DeliveryColorName(c int) string {
 	return "?"
 }
 
-// IsDeliveryPresetIdx returns true if the preset index is a delivery program (10-12).
+// IsDeliveryPresetIdx returns true if the preset index is a delivery program (10-12, 15).
 func IsDeliveryPresetIdx(idx int) bool {
-	return idx >= 10 && idx <= 12
+	return idx >= 10 && idx <= 12 || idx == 15 // idx 15 = Evolving Delivery
 }
 
 // IsTruckPresetIdx returns true if the preset index is a truck program (13-14).
@@ -949,7 +949,7 @@ IF near_dist < $D:20 THEN TURN_FROM_NEAREST
 IF rnd < $E:30 THEN TURN_RANDOM
 IF obs_ahead == 1 THEN AVOID_OBSTACLE
 IF edge == 1 THEN TURN_RIGHT 180
-THEN FWD`
+IF true THEN FWD`
 
 var presetEvolvingTruckUnload = `# Evolving Truck Unload — Trucks + Evolution!
 # 1. Carrying + see dropoff: deliver
@@ -970,4 +970,4 @@ IF near_dist < $B:15 THEN TURN_FROM_NEAREST
 IF rnd < $C:20 THEN TURN_RANDOM
 IF obs_ahead == 1 THEN AVOID_OBSTACLE
 IF edge == 1 THEN TURN_RIGHT 180
-THEN FWD`
+IF true THEN FWD`
