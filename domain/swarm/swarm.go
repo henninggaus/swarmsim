@@ -7,6 +7,7 @@ import (
 	"strings"
 	"swarmsim/domain/physics"
 	"swarmsim/engine/swarmscript"
+	"swarmsim/logger"
 )
 
 // NewSwarmState creates and initializes a fresh swarm scenario.
@@ -484,7 +485,7 @@ func IsTruckPresetIdx(idx int) bool {
 // NewSwarmTruckState creates a fresh truck unloading round.
 func NewSwarmTruckState(rng *rand.Rand) *SwarmTruckState {
 	ts := &SwarmTruckState{
-		TrucksPerRound: 3,
+		TrucksPerRound: 999, // effectively infinite trucks per round
 		RoundNum:       1,
 		TruckNum:       0,
 		RampX:          SwarmRampX,
@@ -557,23 +558,24 @@ func UpdateSwarmTruck(ss *SwarmState) {
 		}
 		if allPicked {
 			t.Phase = TruckComplete
-			t.PhaseTimer = 60
+			t.PhaseTimer = 20 // brief celebration before departure
 		}
 
 	case TruckComplete:
 		t.PhaseTimer--
 		if t.PhaseTimer <= 0 {
 			t.Phase = TruckDrivingOut
+			logger.Info("TRUCK", "Truck departing (all %d packages picked)", len(t.Packages))
 		}
 
 	case TruckDrivingOut:
-		t.X += 3
-		if t.X > ss.ArenaW+100 {
+		t.X -= 3 // drive back LEFT (the way it came)
+		if t.X < -120 {
 			if ts.TruckNum >= ts.TrucksPerRound {
 				t.Phase = TruckRoundDone
 			} else {
 				t.Phase = TruckWaiting
-				t.PhaseTimer = 90
+				t.PhaseTimer = 1 // next truck arrives immediately
 			}
 		}
 
@@ -844,64 +846,48 @@ IF obs_ahead == 1 THEN AVOID_OBSTACLE
 IF edge == 1 THEN TURN_RIGHT 180`
 
 var presetSimpleUnload = `# Simple Unload — enable Trucks!
-# Go to ramp, pick up from truck, deliver to dropoff
-# --- Explore (lowest priority) ---
-IF rnd < 5 THEN TURN_RANDOM
-IF true THEN FWD
-# --- Separation (gentle) ---
-IF near_dist < 12 THEN TURN_FROM_NEAREST
-IF near_dist < 12 THEN FWD_SLOW
-# --- LED gradient ---
-IF d_dist < 200 THEN LED_DROPOFF
-IF d_dist > 200 THEN COPY_LED
-# --- Carrying: deliver to dropoff ---
+# Bots wait at ramp edge, crane transfers packages
+# --- Not carrying: wait at ramp for truck ---
+IF carry == 0 AND on_ramp == 1 AND truck_here == 1 THEN PICKUP
+IF carry == 0 THEN GOTO_RAMP
+IF carry == 0 THEN FWD
+# --- Carrying: deliver to matching dropoff ---
 IF carry == 1 AND match == 1 AND d_dist < 25 THEN DROP
 IF carry == 1 AND match == 1 THEN GOTO_DROPOFF
 IF carry == 1 AND match == 1 THEN FWD
+IF carry == 1 AND d_dist < 200 THEN LED_DROPOFF
 IF carry == 1 AND led_dist < 200 THEN GOTO_LED
 IF carry == 1 AND led_dist < 200 THEN FWD
+IF carry == 1 THEN SET_LED 255 99 0
+IF carry == 1 AND rnd < 8 THEN TURN_RANDOM
 IF carry == 1 THEN FWD
-# --- Not carrying: go to ramp and pick up ---
-IF carry == 0 AND on_ramp == 1 AND truck_here == 1 THEN GOTO_TRUCK_PKG
-IF carry == 0 AND on_ramp == 1 AND truck_here == 1 THEN FWD
-IF carry == 0 AND on_ramp == 1 THEN PICKUP
-IF carry == 0 AND truck_pkg > 0 THEN GOTO_RAMP
-IF carry == 0 AND truck_pkg > 0 THEN FWD
-IF carry == 0 THEN GOTO_RAMP
-IF carry == 0 THEN FWD
+# --- Separation ---
+IF near_dist < 12 THEN TURN_FROM_NEAREST
 # --- Navigation LAST ---
 IF obs_ahead == 1 THEN AVOID_OBSTACLE
 IF edge == 1 THEN TURN_RIGHT 180`
 
 var presetCoordinatedUnload = `# Coordinated Unload — enable Trucks!
-# Messages + LED + truck sensors
-# --- Explore (lowest) ---
-IF rnd < 4 THEN TURN_RANDOM
-IF true THEN FWD
-# --- Separation (gentle) ---
-IF near_dist < 12 THEN TURN_FROM_NEAREST
-# --- LED gradient + broadcast ---
-IF d_dist < 200 THEN LED_DROPOFF
-IF carry == 1 AND d_dist > 200 THEN COPY_LED
-IF d_dist < 200 THEN SEND_DROPOFF 1
+# Messages + LED + crane pickup at ramp
+# --- Not carrying: wait at ramp for truck ---
+IF carry == 0 AND on_ramp == 1 AND truck_here == 1 THEN PICKUP
+IF carry == 0 THEN GOTO_RAMP
+IF carry == 0 THEN FWD
 # --- Carrying: deliver ---
 IF carry == 1 AND match == 1 AND d_dist < 25 THEN DROP
 IF carry == 1 AND match == 1 THEN GOTO_DROPOFF
 IF carry == 1 AND match == 1 THEN FWD
+IF carry == 1 AND d_dist < 200 THEN LED_DROPOFF
+IF carry == 1 AND d_dist < 200 THEN SEND_DROPOFF 1
 IF carry == 1 AND led_dist < 200 THEN GOTO_LED
 IF carry == 1 AND led_dist < 200 THEN FWD
 IF carry == 1 AND heard_dropoff > 0 THEN GOTO_HEARD_DROPOFF
 IF carry == 1 AND heard_dropoff > 0 THEN FWD
 IF carry == 1 THEN SET_LED 255 99 0
+IF carry == 1 AND rnd < 6 THEN TURN_RANDOM
 IF carry == 1 THEN FWD
-# --- Not carrying: go to ramp ---
-IF carry == 0 AND on_ramp == 1 AND truck_here == 1 AND nearest_truck_pkg < 40 THEN GOTO_TRUCK_PKG
-IF carry == 0 AND on_ramp == 1 AND truck_here == 1 THEN FWD
-IF carry == 0 AND on_ramp == 1 THEN PICKUP
-IF carry == 0 AND truck_pkg > 0 THEN GOTO_RAMP
-IF carry == 0 AND truck_pkg > 0 THEN FWD
-IF carry == 0 THEN GOTO_RAMP
-IF carry == 0 THEN FWD
+# --- Separation ---
+IF near_dist < 12 THEN TURN_FROM_NEAREST
 # --- Navigation LAST ---
 IF obs_ahead == 1 THEN AVOID_OBSTACLE
 IF edge == 1 THEN TURN_RIGHT 180`

@@ -52,11 +52,11 @@ type Game struct {
 	welcomeReady bool // set after first frame (init bots needs screen size)
 
 	// Help overlay
-	showHelp   bool
+	showHelp    bool
 	helpScrollY int
 
 	// In-game console
-	showConsole    bool
+	showConsole      bool
 	consoleFilterBot int // -1 = all logs, >= 0 = filter for this bot
 
 	// Classic Mode scenario dropdown
@@ -640,18 +640,18 @@ func (g *Game) handleSwarmInput() {
 		logger.Info("SWARM", "Routes: %v", ss.ShowRoutes)
 	}
 
-	// N key: new truck round (when editor not focused and truck mode active)
+	// N key: force new truck round (when editor not focused and truck mode active)
 	if inpututil.IsKeyJustPressed(ebiten.KeyN) && !ed.Focused && !ss.BotCountEdit {
 		if ss.TruckToggle && ss.TruckState != nil {
-			if ss.TruckState.CurrentTruck != nil && ss.TruckState.CurrentTruck.Phase == swarm.TruckRoundDone {
-				ss.TruckState = swarm.NewSwarmTruckState(ss.Rng)
-				ss.TruckState.RoundNum++
-				ss.ResetBots()
-				if ss.DeliveryOn {
-					swarm.GenerateDeliveryStations(ss)
-				}
-				logger.Info("SWARM", "New truck round %d", ss.TruckState.RoundNum)
+			// Always allow N to restart trucks (not just in RoundDone)
+			oldRound := ss.TruckState.RoundNum
+			ss.TruckState = swarm.NewSwarmTruckState(ss.Rng)
+			ss.TruckState.RoundNum = oldRound + 1
+			ss.ResetBots()
+			if ss.DeliveryOn {
+				swarm.GenerateDeliveryStations(ss)
 			}
+			logger.Info("SWARM", "New truck round %d", ss.TruckState.RoundNum)
 		}
 	}
 
@@ -715,6 +715,10 @@ func (g *Game) handleSwarmClick(mx, my int) {
 
 	case "reset":
 		ss.ResetBots()
+		// Re-create truck state so a fresh truck arrives immediately
+		if ss.TruckToggle {
+			ss.TruckState = swarm.NewSwarmTruckState(ss.Rng)
+		}
 		logger.Info("SWARM", "RESET — %d bots scattered", ss.BotCount)
 		ss.DropdownOpen = false
 		ss.BotCountEdit = false
@@ -906,11 +910,11 @@ func (g *Game) handleSwarmClick(mx, my int) {
 			if !ss.DeliveryOn {
 				ss.DeliveryOn = true
 			}
-			// Force maze on (regenerate to exempt ramp area)
-			ss.MazeOn = true
+			// Maze OFF when trucks active (bots + trucks use open arena)
+			ss.MazeOn = false
+			ss.MazeWalls = nil
 			ss.ObstaclesOn = false
 			ss.Obstacles = nil
-			swarm.GenerateSwarmMaze(ss)
 			// Generate stations and truck state
 			swarm.GenerateDeliveryStations(ss)
 			ss.TruckState = swarm.NewSwarmTruckState(ss.Rng)
@@ -1007,7 +1011,7 @@ func (g *Game) handleSwarmEditorKeys() {
 			ed.Lines[ed.CursorLine] = line[:ed.CursorCol-1] + line[ed.CursorCol:]
 			ed.CursorCol--
 			ss.ProgramName = "Custom"
-		ss.IsDeliveryProgram = false
+			ss.IsDeliveryProgram = false
 		} else if ed.CursorLine > 0 {
 			// Merge with previous line
 			prevLine := ed.Lines[ed.CursorLine-1]
@@ -1018,7 +1022,7 @@ func (g *Game) handleSwarmEditorKeys() {
 			ed.CursorCol = len(prevLine)
 			g.editorEnsureCursorVisible()
 			ss.ProgramName = "Custom"
-		ss.IsDeliveryProgram = false
+			ss.IsDeliveryProgram = false
 		}
 	}
 
@@ -1028,14 +1032,14 @@ func (g *Game) handleSwarmEditorKeys() {
 		if ed.CursorCol < len(line) {
 			ed.Lines[ed.CursorLine] = line[:ed.CursorCol] + line[ed.CursorCol+1:]
 			ss.ProgramName = "Custom"
-		ss.IsDeliveryProgram = false
+			ss.IsDeliveryProgram = false
 		} else if ed.CursorLine < len(ed.Lines)-1 {
 			// Merge with next line
 			nextLine := ed.Lines[ed.CursorLine+1]
 			ed.Lines[ed.CursorLine] = line + nextLine
 			ed.Lines = append(ed.Lines[:ed.CursorLine+1], ed.Lines[ed.CursorLine+2:]...)
 			ss.ProgramName = "Custom"
-		ss.IsDeliveryProgram = false
+			ss.IsDeliveryProgram = false
 		}
 	}
 
@@ -1217,6 +1221,10 @@ func (g *Game) autoReset(reason string) {
 	if ss.DeliveryOn {
 		swarm.GenerateDeliveryStations(ss)
 	}
+	// Re-create truck state so a fresh truck arrives immediately
+	if ss.TruckToggle {
+		ss.TruckState = swarm.NewSwarmTruckState(ss.Rng)
+	}
 	ss.ResetFlashTimer = 30
 	logger.Info("SWARM", "Auto-reset: %s", reason)
 }
@@ -1248,12 +1256,18 @@ func (g *Game) loadSwarmPreset(idx int) {
 			ss.TruckToggle = false
 			ss.TruckState = nil
 		}
-		// Force delivery ON, maze ON, obstacles OFF
+		// Force delivery ON, obstacles OFF
 		ss.DeliveryOn = true
-		ss.MazeOn = true
 		ss.ObstaclesOn = false
 		ss.Obstacles = nil
-		swarm.GenerateSwarmMaze(ss)
+		// Truck presets: maze OFF (open arena); delivery presets: maze ON
+		if swarm.IsTruckPresetIdx(idx) {
+			ss.MazeOn = false
+			ss.MazeWalls = nil
+		} else {
+			ss.MazeOn = true
+			swarm.GenerateSwarmMaze(ss)
+		}
 		swarm.GenerateDeliveryStations(ss)
 		for i := range ss.Bots {
 			ss.Bots[i].CarryingPkg = -1

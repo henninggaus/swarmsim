@@ -487,9 +487,11 @@ func buildSwarmEnvironment(ss *swarm.SwarmState, i int) {
 
 	if ss.TruckToggle && ss.TruckState != nil {
 		ts := ss.TruckState
-		// Check if bot is on ramp
-		if bot.X >= ts.RampX && bot.X <= ts.RampX+ts.RampW &&
-			bot.Y >= ts.RampY && bot.Y <= ts.RampY+ts.RampH {
+		// OnRamp = bot is near the right edge of the ramp (ready for crane pickup)
+		// Bots don't enter the ramp; they wait at the edge
+		rampEdgeX := ts.RampX + ts.RampW // right edge (200)
+		if bot.Y >= ts.RampY && bot.Y <= ts.RampY+ts.RampH &&
+			bot.X >= rampEdgeX && bot.X <= rampEdgeX+50 {
 			bot.OnRamp = true
 		}
 		if ts.CurrentTruck != nil {
@@ -1018,35 +1020,38 @@ func executeSwarmAction(act swarmscript.Action, bot *swarm.SwarmBot, ss *swarm.S
 		if !ss.DeliveryOn || bot.CarryingPkg >= 0 {
 			return
 		}
-		// Truck packages: pick up from truck ramp
+		// Truck packages: crane-based pickup at ramp edge
+		// Bot waits at the ramp edge (OnRamp=true), a crane transfers the package
 		if ss.TruckToggle && ss.TruckState != nil && bot.OnRamp &&
 			ss.TruckState.CurrentTruck != nil && ss.TruckState.CurrentTruck.Phase == swarm.TruckParked {
 			t := ss.TruckState.CurrentTruck
-			if bot.NearestTruckPkgIdx >= 0 && bot.NearestTruckPkgDist < 40 {
-				tpkg := &t.Packages[bot.NearestTruckPkgIdx]
-				if !tpkg.PickedUp {
-					tpkg.PickedUp = true
-					ss.TruckState.TotalPkgs++
-					// Convert to DeliveryPackage
-					dpkg := swarm.DeliveryPackage{
-						Color:      tpkg.Color,
-						CarriedBy:  botIdx,
-						X:          bot.X,
-						Y:          bot.Y,
-						Active:     true,
-						PickupTick: ss.Tick,
-					}
-					ss.Packages = append(ss.Packages, dpkg)
-					bot.CarryingPkg = len(ss.Packages) - 1
-					bot.Stats.TotalPickups++
-					// Emit pickup event for particles
-					ss.DeliveryEvents = append(ss.DeliveryEvents, swarm.SwarmDeliveryEvent{
-						X: bot.X, Y: bot.Y,
-						Color: tpkg.Color, IsPickup: true,
-					})
-					logger.InfoBot(botIdx, "TRUCK", "Bot #%d picked up %s from truck", botIdx, swarm.DeliveryColorName(tpkg.Color))
-					return
+			// Find first unpicked package (crane handles transfer — no distance check)
+			for tpi := range t.Packages {
+				tpkg := &t.Packages[tpi]
+				if tpkg.PickedUp {
+					continue
 				}
+				tpkg.PickedUp = true
+				ss.TruckState.TotalPkgs++
+				// Convert to DeliveryPackage
+				dpkg := swarm.DeliveryPackage{
+					Color:      tpkg.Color,
+					CarriedBy:  botIdx,
+					X:          bot.X,
+					Y:          bot.Y,
+					Active:     true,
+					PickupTick: ss.Tick,
+				}
+				ss.Packages = append(ss.Packages, dpkg)
+				bot.CarryingPkg = len(ss.Packages) - 1
+				bot.Stats.TotalPickups++
+				// Emit pickup event for particles (at ramp edge where bot is)
+				ss.DeliveryEvents = append(ss.DeliveryEvents, swarm.SwarmDeliveryEvent{
+					X: bot.X, Y: bot.Y,
+					Color: tpkg.Color, IsPickup: true,
+				})
+				logger.InfoBot(botIdx, "TRUCK", "Bot #%d crane-pickup %s from truck", botIdx, swarm.DeliveryColorName(tpkg.Color))
+				return
 			}
 		}
 		// Check ground packages first (closer interaction)
@@ -1291,7 +1296,8 @@ func executeSwarmAction(act swarmscript.Action, bot *swarm.SwarmBot, ss *swarm.S
 			return
 		}
 		ts := ss.TruckState
-		cx := ts.RampX + ts.RampW/2
+		// Target the right edge of the ramp (bots wait outside, not inside)
+		cx := ts.RampX + ts.RampW + 20 // just outside ramp right edge
 		cy := ts.RampY + ts.RampH/2
 		dx := cx - bot.X
 		dy := cy - bot.Y
@@ -1402,6 +1408,18 @@ func applySwarmPhysics(ss *swarm.SwarmState, i int) {
 			}
 			bot.X = newX
 			bot.Y = newY
+		}
+	}
+
+	// Ramp barrier — prevent bots from entering ramp zone (trucks only)
+	if ss.TruckToggle && ss.TruckState != nil {
+		rampRight := swarm.SwarmRampX + swarm.SwarmRampW  // right edge of ramp (200)
+		rampTop := swarm.SwarmRampY                       // 200
+		rampBottom := swarm.SwarmRampY + swarm.SwarmRampH // 550
+		br := swarm.SwarmBotRadius
+		// If bot circle overlaps ramp rectangle, push it out to the right
+		if bot.X-br < rampRight && bot.Y+br > rampTop && bot.Y-br < rampBottom {
+			bot.X = rampRight + br
 		}
 	}
 
