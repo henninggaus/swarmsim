@@ -63,9 +63,15 @@ func (r *Renderer) DrawSwarmMode(screen *ebiten.Image, s *simulation.Simulation,
 		vector.StrokeLine(a, ox+ow, oy, ox+ow, oy+oh, 2, ColorSwarmObstacleLo, false)
 	}
 
-	// Maze walls (thin colored rects)
+	// Maze walls (thin colored rects with bright border)
 	for _, wall := range ss.MazeWalls {
-		vector.DrawFilledRect(a, float32(wall.X), float32(wall.Y), float32(wall.W), float32(wall.H), ColorSwarmMazeWall, false)
+		wx, wy, ww, wh := float32(wall.X), float32(wall.Y), float32(wall.W), float32(wall.H)
+		vector.DrawFilledRect(a, wx, wy, ww, wh, ColorSwarmMazeWall, false)
+		// 1px bright border for better visibility
+		vector.StrokeLine(a, wx, wy, wx+ww, wy, 1, ColorSwarmMazeBorder, false)
+		vector.StrokeLine(a, wx, wy, wx, wy+wh, 1, ColorSwarmMazeBorder, false)
+		vector.StrokeLine(a, wx, wy+wh, wx+ww, wy+wh, 1, ColorSwarmMazeBorder, false)
+		vector.StrokeLine(a, wx+ww, wy, wx+ww, wy+wh, 1, ColorSwarmMazeBorder, false)
 	}
 
 	// Light source (concentric circles with decreasing alpha)
@@ -136,6 +142,26 @@ func (r *Renderer) DrawSwarmMode(screen *ebiten.Image, s *simulation.Simulation,
 		}
 	}
 
+	// Pheromone overlay (green dots at cells with intensity > 0.05)
+	if ss.ShowTrails && ss.PherGrid != nil {
+		g := ss.PherGrid
+		for r := 0; r < g.Rows; r++ {
+			for c := 0; c < g.Cols; c++ {
+				v := g.Data[r*g.Cols+c]
+				if v > 0.05 {
+					cx := float32(float64(c)*g.CellSize + g.CellSize/2)
+					cy := float32(float64(r)*g.CellSize + g.CellSize/2)
+					alpha := uint8(v * 180)
+					if alpha > 180 {
+						alpha = 180
+					}
+					pherCol := color.RGBA{0, 255, 100, alpha}
+					vector.DrawFilledCircle(a, cx, cy, 3, pherCol, false)
+				}
+			}
+		}
+	}
+
 	// Follow lines
 	for i := range ss.Bots {
 		bot := &ss.Bots[i]
@@ -153,7 +179,12 @@ func (r *Renderer) DrawSwarmMode(screen *ebiten.Image, s *simulation.Simulation,
 		by := float32(bot.Y)
 		radius := float32(swarm.SwarmBotRadius)
 
-		botCol := color.RGBA{bot.LEDColor[0], bot.LEDColor[1], bot.LEDColor[2], 255}
+		// Boost minimum LED brightness so dark bots are still visible
+		r, g, b := bot.LEDColor[0], bot.LEDColor[1], bot.LEDColor[2]
+		if r < 60 && g < 60 && b < 60 {
+			r, g, b = 80, 80, 80
+		}
+		botCol := color.RGBA{r, g, b, 255}
 		vector.DrawFilledCircle(a, bx, by, radius, botCol, false)
 
 		dirLen := radius * 1.5
