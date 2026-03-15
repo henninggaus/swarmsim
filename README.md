@@ -1,341 +1,353 @@
-# SwarmSim — Schwarm-Robotik-Simulator
+# SwarmSim — Swarm Robotics Simulator
 
 **[Live Demo (WebAssembly)](https://henning-heisenberg.github.io/swarmsim/)**
 
-Ein 2D-Schwarm-Robotik-Simulator mit eigener Skriptsprache (SwarmScript), genetischem Algorithmus und dezentraler Multi-Agent-Logistik. Gebaut in Go mit [Ebiten](https://ebitengine.org/).
+> A 2D swarm robotics simulator with its own scripting language (SwarmScript),
+> genetic programming, multiplayer arenas, and real-time analytics.
+> Built in Go with [Ebiten](https://ebitengine.org/).
 
-## Features
+## Highlights
 
-- **7 Simulationsmodi** (F1-F7): Foraging, Labyrinth, Energy Crisis, Sandbox, Evolution, LKW-Entladung, Swarm-Editor
-- **SwarmScript**: Eigene DSL zum Programmieren von Bot-Verhalten mit 30+ Sensoren und 25+ Aktionen
-- **Dezentrales Delivery-System**: Farbcodierte Pickup/Dropoff-Stationen mit emergenter LED-Gradient-Navigation
-- **Genetische Programmierung (GP)**: Jeder Bot evoliert sein eigenes SwarmScript-Programm mit Crossover und Mutation
-- **Multiplayer / Teams**: Zwei Teams (A/B) treten gegeneinander an mit Scoreboard und Challenge-Modus
-- **Statistik-Dashboard**: Echtzeit-Graphen, Heatmap, Bot-Ranking und Event-Ticker (D-Taste)
-- **Genetischer Algorithmus**: 7-Gen-Genom mit Crossover, Mutation und Fitness-Tracking
-- **Pheromon-System** (Ant Colony Optimization): Search, Found-Resource und Danger Pheromone
-- **LKW-Entlade-Szenario**: Kooperatives Heben, Sortierzonen, Timer-basierte Bewertung
-- **Minimap**, **Screenshot** (PNG) und **GIF-Recording**
-- **WebAssembly-Build** zum Spielen im Browser
+- **Programmable Bots** — Write behavior rules in SwarmScript, a domain-specific language with 30+ sensors and 25+ actions
+- **Genetic Programming** — Programs evolve themselves through crossover and mutation
+- **Multiplayer** — Blue vs Red team competitions with shared arena
+- **Real-time Analytics** — Heatmaps, fitness graphs, delivery rates, bot rankings
+- **Logistics Simulation** — Truck unloading, package delivery, color-coded stations
+- **Visual Block Editor** — Click-based programming without typing
+- **Interactive Tutorial** — 15-step guided tour on first launch (F3)
+- **WebAssembly** — Runs in the browser, no install needed
 
-## Screenshots
-
-![Delivery Mode](screenshots/delivery.png)
-![Snake Formation](screenshots/snake.png)
-![Truck Mode](screenshots/truck.png)
-![SwarmScript Editor](screenshots/editor.png)
-
-## Installation
+## Quick Start
 
 ```bash
-# Clone
 git clone https://github.com/henning-heisenberg/swarmsim.git
 cd swarmsim
-
-# Build
-make build          # Linux/Mac
-make windows        # Windows .exe
-make wasm           # WebAssembly
-
-# Oder direkt
-go build -o swarmsim .
-
-# Run
-./swarmsim
+go run .
 ```
 
-### Voraussetzungen
+Press **F2** for Swarm Lab, select **"Simple Delivery"** from the dropdown, click **DEPLOY**.
+Press **H** for the full keyboard reference.
 
-- Go 1.21+ (getestet mit Go 1.25)
-- Keine CGO-Abhängigkeiten
+### Requirements
 
-## Szenarien
+- Go 1.21+ (tested with Go 1.25)
+- No CGO dependencies
 
-| Taste | Szenario | Beschreibung |
-|-------|----------|--------------|
-| **F1** | Foraging Paradise | 2000x1500 Arena, 50 respawnende Ressourcen, Fokus auf Schwarm-Sammeln |
-| **F2** | Labyrinth | Labyrinth-Generator mit Sackgassen-Ressourcen, Tanks räumen Hindernisse |
-| **F3** | Energy Crisis | 2x Energieverbrauch, langsamer Respawn, Healer-Strategie entscheidend |
-| **F4** | Sandbox | Standardkonfiguration, freies Experimentieren |
-| **F5** | Evolution Arena | Schnelle Generationen (500 Ticks), automatische Evolution |
-| **F6** | LKW-Entladung | Truck-Modus mit Paketen, Sortierzonen und Timer |
-| **F7** | Programmable Swarm | SwarmScript-Editor mit 800x800 Arena und bis zu 500 Bots |
+## SwarmScript Language
 
-## Bot-Typen
+SwarmScript is a rule-based DSL for programming swarm behavior.
+Every line is a rule: `IF <condition> [AND ...] THEN <action>`.
+All matching rules execute each tick (not just the first match).
 
-| Typ | Farbe | Speed | Sensor | Comm | Spezial |
-|-----|-------|-------|--------|------|---------|
-| **Scout** | Cyan | 3.0 | 150px | 80px | Erkundet, markiert Ressourcen, Search-Pheromon |
-| **Worker** | Orange | 1.5 | 60px | 60px | Sammelt und transportiert, folgt Found-Pheromon |
-| **Leader** | Gold | 1.0 | 100px | 200px | Koordiniert Workers, relayed Nachrichten |
-| **Tank** | Dunkelgrün | 0.8 | 50px | 50px | Schiebt Hindernisse, reagiert auf Hilfe-Anfragen |
-| **Healer** | Pink | 1.2 | 80px | 80px | Heilt Bots und lädt Energie auf |
-
-## Tastatur-Shortcuts
-
-### Global (alle Modi)
-
-| Taste | Aktion |
-|-------|--------|
-| **Space** | Pause / Fortsetzen |
-| **+/-** | Simulationsgeschwindigkeit |
-| **F1-F5** | Szenarien laden |
-| **F6** | LKW-Szenario |
-| **F7** | Swarm-Editor |
-| **F10** | Screenshot (PNG) |
-| **F11** | GIF-Recording Start/Stop |
-| **F12** | CPU-Profiling (Build-Tag `profile`) |
-| **ESC** | Beenden |
-
-### Standard-Modus (F1-F6)
-
-| Taste | Aktion |
-|-------|--------|
-| **Linksklick** | Bot auswählen |
-| **Rechtsklick + Ziehen** | Kamera bewegen |
-| **Mausrad** | Zoom |
-| **WASD** | Kamera bewegen |
-| **1-5** | Scout/Worker/Leader/Tank/Healer spawnen |
-| **R** | Ressource spawnen |
-| **H** | Hindernis platzieren |
-| **F** | Kommunikations-Radius anzeigen |
-| **G** | Sensor-Radius anzeigen |
-| **D** | Debug-Kommunikationslinien |
-| **P** | Pheromon-Visualisierung (OFF/FOUND/ALL) |
-| **E** | Generation erzwingen (Evolution) |
-| **V** | Genom-Overlay für ausgewählten Bot |
-| **T** | Trail-Rendering |
-| **M** | Minimap (nur bei Zoom > 1.0) |
-| **N** | Neuer LKW (nur Truck-Modus) |
-
-### Swarm-Modus (F7)
-
-| Taste | Aktion |
-|-------|--------|
-| **Linksklick** | Bot/UI-Element auswählen |
-| **T** | Trails anzeigen |
-| **C** | Delivery-Routen / Challenge starten (Teams) |
-| **D** | Statistik-Dashboard ein-/ausschalten |
-| **L** | Lichtquelle setzen/entfernen |
-| **M** | Minimap |
-| **N** | Neue Runde (Truck/Teams-Modus) |
-
-## SwarmScript
-
-SwarmScript ist eine regelbasierte DSL zum Programmieren von Bot-Verhalten. Jeder Bot evaluiert die Regeln von oben nach unten; die erste passende Regel wird ausgeführt.
-
-### Syntax
+### Example: Package Delivery
 
 ```
-# Kommentar
-IF <bedingung> [AND <bedingung>...] THEN <aktion>
-IF true THEN <aktion>                               # Default-Regel
-```
+# Pick up package when near a pickup station that has one
+IF carry == 0 AND p_dist < 20 AND has_pkg == 1 THEN PICKUP
 
-### Beispiel: Smart Delivery
+# Navigate to matching dropoff
+IF carry == 1 AND match == 1 THEN GOTO_DROPOFF
 
-```
-# Paket aufheben wenn nahe an Pickup mit Paket
-IF carrying == 0 AND pickup_dist < 20 AND has_pkg == 1 THEN PICKUP
+# Drop package at matching station
+IF carry == 1 AND d_dist < 25 AND match == 1 THEN DROP
 
-# Mit Paket zum passenden Dropoff navigieren
-IF carrying == 1 AND match == 1 THEN GOTO_MATCH
-IF carrying == 1 THEN GOTO_LED
-
-# LED-Farbe für Navigation setzen
-IF carrying == 1 THEN LED_DROPOFF
-IF carrying == 0 THEN LED_PICKUP
-
-# Paket abliefern
-IF carrying == 1 AND dropoff_dist < 20 AND match == 1 THEN DROP
-
-# Standardverhalten
-IF obs_ahead == 1 THEN AVOID_OBSTACLE
+# Collision avoidance
 IF near_dist < 15 THEN TURN_FROM_NEAREST
+IF obs_ahead == 1 THEN AVOID_OBSTACLE
+
+# Default: move forward
 IF true THEN FWD
 ```
 
-### Sensor-Referenz
+### Sensor Reference
 
-| Sensor | Alias | Beschreibung |
-|--------|-------|--------------|
-| `neighbors_count` | `nbrs`, `neighbors` | Anzahl Nachbarn im Sensorbereich |
-| `nearest_distance` | `near_dist` | Distanz zum nächsten Nachbarn |
-| `state` | `my_state` | Interner Zustand (0-255) |
-| `counter` | — | Zähler-Variable (0-255) |
-| `timer` | — | Timer (zählt runter) |
-| `on_edge` | `edge` | Am Arena-Rand? (true/false) |
-| `received_message` | `msg` | Empfangene Nachricht |
-| `light_value` | `light` | Lichtstärke (0-100) |
-| `random` | `rnd` | Zufallswert (0-100) |
-| `has_leader` | `leader` | Folgt einem Bot? |
-| `has_follower` | `follower` | Wird gefolgt? |
-| `chain_length` | `chain_len` | Länge der Follow-Kette |
-| `nearest_led_r/g/b` | — | LED-Farbe des nächsten Nachbarn |
-| `obstacle_ahead` | `obs_ahead` | Hindernis voraus? |
-| `obstacle_distance` | `obs_dist` | Distanz zum Hindernis |
-| `value1`, `value2` | — | Benutzerdefinierte Variablen |
-| `tick` | — | Simulations-Tick |
+**Navigation & Neighbors**
 
-**Delivery-Sensoren:**
+| Sensor | Alias | Description |
+|--------|-------|-------------|
+| `nearest_distance` | `near_dist` | Distance to nearest bot |
+| `neighbors_count` | `nbrs` | Number of neighbors in sensor range |
+| `on_edge` | `edge` | At arena boundary? (0/1) |
+| `obstacle_ahead` | `obs_ahead` | Obstacle in front? (0/1) |
+| `obstacle_distance` | `obs_dist` | Distance to nearest obstacle |
+| `light_value` | `light` | Light intensity (0-100) |
+| `random` | `rnd` | Random value (0-100) |
+| `tick` | — | Global simulation tick |
 
-| Sensor | Alias | Beschreibung |
-|--------|-------|--------------|
-| `carrying` | `carry` | Trägt Paket? (0/1) |
-| `carrying_color` | — | Farbe des Pakets (1-4) |
-| `nearest_pickup_dist` | `p_dist` | Distanz zur nächsten Pickup-Station |
-| `nearest_pickup_color` | `pickup_color` | Farbe der nächsten Pickup-Station |
-| `nearest_pickup_has_package` | `has_pkg` | Hat Pickup ein Paket? |
-| `nearest_dropoff_dist` | `d_dist` | Distanz zur nächsten Dropoff-Station |
-| `dropoff_match` | `match` | Passt Dropoff zur Paketfarbe? |
-| `nearest_matching_led_dist` | `led_dist` | Distanz zum Bot mit passender LED |
-| `heard_pickup_color` | `heard_pickup` | Per Nachricht gehörte Pickup-Farbe |
-| `heard_dropoff_color` | `heard_dropoff` | Per Nachricht gehörte Dropoff-Farbe |
-| `wall_right` | — | Wand rechts? (0/1, 25px Reichweite) |
-| `wall_left` | — | Wand links? (0/1, 25px Reichweite) |
-| `wall_front` | — | Wand vorne? (Alias für obs_ahead) |
-| `pheromone` | `pher` | Pheromon-Intensität voraus (0-100) |
-| `exploring` | `lost` | Bot hat keinen Dropoff/Beacon in Sicht? |
-| `on_ramp` | — | Bot auf der LKW-Rampe? |
-| `truck_here` | — | LKW geparkt und bereit? |
-| `heard_beacon` | — | Beacon-Signal vom Dropoff empfangen? |
+**Internal State**
 
-### Aktions-Referenz
+| Sensor | Alias | Description |
+|--------|-------|-------------|
+| `state` | `my_state` | Internal state variable (0-255) |
+| `counter` | — | Counter variable (0-255) |
+| `timer` | — | Countdown timer (ticks) |
+| `value1`, `value2` | — | User-defined variables |
+| `has_leader` | `leader` | Following another bot? |
+| `chain_length` | `chain_len` | Follow-chain length |
+| `received_message` | `msg` | Message received? |
 
-| Aktion | Alias | Beschreibung |
-|--------|-------|--------------|
-| `MOVE_FORWARD` | `FWD` | Vorwärts bewegen |
-| `MOVE_FORWARD_SLOW` | `FWD_SLOW` | Langsam vorwärts |
-| `STOP` | — | Anhalten |
-| `TURN_LEFT N` | — | Links drehen (N Grad) |
-| `TURN_RIGHT N` | — | Rechts drehen (N Grad) |
-| `TURN_RANDOM` | — | Zufällige Richtung |
-| `TURN_TO_NEAREST` | — | Zum nächsten Nachbarn drehen |
-| `TURN_FROM_NEAREST` | — | Vom nächsten Nachbarn weg |
-| `TURN_TO_CENTER` | — | Zum Zentrum der Nachbarn |
-| `TURN_TO_LIGHT` | — | Zur Lichtquelle |
-| `TURN_AWAY_OBSTACLE` | `AVOID_OBSTACLE` | Hindernis ausweichen |
-| `FOLLOW_NEAREST` | — | Nächstem Bot folgen |
-| `UNFOLLOW` | — | Aufhören zu folgen |
-| `SET_STATE N` | — | Zustand setzen |
-| `SET_COUNTER N` | — | Zähler setzen |
-| `INC_COUNTER` | — | Zähler +1 |
-| `DEC_COUNTER` | — | Zähler -1 |
-| `SET_VALUE1 N` | — | Value1 setzen |
-| `SET_VALUE2 N` | — | Value2 setzen |
-| `SET_TIMER N` | — | Timer setzen (Ticks) |
-| `SEND_MESSAGE N` | — | Nachricht senden |
-| `SET_LED R G B` | — | LED-Farbe setzen (RGB) |
-| `COPY_NEAREST_LED` | `COPY_LED` | LED des Nachbarn kopieren |
-| `PICKUP` | — | Paket aufheben |
-| `DROP` | — | Paket ablegen |
-| `TURN_TO_PICKUP` | `GOTO_PICKUP` | Zur Pickup-Station |
-| `TURN_TO_MATCHING_DROPOFF` | `GOTO_MATCH` | Zum passenden Dropoff |
-| `TURN_TO_MATCHING_LED` | `GOTO_LED` | Zum Bot mit passender LED |
-| `SEND_PICKUP N` | — | Pickup-Farbe broadcasten |
-| `SEND_DROPOFF N` | — | Dropoff-Farbe broadcasten |
-| `SET_LED_PICKUP_COLOR` | `LED_PICKUP` | LED = nächste Pickup-Farbe |
-| `SET_LED_DROPOFF_COLOR` | `LED_DROPOFF` | LED = nächste Dropoff-Farbe |
-| `WALL_FOLLOW_RIGHT` | — | Right-Hand-Wall-Following |
-| `WALL_FOLLOW_LEFT` | — | Left-Hand-Wall-Following |
-| `FOLLOW_PHER` | `GOTO_PHER` | Pheromon-Gradient folgen |
-| `SPIRAL` | — | Spiralsuche (wachsende Kreise) |
-| `GOTO_RAMP` | — | Zur LKW-Rampe navigieren |
-| `GOTO_BEACON` | — | Zum Beacon-Signal navigieren |
-| `GOTO_HEARD_DROPOFF` | — | Zur gehörten Dropoff-Position |
-| `GOTO_HEARD_PICKUP` | — | Zur gehörten Pickup-Position |
+**Delivery**
 
-### Preset-Programme (18 Stück)
+| Sensor | Alias | Description |
+|--------|-------|-------------|
+| `carrying` | `carry` | Carrying a package? (0/1) |
+| `nearest_pickup_dist` | `p_dist` | Distance to nearest pickup |
+| `nearest_pickup_has_package` | `has_pkg` | Pickup has package ready? |
+| `nearest_dropoff_dist` | `d_dist` | Distance to nearest dropoff |
+| `dropoff_match` | `match` | Dropoff matches package color? |
+| `nearest_matching_led_dist` | `led_dist` | Distance to bot with matching LED |
+| `heard_pickup_color` | `heard_pickup` | Pickup color heard via message |
+| `heard_dropoff_color` | `heard_dropoff` | Dropoff color heard via message |
+| `exploring` | `lost` | No dropoff/beacon in sight? |
 
-| Name | Beschreibung |
-|------|--------------|
-| Aggregation | Bots clustern sich zum Zentrum |
-| Dispersion | Bots verteilen sich gleichmäßig |
-| Orbit | Kreisen um Lichtquelle |
-| Color Wave | Rote LED-Welle per Messaging |
-| Flocking | Boids-artiges Schwarmverhalten |
-| Snake Formation | Bots bilden Ketten und schlängeln |
-| Obstacle Nav | Navigation um Hindernisse zum Licht |
-| Pulse Sync | Synchronisierte LED-Pulse wie Glühwürmchen |
-| Trail Follow | Bots folgen und kopieren LED-Farben |
-| Ant Colony | Ameisenartiges Sammeln mit Lichtsuche |
-| Simple Delivery | Smart Delivery mit LED-Gradient-Navigation |
-| Delivery Comm | Delivery mit Kommunikations-Nachrichten |
-| Delivery Roles | Zwei Rollen: Beacon (LED-Leuchtturm) und Carrier |
-| Simple Unload | LKW-Entladung mit Beacon-Navigation |
-| Coordinated Unload | Kooperative LKW-Entladung mit LED + Nachrichten |
-| Evolving Delivery | Delivery mit evolutionären Parametern ($A-$Z) |
-| Evolving Truck | LKW-Entladung mit Evolution |
-| Maze Explorer | Right-Hand-Wall-Following im Labyrinth |
-| GP: Random Start | Genetische Programmierung mit zufälligen Programmen |
-| GP: Seeded Start | GP: 50% mutiertes Seed-Programm + 50% zufällig |
+**Truck & Maze**
 
-## Systeme
+| Sensor | Alias | Description |
+|--------|-------|-------------|
+| `on_ramp` | — | Bot on truck ramp? |
+| `truck_here` | — | Truck parked and ready? |
+| `truck_pkg_count` | — | Packages remaining on truck |
+| `heard_beacon` | — | Beacon signal from dropoff? |
+| `wall_right` | — | Wall within 25px on right? |
+| `wall_left` | — | Wall within 25px on left? |
+| `pheromone` | `pher` | Pheromone intensity ahead (0-100) |
 
-### Pheromon-System (ACO)
-Drei Pheromontypen: **Search** (blau), **Found Resource** (grün), **Danger** (rot). Bots hinterlassen Pheromone, die über Zeit verdampfen und zu Nachbarzellen diffundieren. Scouts meiden Search-Pheromon (um neue Gebiete zu erkunden), Workers folgen Found-Resource-Trails. Visualisierung mit **P**.
+**Teams**
 
-### Energie-System
-Alle Bots haben Energie (0-100). Bewegung, Messaging, Tragen, Pheromone und Hindernisse schieben verbrauchen Energie. Aufladen an der Home Base. Healers können Energie übertragen. Bei 0 Energie: Bot wird immobilisiert und sendet Hilferuf.
+| Sensor | Description |
+|--------|-------------|
+| `team` | Team membership (1=A, 2=B) |
+| `team_score` | Own team's score |
+| `enemy_score` | Opposing team's score |
 
-### Genetischer Algorithmus
-7 Gene pro Bot: FlockingWeight, PheromoneFollow, ExplorationDrive, CommFrequency, EnergyConservation, SpeedPreference, CooperationBias. Top 30% Genome werden bewahrt, Rest durch Crossover mit Mutation ersetzt. **E** zum manuellen Evolvieren, **V** für Genom-Overlay.
+**Evolution Parameters**
 
-### Delivery-System (Swarm-Modus)
-Farbcodierte Pickup/Dropoff-Stationen (Rot, Blau, Gelb, Grün). Bots müssen Pakete von Pickups aufheben und zu passenden Dropoffs liefern. Emergente Navigation über LED-Gradienten: Bots setzen ihre LED-Farbe basierend auf Station-Nähe, andere Bots navigieren entlang des Farbgradienten.
+```
+IF near_dist < $A:15 THEN TURN_FROM_NEAREST
+```
 
-### Genetische Programmierung (GP)
-Jeder Bot erhält sein eigenes SwarmScript-Programm. Programme werden durch Crossover (erste Hälfte von Elter A, Rest von Elter B) und Mutation (Sensor/Wert/Aktion/Regelwechsel) evolviert. Fitness basiert auf Lieferungen, Pickups, Distanz und Anti-Stuck-Zähler. Top 3 Programme werden als Elite bewahrt. Evolution alle 2000 Ticks. GP-Button im Editor-Panel, "Export Best" übernimmt das beste Programm.
+`$A:15` = Parameter A with default value 15. When Evolution is enabled, each bot gets its own value for each parameter. Natural selection optimizes these values over generations.
 
-### Multiplayer / Teams
-Zwei Teams (A=Blau, B=Rot) treten in der gleichen Arena gegeneinander an. Jedes Team kann ein eigenes Programm erhalten. Challenge-Modus (C-Taste): 5000 Ticks, wer mehr liefert gewinnt. Neue Runde (N-Taste) setzt Punkte und Positionen zurück. Team-Sensoren: `team`, `team_score`, `enemy_score`.
+### Action Reference
 
-### Statistik-Dashboard
-Echtzeit-Dashboard (D-Taste) mit fünf Panels: Fitness-Graph (Best/Avg über Generationen), Lieferrate-Balkendiagramm (pro 500-Tick-Fenster), Bot-Heatmap (Bewegungsdichte blau→rot), Bot-Effizienz-Ranking (Top 5), und Live-Event-Ticker.
+**Movement**
 
-## Architektur
+| Action | Description |
+|--------|-------------|
+| `FWD` / `FWD_SLOW` | Move forward (normal / slow) |
+| `STOP` | Stop moving |
+| `TURN_LEFT N` | Turn left by N degrees |
+| `TURN_RIGHT N` | Turn right by N degrees |
+| `TURN_RANDOM` | Turn to random direction |
+| `TURN_TO_NEAREST` | Turn toward nearest bot |
+| `TURN_FROM_NEAREST` | Turn away from nearest bot |
+| `TURN_TO_CENTER` | Turn toward neighbor centroid |
+| `TURN_TO_LIGHT` | Turn toward light source |
+| `AVOID_OBSTACLE` | Dodge obstacle ahead |
+| `SPIRAL` | Expanding spiral search |
+
+**Delivery**
+
+| Action | Description |
+|--------|-------------|
+| `PICKUP` | Pick up package |
+| `DROP` | Drop package |
+| `GOTO_PICKUP` | Turn toward nearest pickup |
+| `GOTO_DROPOFF` / `GOTO_MATCH` | Turn toward matching dropoff |
+| `GOTO_LED` | Turn toward bot with matching LED |
+| `GOTO_RAMP` | Navigate to truck ramp |
+| `GOTO_BEACON` | Navigate to beacon signal |
+| `LED_PICKUP` | Set LED to nearest pickup color |
+| `LED_DROPOFF` | Set LED to nearest dropoff color |
+
+**Communication & State**
+
+| Action | Description |
+|--------|-------------|
+| `SET_STATE N` | Set internal state (0-9) |
+| `SET_LED R G B` | Set LED color (RGB 0-255) |
+| `COPY_LED` | Copy nearest bot's LED color |
+| `SEND_MESSAGE N` | Broadcast message |
+| `SEND_PICKUP N` | Broadcast pickup color info |
+| `SEND_DROPOFF N` | Broadcast dropoff color info |
+| `FOLLOW_NEAREST` | Start following nearest bot |
+| `UNFOLLOW` | Stop following |
+
+**Maze Navigation**
+
+| Action | Description |
+|--------|-------------|
+| `WALL_FOLLOW_RIGHT` | Right-hand wall following |
+| `WALL_FOLLOW_LEFT` | Left-hand wall following |
+| `FOLLOW_PHER` | Follow pheromone gradient |
+
+### Preset Programs (20)
+
+| Preset | Category | Description |
+|--------|----------|-------------|
+| Aggregation | Behavior | Bots cluster toward center |
+| Dispersion | Behavior | Bots spread out evenly |
+| Orbit | Behavior | Circle around light source |
+| Color Wave | Communication | LED color wave through swarm |
+| Flocking | Behavior | Boids-style swarming |
+| Snake Formation | Following | Bots form chains |
+| Obstacle Nav | Navigation | Navigate around obstacles to light |
+| Pulse Sync | Communication | Synchronized LED pulses (fireflies) |
+| Trail Follow | Following | Bots follow and copy LED trails |
+| Ant Colony | Foraging | Simplified ant colony optimization |
+| Simple Delivery | Delivery | Random exploration + package delivery |
+| Delivery Comm | Delivery | With station position sharing |
+| Delivery Roles | Delivery | 50% scouts, 50% carriers |
+| Simple Unload | Truck | Basic truck unloading |
+| Coordinated Unload | Truck | LED-gradient + beacon coordination |
+| Evolving Delivery | Evolution | Delivery with evolvable parameters |
+| Evolving Truck | Evolution | Truck unloading with evolution |
+| Maze Explorer | Maze | Wall-following maze navigation |
+| GP: Random Start | GP | Fully random genetic programs |
+| GP: Seeded Start | GP | Seeded from Simple Delivery |
+
+## Modes
+
+### F1: Classic Mode
+
+Traditional swarm simulation with 5 bot types (Scout, Worker, Leader, Tank, Healer).
+Scenarios include Sandbox, Foraging Paradise, Labyrinth, Energy Crisis, and Evolution Arena.
+Features pheromone trails, energy management, and genetic algorithms.
+
+### F2: Swarm Lab
+
+The main mode. Full SwarmScript editor with visual block editor.
+Features: Delivery system, Trucks, Maze, Obstacles, Light source,
+Parameter Evolution, Genetic Programming, Teams, and Dashboard.
+
+## Features In Detail
+
+### Genetic Programming (GP)
+
+Each bot gets its own randomly generated SwarmScript program.
+Every 2000 ticks: fitness evaluation, selection (top 20%), crossover, mutation.
+Top 3 programs preserved as elite. After enough generations, bots develop
+delivery strategies no human wrote. Use **"Export Best"** to save the evolved program.
+
+**Fitness:** `Deliveries*30 + Pickups*15 + Distance*0.01 - StuckCount*10 - IdleTicks*0.05`
+
+### Multiplayer (Teams)
+
+Two teams (Blue A, Red B) compete in the same arena with separate programs.
+**Challenge mode** (C key): 5000 ticks, team with more correct deliveries wins.
+New round (N key) resets scores and positions. Each team can run a different program.
+
+### Truck Unloading
+
+Trucks drive in and park at the ramp. Bots pick up packages from the truck
+and deliver them to color-coded dropoff stations. Ramp semaphore limits
+concurrent access to 3 bots. After all packages are unloaded,
+the truck leaves and the next one arrives.
+
+### Statistics Dashboard (D key)
+
+Real-time dashboard with five panels:
+- **Fitness Graph** — Best/average fitness over generations
+- **Delivery Rate** — Bar chart per 500-tick window
+- **Heatmap** — Bot movement density (blue to red)
+- **Ranking** — Top 5 bots by deliveries
+- **Event Ticker** — Live pickup/delivery events
+
+### Interactive Tutorial (F3)
+
+15-step guided tour covering SwarmScript basics, delivery mode,
+bot selection, follow-cam, block editor, and feature toggles.
+Starts automatically on first launch, skippable with ESC.
+
+## Architecture
 
 ```
 swarmsim/
-  domain/          Kernlogik (reine Typen, kein Framework)
-    bot/           Bot-Interface, Typen (Scout/Worker/Leader/Tank/Healer)
-    physics/       Arena, Obstacles, SpatialHash (O(1) Neighbor-Lookup)
-    comm/          Dezentrales Messaging (TTL, Range-basiert)
-    genetics/      Genom, Crossover, Mutation, Fitness
-    resource/      Ressourcen-Spawning und -Management
-    swarm/         SwarmBot, SwarmState, Delivery-Stations, GP, Teams, Stats
-  engine/          Orchestrierung
-    simulation/    Simulation-Loop, Szenarien, Config
-    swarmscript/   Parser + Interpreter für SwarmScript DSL, GP-Operatoren
-    pheromone/     Pheromon-Grid mit Diffusion und Evaporation
-  render/          Ebiten-basierte Visualisierung
-    renderer.go    Kamera, Bot-Sprites, Pheromon-Rendering
-    hud.go         Heads-Up Display
-    swarm_render.go  Swarm-Modus Arena-Rendering
-    swarm_editor.go  Code-Editor mit Syntax-Highlighting
-    dashboard.go   Statistik-Dashboard (Graphen, Heatmap, Ranking)
-    minimap.go     150x100px Übersichtskarte
-    capture.go     Screenshot (PNG) und GIF-Recording
-    particles.go   Partikel-Effekte
-    colors.go      Farbkonstanten
-  main.go          Ebiten Game-Loop, Input-Handling
-  profiling.go     CPU-Profiling (Build-Tag: profile)
+├── domain/              Core logic (no rendering dependencies)
+│   ├── bot/             Bot types and behavior interfaces
+│   ├── swarm/           SwarmBot, delivery, GP evolution, teams, stats
+│   ├── physics/         Collision detection, spatial hash, arena
+│   ├── comm/            Decentralized message passing (TTL, range)
+│   ├── genetics/        Genome, crossover, mutation, fitness
+│   └── resource/        Resource spawning and management
+├── engine/              Simulation engine
+│   ├── simulation/      Game loop, scenarios, configuration
+│   ├── swarmscript/     Parser, interpreter, GP operators
+│   └── pheromone/       Pheromone grid (diffusion, evaporation)
+├── render/              All rendering (Ebiten)
+│   ├── renderer.go      Camera, bot sprites, pheromone rendering
+│   ├── swarm_render.go  Swarm mode arena + HUD
+│   ├── swarm_editor.go  Code editor with syntax highlighting
+│   ├── dashboard.go     Statistics dashboard (graphs, heatmap)
+│   ├── tutorial.go      Interactive 15-step tutorial
+│   ├── tooltips.go      Hover tooltips for all UI elements
+│   ├── help.go          Help overlay (H key)
+│   ├── minimap.go       150x100px overview map
+│   ├── capture.go       Screenshot (PNG) and GIF recording
+│   └── particles.go     Particle effects
+└── main.go              Ebiten game loop, input handling
 ```
 
-### Performance-Optimierungen
-- **SpatialHash**: Pre-allokierte Flat-Slices statt Maps, wiederverwendbarer Query-Buffer
-- **Bot-Sprites**: Vorgerenderte 24x24px Dreiecke, Tinting via ColorScale
-- **Pheromon-Cache**: Pixel-Buffer nur alle 5 Ticks neu berechnet
-- **Text-Cache**: HUD-Texte als gecachte GPU-Images mit 120-Frame-Eviction
-- **Bedingte Dashed Lines**: Nur gezeichnet wenn Bots Pakete tragen
+### Performance
 
-## Technologie
+- **SpatialHash** — O(1) neighbor lookup with pre-allocated flat slices
+- **Text Cache** — HUD text rendered as cached GPU images (120-frame eviction)
+- **Pheromone Cache** — Pixel buffer recalculated every 5 ticks only
+- **Bot Sprites** — Pre-rendered 24x24px triangles with ColorScale tinting
 
-- **Go 1.21+** (kein CGO)
-- **Ebiten v2.9** (2D Game Library)
-- Cross-Compile: Windows, Linux, WebAssembly
-- Keine externen Abhängigkeiten außer Ebiten
+## Building
 
-## Lizenz
+```bash
+make build          # Linux/Mac binary
+make windows        # Windows .exe (cross-compile)
+make wasm           # WebAssembly → docs/swarmsim.wasm
+go test ./...       # Run all tests
+```
+
+Or directly:
+
+```bash
+go build -o swarmsim .
+./swarmsim
+```
+
+## Keyboard Shortcuts
+
+### Global
+
+| Key | Action |
+|-----|--------|
+| **Space** | Pause / Resume |
+| **+/-** | Simulation speed (0.5x - 5.0x) |
+| **F1** | Classic Mode |
+| **F2** | Swarm Lab |
+| **F3** | Start Tutorial |
+| **F10** | Screenshot (PNG) |
+| **F11** | GIF Recording |
+| **H** | Help overlay |
+| **ESC** | Quit |
+
+### Swarm Lab (F2)
+
+| Key | Action |
+|-----|--------|
+| **Click** | Select bot / UI element |
+| **T** | Toggle trails |
+| **L** | Place / remove light source |
+| **C** | Show routes / start challenge (teams) |
+| **D** | Toggle statistics dashboard |
+| **M** | Toggle minimap |
+| **N** | New round (trucks / teams) |
+| **F** | Follow selected bot |
+| **Tab** | Filter log to selected bot |
+
+## Tech Stack
+
+- **Go 1.21+** (no CGO)
+- **Ebiten v2** (2D game library)
+- Cross-compile: Windows, Linux, WebAssembly
+- No external dependencies beyond Ebiten
+
+## License
 
 MIT
