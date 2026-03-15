@@ -186,6 +186,14 @@ IF true THEN FWD
 | `nearest_matching_led_dist` | `led_dist` | Distanz zum Bot mit passender LED |
 | `heard_pickup_color` | `heard_pickup` | Per Nachricht gehörte Pickup-Farbe |
 | `heard_dropoff_color` | `heard_dropoff` | Per Nachricht gehörte Dropoff-Farbe |
+| `wall_right` | — | Wand rechts? (0/1, 25px Reichweite) |
+| `wall_left` | — | Wand links? (0/1, 25px Reichweite) |
+| `wall_front` | — | Wand vorne? (Alias für obs_ahead) |
+| `pheromone` | `pher` | Pheromon-Intensität voraus (0-100) |
+| `exploring` | `lost` | Bot hat keinen Dropoff/Beacon in Sicht? |
+| `on_ramp` | — | Bot auf der LKW-Rampe? |
+| `truck_here` | — | LKW geparkt und bereit? |
+| `heard_beacon` | — | Beacon-Signal vom Dropoff empfangen? |
 
 ### Aktions-Referenz
 
@@ -223,8 +231,16 @@ IF true THEN FWD
 | `SEND_DROPOFF N` | — | Dropoff-Farbe broadcasten |
 | `SET_LED_PICKUP_COLOR` | `LED_PICKUP` | LED = nächste Pickup-Farbe |
 | `SET_LED_DROPOFF_COLOR` | `LED_DROPOFF` | LED = nächste Dropoff-Farbe |
+| `WALL_FOLLOW_RIGHT` | — | Right-Hand-Wall-Following |
+| `WALL_FOLLOW_LEFT` | — | Left-Hand-Wall-Following |
+| `FOLLOW_PHER` | `GOTO_PHER` | Pheromon-Gradient folgen |
+| `SPIRAL` | — | Spiralsuche (wachsende Kreise) |
+| `GOTO_RAMP` | — | Zur LKW-Rampe navigieren |
+| `GOTO_BEACON` | — | Zum Beacon-Signal navigieren |
+| `GOTO_HEARD_DROPOFF` | — | Zur gehörten Dropoff-Position |
+| `GOTO_HEARD_PICKUP` | — | Zur gehörten Pickup-Position |
 
-### Preset-Programme (13 Stück)
+### Preset-Programme (18 Stück)
 
 | Name | Beschreibung |
 |------|--------------|
@@ -241,6 +257,11 @@ IF true THEN FWD
 | Simple Delivery | Smart Delivery mit LED-Gradient-Navigation |
 | Delivery Comm | Delivery mit Kommunikations-Nachrichten |
 | Delivery Roles | Zwei Rollen: Beacon (LED-Leuchtturm) und Carrier |
+| Simple Unload | LKW-Entladung mit Beacon-Navigation |
+| Coordinated Unload | Kooperative LKW-Entladung mit LED + Nachrichten |
+| Evolving Delivery | Delivery mit evolutionären Parametern ($A-$Z) |
+| Evolving Truck | LKW-Entladung mit Evolution |
+| Maze Explorer | Right-Hand-Wall-Following im Labyrinth |
 
 ## Systeme
 
