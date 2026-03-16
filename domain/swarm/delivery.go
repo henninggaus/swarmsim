@@ -19,6 +19,7 @@ func UpdateDeliverySystem(ss *SwarmState) {
 					X:         st.X,
 					Y:         st.Y,
 					Active:    true,
+					SpawnTick: ss.Tick,
 				})
 			}
 		}

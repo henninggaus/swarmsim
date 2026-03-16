@@ -3,7 +3,8 @@ package physics
 // Obstacle is a rectangular obstacle in the arena.
 type Obstacle struct {
 	X, Y, W, H float64
-	Pushable   bool // can be moved by Tank bots
+	Pushable   bool    // can be moved by Tank bots
+	VX, VY     float64 // velocity for dynamic environment mode
 }
 
 // Arena holds the world boundaries and obstacles.

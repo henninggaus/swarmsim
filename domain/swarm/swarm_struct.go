@@ -231,6 +231,7 @@ type DeliveryPackage struct {
 	OnGround   bool    // true if dropped on ground (not at station)
 	PickupTick int     // tick when picked up (for avg time)
 	Active     bool    // false if delivered and waiting respawn
+	SpawnTick  int     // tick when spawned (for expiry in dynamic mode)
 }
 
 // DeliveryStats tracks delivery performance.
@@ -327,6 +328,7 @@ type SwarmState struct {
 	Obstacles   []*physics.Obstacle
 	MazeWalls   []*physics.Obstacle
 	ObstaclesOn bool
+	DynamicEnv  bool // dynamic environment: moving obstacles + expiring packages
 	MazeOn      bool
 	WrapMode    bool // false=BOUNCE, true=WRAP
 	ShowTrails  bool

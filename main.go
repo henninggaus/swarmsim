@@ -896,6 +896,12 @@ func (g *Game) handleSwarmInput() {
 		}
 	}
 
+	// J key: toggle dynamic environment (moving obstacles + package expiry)
+	if inpututil.IsKeyJustPressed(ebiten.KeyJ) && !ed.Focused && !ss.BotCountEdit {
+		ss.DynamicEnv = !ss.DynamicEnv
+		logger.Info("SWARM", "Dynamic environment: %v", ss.DynamicEnv)
+	}
+
 	// F key: toggle follow-cam (when editor not focused)
 	if inpututil.IsKeyJustPressed(ebiten.KeyF) && !ed.Focused && !ss.BotCountEdit {
 		if ss.FollowCamBot >= 0 {

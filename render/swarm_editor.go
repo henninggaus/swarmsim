@@ -541,6 +541,11 @@ func DrawSwarmHUD(screen *ebiten.Image, s *simulation.Simulation, fps float64) {
 			ss.BotCount, ss.ProgramName, ss.Tick)
 		ebitenutil.DebugPrintAt(screen, arenaInfo, 420, 35)
 
+		// Dynamic environment indicator
+		if ss.DynamicEnv {
+			printColoredAt(screen, "DYNAMISCH", 750, 35, color.RGBA{255, 150, 50, 220})
+		}
+
 		// Reset flash indicator
 		if ss.ResetFlashTimer > 0 {
 			flashAlpha := uint8(255)

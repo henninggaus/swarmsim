@@ -231,6 +231,11 @@ func (s *Simulation) updateSwarmMode() {
 		}
 	}
 
+	// Phase 4.52: Dynamic environment — moving obstacles + expiring packages
+	if ss.DynamicEnv {
+		swarm.UpdateDynamicEnvironment(ss)
+	}
+
 	// Phase 4.55: Pheromone trails — carrying bots deposit, grid decays
 	if ss.PherGrid != nil {
 		for i := range ss.Bots {
