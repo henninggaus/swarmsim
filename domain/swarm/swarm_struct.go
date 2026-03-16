@@ -348,6 +348,9 @@ type SwarmState struct {
 	// Color filter (W key): 0=off, 1=red, 2=green, 3=blue, 4=carrying, 5=idle
 	ColorFilter int
 
+	// Formation analysis overlay (F6)
+	ShowFormation bool
+
 	// Auto-Optimizer
 	AutoOptimizer *AutoOptimizerState
 

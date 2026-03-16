@@ -565,6 +565,11 @@ func (r *Renderer) DrawSwarmMode(screen *ebiten.Image, s *simulation.Simulation,
 		DrawTournamentOverlay(screen, ss)
 	}
 
+	// Formation analysis overlay (F6 key)
+	if ss.ShowFormation {
+		DrawFormationOverlay(screen, ss)
+	}
+
 	// Arena editor mode indicator
 	if ss.ArenaEditMode {
 		toolNames := []string{"Hindernis", "Station", "Loeschen"}

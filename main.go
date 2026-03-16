@@ -778,6 +778,12 @@ func (g *Game) handleSwarmInput() {
 		}
 	}
 
+	// F6 key: toggle formation analysis overlay
+	if inpututil.IsKeyJustPressed(ebiten.KeyF6) && !ed.Focused {
+		ss.ShowFormation = !ss.ShowFormation
+		logger.Info("SWARM", "Formation-Analyse: %v", ss.ShowFormation)
+	}
+
 	// Y key: toggle heatmap overlay
 	if inpututil.IsKeyJustPressed(ebiten.KeyY) && !ed.Focused && !ss.BotCountEdit {
 		ss.ShowHeatmap = !ss.ShowHeatmap

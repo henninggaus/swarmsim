@@ -129,6 +129,7 @@ func DrawHelpOverlay(screen *ebiten.Image, isSwarmMode bool, scrollY int) {
 		{"P", "Nachrichten-Wellen: zeigt Broadcast-Ringe"},
 		{"F4", "Auto-Optimizer: testet Parameter automatisch"},
 		{"F5", "Szenario-Kette: 3 Szenarien nacheinander durchlaufen"},
+		{"F6", "Formation-Analyse: Schwarm-Metriken Overlay"},
 		{"Ctrl+Klick", "Bot-Genom auf alle anderen klonen"},
 		{"X", "Stats als CSV in Clipboard exportieren"},
 	})
