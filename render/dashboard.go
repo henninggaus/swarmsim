@@ -76,9 +76,18 @@ func DrawDashboard(screen *ebiten.Image, ss *swarm.SwarmState, x, y, w, h int) {
 		cy += 65
 	}
 
-	// 3. Heatmap
-	if st.HeatmapMax > 0 {
-		drawDashSectionHeader(screen, cx, cy, w-15, "BEWEGUNGS-HEATMAP", sectionCol)
+	// 3. Heatmap (toggle between motion and action with A key)
+	if st.ShowActionHeat && st.ActionHeatmapMax > 0 {
+		drawDashSectionHeader(screen, cx, cy, w-15, "AKTIONS-HEATMAP (A)", sectionCol)
+		cy += 14
+		printColoredAt(screen, "Wo passieren Pickups & Deliveries?", cx, cy, dimCol)
+		cy += 10
+		printColoredAt(screen, "Blau=wenig  Gelb=mittel  Rot=Hotspot", cx, cy, color.RGBA{80, 80, 100, 180})
+		cy += 12
+		drawDashActionHeatmap(screen, st, cx, cy, w-15, w-15)
+		cy += w - 10
+	} else if st.HeatmapMax > 0 {
+		drawDashSectionHeader(screen, cx, cy, w-15, "BEWEGUNGS-HEATMAP (A)", sectionCol)
 		cy += 14
 		printColoredAt(screen, "Wo bewegen sich Bots am meisten?", cx, cy, dimCol)
 		cy += 10
@@ -322,6 +331,43 @@ func drawDashHeatmap(screen *ebiten.Image, st *swarm.StatsTracker, gx, gy, gw, g
 			default:
 				t := (frac - 0.75) * 4
 				col = color.RGBA{255, uint8(255 * (1 - t)), 0, 200}
+			}
+
+			px := float32(gx) + float32(cx)*cellW
+			py := float32(gy) + float32(cy)*cellH
+			vector.DrawFilledRect(screen, px, py, cellW+1, cellH+1, col, false)
+		}
+	}
+}
+
+// drawDashActionHeatmap draws a heatmap of pickup/drop events.
+func drawDashActionHeatmap(screen *ebiten.Image, st *swarm.StatsTracker, gx, gy, gw, gh int) {
+	if st.ActionHeatmapMax <= 0 {
+		return
+	}
+	cellW := float32(gw) / 80.0
+	cellH := float32(gh) / 60.0
+
+	for cx := 0; cx < 80; cx++ {
+		for cy := 0; cy < 60; cy++ {
+			val := st.ActionHeatmap[cx][cy]
+			if val == 0 {
+				continue
+			}
+			frac := float32(val) / float32(st.ActionHeatmapMax)
+
+			// Color gradient: blue -> yellow -> orange -> red
+			var col color.RGBA
+			switch {
+			case frac < 0.33:
+				t := frac * 3
+				col = color.RGBA{0, 0, uint8(120 + 135*t), 200}
+			case frac < 0.66:
+				t := (frac - 0.33) * 3
+				col = color.RGBA{uint8(255 * t), uint8(200 * t), uint8(255 * (1 - t)), 200}
+			default:
+				t := (frac - 0.66) * 3
+				col = color.RGBA{255, uint8(200 * (1 - t)), 0, 220}
 			}
 
 			px := float32(gx) + float32(cx)*cellW

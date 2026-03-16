@@ -1413,6 +1413,7 @@ func executeSwarmAction(act swarmscript.Action, bot *swarm.SwarmBot, ss *swarm.S
 				// Stats tracker pickup event
 				if ss.StatsTracker != nil {
 					ss.StatsTracker.AddPickupEvent(botIdx, swarm.DeliveryColorName(tpkg.Color))
+					ss.StatsTracker.RecordActionAt(bot.X, bot.Y, ss.ArenaW, ss.ArenaH)
 				}
 				// Turn away from ramp (toward arena interior) so bot leaves immediately
 				bot.Angle = (ss.Rng.Float64() - 0.5) * math.Pi / 2 // roughly rightward ±45°
@@ -1437,6 +1438,7 @@ func executeSwarmAction(act swarmscript.Action, bot *swarm.SwarmBot, ss *swarm.S
 				// Stats tracker pickup event
 				if ss.StatsTracker != nil {
 					ss.StatsTracker.AddPickupEvent(botIdx, swarm.DeliveryColorName(pkg.Color))
+					ss.StatsTracker.RecordActionAt(bot.X, bot.Y, ss.ArenaW, ss.ArenaH)
 				}
 				logger.InfoBot(botIdx, "DELIVERY", "Bot #%d picked up %s package", botIdx, swarm.DeliveryColorName(pkg.Color))
 				// Emit pickup event for particles
@@ -1531,6 +1533,7 @@ func executeSwarmAction(act swarmscript.Action, bot *swarm.SwarmBot, ss *swarm.S
 				if ss.StatsTracker != nil {
 					ss.StatsTracker.RecordDelivery(correct, bot.Team)
 					ss.StatsTracker.AddDeliveryEvent(botIdx, swarm.DeliveryColorName(pkg.Color), correct, deliveryTime)
+					ss.StatsTracker.RecordActionAt(bot.X, bot.Y, ss.ArenaW, ss.ArenaH)
 				}
 				// Truck scoring
 				if ss.TruckToggle && ss.TruckState != nil {

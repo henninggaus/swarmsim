@@ -710,6 +710,14 @@ func (g *Game) handleSwarmInput() {
 		logger.Info("SWARM", "Dashboard: %v", ss.DashboardOn)
 	}
 
+	// A key: toggle action heatmap vs motion heatmap on dashboard
+	if inpututil.IsKeyJustPressed(ebiten.KeyA) && !ed.Focused && !ss.BotCountEdit {
+		if ss.DashboardOn && ss.StatsTracker != nil {
+			ss.StatsTracker.ShowActionHeat = !ss.StatsTracker.ShowActionHeat
+			logger.Info("SWARM", "Action heatmap: %v", ss.StatsTracker.ShowActionHeat)
+		}
+	}
+
 	// V key: toggle genome visualization (when editor not focused + evolution on)
 	if inpututil.IsKeyJustPressed(ebiten.KeyV) && !ed.Focused && !ss.BotCountEdit {
 		if ss.EvolutionOn {

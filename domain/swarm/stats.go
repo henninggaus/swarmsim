@@ -23,6 +23,11 @@ type StatsTracker struct {
 
 	// Event ticker (scrolling log of recent events)
 	EventTicker []string // last 20 events
+
+	// Action heatmap (tracks where specific actions happen)
+	ActionHeatmap    [80][60]int // pickup + drop events per cell
+	ActionHeatmapMax int
+	ShowActionHeat   bool // A key toggle: show action heatmap instead of motion heatmap
 }
 
 // BotRankEntry stores a bot's ranking info.
@@ -160,4 +165,18 @@ func (st *StatsTracker) AddDeliveryEvent(botIdx int, colorName string, correct b
 func (st *StatsTracker) AddPickupEvent(botIdx int, colorName string) {
 	text := fmt.Sprintf("#%d pickup %s", botIdx, colorName)
 	st.AddEvent(text)
+}
+
+// RecordActionAt records an action event at a world position for the action heatmap.
+func (st *StatsTracker) RecordActionAt(x, y, arenaW, arenaH float64) {
+	cellW := arenaW / 80.0
+	cellH := arenaH / 60.0
+	cx := int(x / cellW)
+	cy := int(y / cellH)
+	if cx >= 0 && cx < 80 && cy >= 0 && cy < 60 {
+		st.ActionHeatmap[cx][cy]++
+		if st.ActionHeatmap[cx][cy] > st.ActionHeatmapMax {
+			st.ActionHeatmapMax = st.ActionHeatmap[cx][cy]
+		}
+	}
 }
