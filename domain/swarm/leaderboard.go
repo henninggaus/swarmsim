@@ -69,9 +69,14 @@ func SubmitScore(lb *LeaderboardState, entry LeaderboardEntry) bool {
 		return false
 	}
 
-	// Check if it qualifies
+	// Check if it qualifies (find actual worst score defensively)
 	if len(lb.Entries) >= maxLeaderboardEntries {
-		worstScore := lb.Entries[len(lb.Entries)-1].Score
+		worstScore := lb.Entries[0].Score
+		for _, e := range lb.Entries {
+			if e.Score < worstScore {
+				worstScore = e.Score
+			}
+		}
 		if entry.Score <= worstScore {
 			return false
 		}
