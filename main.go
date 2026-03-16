@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"swarmsim/domain/bot"
+	"swarmsim/domain/physics"
 	"swarmsim/domain/swarm"
 	"swarmsim/engine/simulation"
 	"swarmsim/engine/swarmscript"
@@ -913,6 +914,34 @@ func (g *Game) handleSwarmInput() {
 		}
 	}
 
+	// O key: toggle arena edit mode
+	if inpututil.IsKeyJustPressed(ebiten.KeyO) && !ed.Focused && !ss.BotCountEdit {
+		ss.ArenaEditMode = !ss.ArenaEditMode
+		ss.ArenaDragIdx = -1
+		if ss.ArenaEditMode {
+			ss.ArenaEditTool = 0 // default: obstacle
+			logger.Info("SWARM", "Arena-Editor ON (Tool: Obstacle)")
+		} else {
+			logger.Info("SWARM", "Arena-Editor OFF")
+		}
+	}
+
+	// Arena edit tool switching: 1=obstacle, 2=station, 3=delete (when in edit mode)
+	if ss.ArenaEditMode && !ed.Focused {
+		if inpututil.IsKeyJustPressed(ebiten.KeyDigit1) {
+			ss.ArenaEditTool = 0
+			logger.Info("SWARM", "Arena-Editor Tool: Obstacle")
+		}
+		if inpututil.IsKeyJustPressed(ebiten.KeyDigit2) {
+			ss.ArenaEditTool = 1
+			logger.Info("SWARM", "Arena-Editor Tool: Station")
+		}
+		if inpututil.IsKeyJustPressed(ebiten.KeyDigit3) {
+			ss.ArenaEditTool = 2
+			logger.Info("SWARM", "Arena-Editor Tool: Delete")
+		}
+	}
+
 	// Editor keyboard input (when editor is focused)
 	if ed.Focused {
 		g.handleSwarmEditorKeys()
@@ -1290,8 +1319,14 @@ func (g *Game) handleSwarmClick(mx, my int) {
 		ss.BotCountEdit = false
 		ss.DropdownOpen = false
 
-		// Try to select a bot in the arena
+		// Arena edit mode: place/remove objects
 		awx, awy, inside := render.SwarmScreenToArena(mx, my, ss)
+		if inside && ss.ArenaEditMode {
+			g.handleArenaEdit(awx, awy)
+			return
+		}
+
+		// Try to select a bot in the arena
 		if inside {
 			bestIdx := -1
 			bestDist := 15.0 // max click distance
@@ -1324,6 +1359,96 @@ func (g *Game) handleSwarmClick(mx, my int) {
 		} else {
 			ss.SelectedBot = -1
 			ss.CompareBot = -1
+		}
+	}
+}
+
+// handleArenaEdit handles arena clicks when arena edit mode is active.
+func (g *Game) handleArenaEdit(awx, awy float64) {
+	ss := g.sim.SwarmState
+
+	switch ss.ArenaEditTool {
+	case 0: // Place obstacle
+		obs := &physics.Obstacle{
+			X: awx - 20,
+			Y: awy - 20,
+			W: 40,
+			H: 40,
+		}
+		ss.Obstacles = append(ss.Obstacles, obs)
+		ss.ObstaclesOn = true
+		logger.Info("ARENA-EDIT", "Placed obstacle at (%.0f, %.0f)", awx, awy)
+
+	case 1: // Place station
+		if !ss.DeliveryOn {
+			ss.DeliveryOn = true
+			ss.Stations = nil
+			ss.Packages = nil
+		}
+		// Cycle through colors: count existing stations to pick next color
+		nextColor := (len(ss.Stations) % 4) + 1
+		isPickup := len(ss.Stations)%2 == 0 // alternate pickup/dropoff
+		st := swarm.DeliveryStation{
+			X:        awx,
+			Y:        awy,
+			Color:    nextColor,
+			IsPickup: isPickup,
+		}
+		if isPickup {
+			st.HasPackage = true
+			ss.Packages = append(ss.Packages, swarm.DeliveryPackage{
+				Color:     nextColor,
+				CarriedBy: -1,
+				X:         awx,
+				Y:         awy,
+				Active:    true,
+				SpawnTick: ss.Tick,
+			})
+		}
+		ss.Stations = append(ss.Stations, st)
+		kind := "Dropoff"
+		if isPickup {
+			kind = "Pickup"
+		}
+		logger.Info("ARENA-EDIT", "Placed %s station (color %d) at (%.0f, %.0f)", kind, nextColor, awx, awy)
+
+	case 2: // Delete nearest object
+		// Check obstacles first
+		bestObsDist := 50.0
+		bestObsIdx := -1
+		for i, obs := range ss.Obstacles {
+			cx := obs.X + obs.W/2
+			cy := obs.Y + obs.H/2
+			dx := cx - awx
+			dy := cy - awy
+			d := math.Sqrt(dx*dx + dy*dy)
+			if d < bestObsDist {
+				bestObsDist = d
+				bestObsIdx = i
+			}
+		}
+		// Check stations
+		bestStDist := 50.0
+		bestStIdx := -1
+		for i := range ss.Stations {
+			dx := ss.Stations[i].X - awx
+			dy := ss.Stations[i].Y - awy
+			d := math.Sqrt(dx*dx + dy*dy)
+			if d < bestStDist {
+				bestStDist = d
+				bestStIdx = i
+			}
+		}
+		// Delete whichever is closer
+		if bestObsIdx >= 0 && (bestStIdx < 0 || bestObsDist < bestStDist) {
+			ss.Obstacles = append(ss.Obstacles[:bestObsIdx], ss.Obstacles[bestObsIdx+1:]...)
+			logger.Info("ARENA-EDIT", "Deleted obstacle at (%.0f, %.0f)", awx, awy)
+			if len(ss.Obstacles) == 0 {
+				ss.ObstaclesOn = false
+			}
+		} else if bestStIdx >= 0 {
+			ss.Stations = append(ss.Stations[:bestStIdx], ss.Stations[bestStIdx+1:]...)
+			logger.Info("ARENA-EDIT", "Deleted station at (%.0f, %.0f)", awx, awy)
 		}
 	}
 }

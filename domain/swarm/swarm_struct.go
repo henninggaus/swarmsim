@@ -330,6 +330,10 @@ type SwarmState struct {
 	ObstaclesOn bool
 	DynamicEnv  bool // dynamic environment: moving obstacles + expiring packages
 	MazeOn      bool
+	ArenaEditMode bool // arena editor: click to place/remove obstacles & stations
+	ArenaEditTool int  // 0=obstacle, 1=station, 2=delete
+	ArenaDragIdx  int  // index of obstacle being dragged (-1=none)
+	ArenaDragType int  // 0=obstacle, 1=station
 	WrapMode    bool // false=BOUNCE, true=WRAP
 	ShowTrails  bool
 

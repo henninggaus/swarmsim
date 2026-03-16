@@ -445,6 +445,21 @@ func (r *Renderer) DrawSwarmMode(screen *ebiten.Image, s *simulation.Simulation,
 		DrawGenomeBrowser(screen, ss)
 	}
 
+	// Arena editor mode indicator
+	if ss.ArenaEditMode {
+		toolNames := []string{"Hindernis", "Station", "Loeschen"}
+		toolColors := []color.RGBA{
+			{180, 120, 60, 255},
+			{60, 180, 120, 255},
+			{255, 80, 80, 255},
+		}
+		label := fmt.Sprintf("ARENA-EDITOR  Tool: %s  (1/2/3=wechseln, O=aus)", toolNames[ss.ArenaEditTool])
+		// Background bar
+		vector.DrawFilledRect(screen, 360, float32(sh-46), float32(sw-365), 16,
+			color.RGBA{20, 20, 40, 200}, false)
+		printColoredAt(screen, label, 365, sh-45, toolColors[ss.ArenaEditTool])
+	}
+
 	// Statistics dashboard
 	if ss.DashboardOn && ss.StatsTracker != nil {
 		DrawDashboard(screen, ss, sw-260, 55, 250, sh-70)
