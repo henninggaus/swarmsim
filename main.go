@@ -784,6 +784,29 @@ func (g *Game) handleSwarmInput() {
 		logger.Info("SWARM", "Formation-Analyse: %v", ss.ShowFormation)
 	}
 
+	// F8 key: save parameter preset
+	if inpututil.IsKeyJustPressed(ebiten.KeyF8) && !ed.Focused {
+		name := fmt.Sprintf("Preset_%s_%d", ss.ProgramName, ss.Tick)
+		swarm.SavePreset(ss, name)
+		g.renderer.OverlayText = "Preset gespeichert: " + name
+		g.renderer.OverlayTimer = 60
+	}
+
+	// F9 key: cycle and load saved presets
+	if inpututil.IsKeyJustPressed(ebiten.KeyF9) && !ed.Focused {
+		names := swarm.ListPresets()
+		if len(names) > 0 {
+			ss.PresetIdx = ss.PresetIdx % len(names)
+			swarm.LoadPreset(ss, names[ss.PresetIdx])
+			g.renderer.OverlayText = "Preset geladen: " + names[ss.PresetIdx]
+			g.renderer.OverlayTimer = 60
+			ss.PresetIdx = (ss.PresetIdx + 1) % len(names)
+		} else {
+			g.renderer.OverlayText = "Keine Presets gespeichert (F8 zum Speichern)"
+			g.renderer.OverlayTimer = 60
+		}
+	}
+
 	// Y key: toggle heatmap overlay
 	if inpututil.IsKeyJustPressed(ebiten.KeyY) && !ed.Focused && !ss.BotCountEdit {
 		ss.ShowHeatmap = !ss.ShowHeatmap

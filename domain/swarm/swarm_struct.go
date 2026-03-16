@@ -351,6 +351,9 @@ type SwarmState struct {
 	// Formation analysis overlay (F6)
 	ShowFormation bool
 
+	// Parameter preset system (F8 save, F9 load)
+	PresetIdx int // current preset index for cycling
+
 	// Auto-Optimizer
 	AutoOptimizer *AutoOptimizerState
 
