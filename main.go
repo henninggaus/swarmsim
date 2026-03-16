@@ -813,6 +813,17 @@ func (g *Game) handleSwarmInput() {
 		logger.Info("SWARM", "Live-Chart: %v", ss.ShowLiveChart)
 	}
 
+	// Comma key: toggle bot spatial memory
+	if inpututil.IsKeyJustPressed(ebiten.KeyComma) && !ed.Focused && !ss.BotCountEdit {
+		ss.MemoryEnabled = !ss.MemoryEnabled
+		if ss.MemoryEnabled {
+			swarm.InitBotMemory(ss)
+		} else {
+			swarm.ClearBotMemory(ss)
+		}
+		logger.Info("SWARM", "Bot-Gedaechtnis: %v", ss.MemoryEnabled)
+	}
+
 	// Y key: toggle heatmap overlay
 	if inpututil.IsKeyJustPressed(ebiten.KeyY) && !ed.Focused && !ss.BotCountEdit {
 		ss.ShowHeatmap = !ss.ShowHeatmap

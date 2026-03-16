@@ -133,6 +133,7 @@ func DrawHelpOverlay(screen *ebiten.Image, isSwarmMode bool, scrollY int) {
 		{"F8", "Parameter-Preset speichern"},
 		{"F9", "Gespeichertes Preset laden (zyklisch)"},
 		{".", "Live-Chart: Lieferstatistik als Liniendiagramm"},
+		{",", "Bot-Gedaechtnis: Bots merken sich besuchte Zellen"},
 		{"Z", "Replay-Modus: Zeitverlauf mit Pfeiltasten scrubben"},
 		{"I", "Energie-System: Bots verbrauchen Energie"},
 		{"K", "Kommunikations-Graph: Nachrichten-Linien anzeigen"},
@@ -226,6 +227,13 @@ func DrawHelpOverlay(screen *ebiten.Image, isSwarmMode bool, scrollY int) {
 		{"truck_here", "1 = LKW ist an der Rampe geparkt"},
 		{"truck_pkg", "Anzahl verbleibender Pakete im LKW"},
 		{"speed", "Aktuelle Geschwindigkeit des Bots"},
+		{"bot_ahead", "Nachbarn im 90-Grad-Kegel voraus"},
+		{"bot_behind", "Nachbarn im 90-Grad-Kegel hinten"},
+		{"bot_left", "Nachbarn im 90-Grad-Kegel links"},
+		{"bot_right", "Nachbarn im 90-Grad-Kegel rechts"},
+		{"visited_here", "Wie oft aktuelle Zelle besucht (Memory)"},
+		{"visited_ahead", "Wie oft Zelle voraus besucht (Memory)"},
+		{"explored", "Prozent des Gebiets erkundet (Memory)"},
 	})
 	ly += 6
 

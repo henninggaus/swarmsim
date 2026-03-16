@@ -395,6 +395,11 @@ func (s *Simulation) updateSwarmMode() {
 		swarm.UpdateHeatmap(ss)
 	}
 
+	// Phase 4.94: Bot spatial memory update (every 5 ticks)
+	if ss.MemoryEnabled && ss.Tick%5 == 0 {
+		swarm.UpdateBotMemory(ss)
+	}
+
 	// Phase 4.95: Accumulate lifetime stats (before StuckPrevX/Y is overwritten)
 	for i := range ss.Bots {
 		bot := &ss.Bots[i]
@@ -1262,6 +1267,13 @@ func evaluateSwarmCondition(cond swarmscript.Condition, bot *swarm.SwarmBot, sna
 		return compareInt(deg, cond.Op, cv)
 	case swarmscript.CondSpeed:
 		return compareInt(int(bot.Speed*100), cond.Op, cv)
+
+	case swarmscript.CondVisitedHere:
+		return compareInt(swarm.BotVisitedHere(bot), cond.Op, cv)
+	case swarmscript.CondVisitedAhead:
+		return compareInt(swarm.BotVisitedAhead(bot), cond.Op, cv)
+	case swarmscript.CondExplored:
+		return compareInt(swarm.BotExploredPercent(bot), cond.Op, cv)
 	}
 
 	return false

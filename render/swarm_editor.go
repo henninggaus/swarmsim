@@ -571,6 +571,11 @@ func DrawSwarmHUD(screen *ebiten.Image, s *simulation.Simulation, fps float64) {
 			printColoredAt(screen, "WELLEN", 950, 35, color.RGBA{100, 200, 255, 220})
 		}
 
+		// Memory indicator
+		if ss.MemoryEnabled {
+			printColoredAt(screen, "MEMORY", 1030, 35, color.RGBA{200, 150, 255, 220})
+		}
+
 		// Reset flash indicator
 		if ss.ResetFlashTimer > 0 {
 			flashAlpha := uint8(255)

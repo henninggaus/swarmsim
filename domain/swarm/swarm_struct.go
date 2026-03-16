@@ -93,6 +93,11 @@ type SwarmBot struct {
 	BotLeft   int // neighbors in left cone
 	BotRight  int // neighbors in right cone
 
+	// Spatial memory (visited grid per bot)
+	MemoryGrid []uint8
+	MemoryCols int
+	MemoryRows int
+
 	// Anti-stuck tracking
 	StuckTicks      int     // how many ticks bot barely moved
 	StuckPrevX      float64 // position last tick for stuck detection
@@ -454,6 +459,7 @@ type SwarmState struct {
 
 	ShowCommGraph bool // K key toggle: show communication lines between bots
 	EnergyEnabled bool // energy system toggle
+	MemoryEnabled bool // bot spatial memory system toggle
 
 	CollisionCount  int // obstacle collisions this tick (reset per tick)
 	ResetFlashTimer int // counts down from 30 for "RESET" flash

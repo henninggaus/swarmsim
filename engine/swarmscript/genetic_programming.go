@@ -31,6 +31,9 @@ var gpSensorPool = []gpSensorEntry{
 	{CondBotBehind, 0, 5},
 	{CondBotLeft, 0, 5},
 	{CondBotRight, 0, 5},
+	{CondVisitedHere, 0, 5},
+	{CondVisitedAhead, 0, 5},
+	{CondExplored, 0, 100},
 }
 
 // gpActionEntry defines an action template for random generation.
@@ -393,6 +396,12 @@ func condTypeName(t ConditionType) string {
 		return "heading"
 	case CondSpeed:
 		return "speed"
+	case CondVisitedHere:
+		return "visited_here"
+	case CondVisitedAhead:
+		return "visited_ahead"
+	case CondExplored:
+		return "explored"
 	default:
 		return "true"
 	}
