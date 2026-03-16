@@ -1468,6 +1468,13 @@ func (g *Game) handleSwarmClick(mx, my int) {
 				}
 			}
 
+			// Ctrl+click: clone bot genome to all others
+			ctrlHeld := ebiten.IsKeyPressed(ebiten.KeyControl) || ebiten.IsKeyPressed(ebiten.KeyMeta)
+			if ctrlHeld && bestIdx >= 0 {
+				g.cloneBotGenome(bestIdx)
+				return
+			}
+
 			// Shift+click: set compare bot (if a primary bot is already selected)
 			shiftHeld := ebiten.IsKeyPressed(ebiten.KeyShift)
 			if shiftHeld && bestIdx >= 0 && ss.SelectedBot >= 0 && bestIdx != ss.SelectedBot {
@@ -1489,6 +1496,39 @@ func (g *Game) handleSwarmClick(mx, my int) {
 			ss.CompareBot = -1
 		}
 	}
+}
+
+// cloneBotGenome copies a bot's genome (params/weights/program) to all other bots.
+func (g *Game) cloneBotGenome(srcIdx int) {
+	ss := g.sim.SwarmState
+	src := &ss.Bots[srcIdx]
+	cloned := 0
+
+	for i := range ss.Bots {
+		if i == srcIdx {
+			continue
+		}
+		// Clone evolution params
+		if ss.EvolutionOn {
+			ss.Bots[i].ParamValues = src.ParamValues
+			cloned++
+		}
+		// Clone neuro brain weights
+		if ss.NeuroEnabled && src.Brain != nil {
+			if ss.Bots[i].Brain == nil {
+				ss.Bots[i].Brain = &swarm.NeuroBrain{}
+			}
+			ss.Bots[i].Brain.Weights = src.Brain.Weights
+			cloned++
+		}
+		// Clone GP program
+		if ss.GPEnabled && src.OwnProgram != nil {
+			ss.Bots[i].OwnProgram = src.OwnProgram // share program (read-only between evolutions)
+			cloned++
+		}
+	}
+	ss.SelectedBot = srcIdx
+	logger.Info("SWARM", "Cloned bot #%d genome to %d bots", srcIdx, cloned)
 }
 
 // handleArenaEdit handles arena clicks when arena edit mode is active.
