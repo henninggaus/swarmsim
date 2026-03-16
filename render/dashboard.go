@@ -17,58 +17,104 @@ func DrawDashboard(screen *ebiten.Image, ss *swarm.SwarmState, x, y, w, h int) {
 		return
 	}
 
-	// Dashboard background
+	// Dashboard background with subtle gradient effect
 	vector.DrawFilledRect(screen, float32(x), float32(y), float32(w), float32(h),
-		color.RGBA{15, 15, 25, 230}, false)
+		color.RGBA{15, 15, 25, 235}, false)
+	// Top highlight
+	vector.DrawFilledRect(screen, float32(x), float32(y), float32(w), 2,
+		color.RGBA{80, 120, 200, 80}, false)
 	vector.StrokeRect(screen, float32(x), float32(y), float32(w), float32(h), 1,
-		color.RGBA{80, 80, 100, 150}, false)
+		color.RGBA{60, 80, 120, 150}, false)
 
-	headerCol := color.RGBA{0, 200, 220, 255}
-	dimCol := color.RGBA{120, 120, 140, 220}
+	headerCol := color.RGBA{136, 204, 255, 255}
+	sectionCol := color.RGBA{180, 200, 230, 220}
+	dimCol := color.RGBA{110, 115, 130, 220}
 	cx := x + 5
 	cy := y + 5
 
-	printColoredAt(screen, "Dashboard", cx, cy, headerCol)
+	printColoredAt(screen, "DASHBOARD", cx, cy, headerCol)
+	printColoredAt(screen, "(Taste D)", cx+70, cy, dimCol)
 	cy += 18
 
-	// 1. Fitness Graph (if evolution or GP active)
-	if (ss.EvolutionOn || ss.GPEnabled) && len(ss.FitnessHistory) > 1 {
-		printColoredAt(screen, "Fitness", cx, cy, dimCol)
+	// 1. Fitness Graph (if evolution, GP, or neuro active)
+	if (ss.EvolutionOn || ss.GPEnabled || ss.NeuroEnabled) && len(ss.FitnessHistory) > 1 {
+		drawDashSectionHeader(screen, cx, cy, w-15, "FITNESS-VERLAUF", sectionCol)
 		cy += 14
+		printColoredAt(screen, "Gruen=Best  Gelb=Durchschnitt", cx, cy, dimCol)
+		cy += 10
+		desc := "Zeigt wie Evolution die Parameter optimiert"
+		if ss.NeuroEnabled {
+			desc = "Zeigt wie Neuro-Netze durch Evolution lernen"
+		}
+		printColoredAt(screen, desc, cx, cy, color.RGBA{80, 80, 100, 180})
+		cy += 12
 		drawDashFitnessGraph(screen, ss, cx, cy, w-15, 60)
 		cy += 65
 	}
 
+	// 1b. Learning Speed Curve (fitness delta per generation)
+	if (ss.EvolutionOn || ss.GPEnabled || ss.NeuroEnabled) && len(ss.FitnessHistory) > 2 {
+		drawDashSectionHeader(screen, cx, cy, w-15, "LERNGESCHWINDIGKEIT", sectionCol)
+		cy += 14
+		printColoredAt(screen, "Fitness-Aenderung pro Generation", cx, cy, dimCol)
+		cy += 12
+		drawDashSpeedCurve(screen, ss, cx, cy, w-15, 50)
+		cy += 55
+	}
+
 	// 2. Delivery Rate Bar Chart
 	if ss.DeliveryOn && len(st.DeliveryBuckets) > 0 {
-		printColoredAt(screen, "Delivery Rate", cx, cy, dimCol)
+		drawDashSectionHeader(screen, cx, cy, w-15, "LIEFERRATE", sectionCol)
 		cy += 14
+		if ss.TeamsEnabled {
+			printColoredAt(screen, "Blau=Team A  Rot=Team B (pro 500 Ticks)", cx, cy, dimCol)
+		} else {
+			printColoredAt(screen, "Gruen=Richtig  Rot=Falsch (pro 500 Ticks)", cx, cy, dimCol)
+		}
+		cy += 12
 		drawDashDeliveryChart(screen, st, ss, cx, cy, w-15, 60)
 		cy += 65
 	}
 
 	// 3. Heatmap
 	if st.HeatmapMax > 0 {
-		printColoredAt(screen, "Heatmap", cx, cy, dimCol)
+		drawDashSectionHeader(screen, cx, cy, w-15, "BEWEGUNGS-HEATMAP", sectionCol)
 		cy += 14
+		printColoredAt(screen, "Wo bewegen sich Bots am meisten?", cx, cy, dimCol)
+		cy += 10
+		printColoredAt(screen, "Blau=wenig  Gruen=mittel  Rot=haeufig", cx, cy, color.RGBA{80, 80, 100, 180})
+		cy += 12
 		drawDashHeatmap(screen, st, cx, cy, w-15, w-15)
 		cy += w - 10
 	}
 
 	// 4. Bot Efficiency Ranking
 	if len(st.BotRankings) > 0 && ss.DeliveryOn {
-		printColoredAt(screen, "Top Bots", cx, cy, dimCol)
+		drawDashSectionHeader(screen, cx, cy, w-15, "TOP BOTS", sectionCol)
 		cy += 14
+		printColoredAt(screen, "Sortiert nach Lieferungen (avg = Lieferzeit)", cx, cy, dimCol)
+		cy += 12
 		drawDashRanking(screen, st, cx, cy, w-15, 80)
 		cy += 85
 	}
 
 	// 5. Event Ticker
 	if len(st.EventTicker) > 0 {
-		printColoredAt(screen, "Events", cx, cy, dimCol)
+		drawDashSectionHeader(screen, cx, cy, w-15, "LIVE-EVENTS", sectionCol)
 		cy += 14
+		printColoredAt(screen, "Letzte Aktionen: Pickup, Delivery, Respawn...", cx, cy, dimCol)
+		cy += 12
 		drawDashTicker(screen, st, cx, cy, w-15, 80)
 	}
+}
+
+// drawDashSectionHeader draws a section header with a subtle background line.
+func drawDashSectionHeader(screen *ebiten.Image, x, y, w int, title string, col color.RGBA) {
+	vector.DrawFilledRect(screen, float32(x-2), float32(y), float32(w+4), float32(lineH-2),
+		color.RGBA{25, 30, 50, 200}, false)
+	vector.DrawFilledRect(screen, float32(x-2), float32(y+lineH-3), float32(w+4), 1,
+		color.RGBA{60, 80, 120, 100}, false)
+	printColoredAt(screen, title, x, y, col)
 }
 
 // drawDashFitnessGraph draws a mini fitness graph.
@@ -88,6 +134,11 @@ func drawDashFitnessGraph(screen *ebiten.Image, ss *swarm.SwarmState, gx, gy, gw
 			maxFit = h.Best
 		}
 	}
+
+	// Axis labels
+	printColoredAt(screen, fmt.Sprintf("%.0f", maxFit), gx+2, gy+2, color.RGBA{80, 80, 100, 150})
+	printColoredAt(screen, "0", gx+2, gy+gh-lineH, color.RGBA{80, 80, 100, 150})
+
 	// Draw lines
 	start := 0
 	if n > 50 {
@@ -100,12 +151,76 @@ func drawDashFitnessGraph(screen *ebiten.Image, ss *swarm.SwarmState, gx, gy, gw
 		// Best (green)
 		y0b := float32(gy+gh) - float32(history[start+i-1].Best/maxFit)*float32(gh)
 		y1b := float32(gy+gh) - float32(history[start+i].Best/maxFit)*float32(gh)
-		vector.StrokeLine(screen, x0, y0b, x1, y1b, 1, color.RGBA{80, 255, 80, 220}, false)
+		vector.StrokeLine(screen, x0, y0b, x1, y1b, 1.5, color.RGBA{80, 255, 80, 220}, false)
 		// Avg (yellow)
 		y0a := float32(gy+gh) - float32(history[start+i-1].Avg/maxFit)*float32(gh)
 		y1a := float32(gy+gh) - float32(history[start+i].Avg/maxFit)*float32(gh)
-		vector.StrokeLine(screen, x0, y0a, x1, y1a, 1, color.RGBA{255, 200, 50, 200}, false)
+		vector.StrokeLine(screen, x0, y0a, x1, y1a, 1, color.RGBA{255, 200, 50, 180}, false)
 	}
+
+	// Generation count label
+	genLabel := fmt.Sprintf("Gen %d-%d", start+1, n)
+	printColoredAt(screen, genLabel, gx+gw-len(genLabel)*charW-2, gy+gh-lineH, color.RGBA{80, 80, 100, 150})
+}
+
+// drawDashSpeedCurve draws fitness delta (learning speed) per generation.
+func drawDashSpeedCurve(screen *ebiten.Image, ss *swarm.SwarmState, gx, gy, gw, gh int) {
+	vector.DrawFilledRect(screen, float32(gx), float32(gy), float32(gw), float32(gh),
+		color.RGBA{5, 5, 15, 200}, false)
+
+	history := ss.FitnessHistory
+	n := len(history)
+	if n < 3 {
+		return
+	}
+
+	// Compute deltas
+	start := 0
+	if n > 50 {
+		start = n - 50
+	}
+	pts := n - start
+	deltas := make([]float64, pts-1)
+	maxAbs := 1.0
+	for i := 1; i < pts; i++ {
+		d := history[start+i].Best - history[start+i-1].Best
+		deltas[i-1] = d
+		if d > maxAbs {
+			maxAbs = d
+		}
+		if -d > maxAbs {
+			maxAbs = -d
+		}
+	}
+
+	// Zero line at center
+	midY := float32(gy) + float32(gh)/2
+	vector.StrokeLine(screen, float32(gx), midY, float32(gx+gw), midY, 1,
+		color.RGBA{60, 60, 80, 150}, false)
+
+	// Draw bars
+	barW := float32(gw) / float32(len(deltas))
+	if barW < 1 {
+		barW = 1
+	}
+	for i, d := range deltas {
+		bx := float32(gx) + float32(i)*barW
+		h := float32(d/maxAbs) * float32(gh/2)
+		if d >= 0 {
+			// Green bar up
+			vector.DrawFilledRect(screen, bx, midY-h, barW, h,
+				color.RGBA{80, 220, 80, 200}, false)
+		} else {
+			// Red bar down
+			vector.DrawFilledRect(screen, bx, midY, barW, -h,
+				color.RGBA{220, 80, 80, 200}, false)
+		}
+	}
+
+	// Labels
+	printColoredAt(screen, fmt.Sprintf("+%.0f", maxAbs), gx+2, gy+1, color.RGBA{80, 80, 100, 150})
+	printColoredAt(screen, fmt.Sprintf("-%.0f", maxAbs), gx+2, gy+gh-lineH, color.RGBA{80, 80, 100, 150})
+	printColoredAt(screen, "Gruen=besser Rot=schlechter", gx+gw/3, gy+gh-lineH, color.RGBA{60, 60, 80, 120})
 }
 
 // drawDashDeliveryChart draws a bar chart of deliveries per window.
@@ -164,6 +279,14 @@ func drawDashDeliveryChart(screen *ebiten.Image, st *swarm.StatsTracker, ss *swa
 			vector.DrawFilledRect(screen, bx, float32(gy+gh)-hW, barW, hW,
 				color.RGBA{200, 80, 80, 200}, false)
 		}
+
+		// Bucket value label
+		val := st.DeliveryBuckets[i]
+		if val > 0 {
+			label := fmt.Sprintf("%d", val)
+			printColoredAt(screen, label, int(bx)+int(barW/2)-len(label)*charW/2, gy+gh-lineH,
+				color.RGBA{180, 180, 200, 150})
+		}
 	}
 }
 
@@ -184,7 +307,7 @@ func drawDashHeatmap(screen *ebiten.Image, st *swarm.StatsTracker, gx, gy, gw, g
 			// Normalize to 0-1
 			frac := float32(val) / float32(st.HeatmapMax)
 
-			// Color gradient: blue → green → yellow → red
+			// Color gradient: blue -> green -> yellow -> red
 			var col color.RGBA
 			switch {
 			case frac < 0.25:
@@ -227,8 +350,14 @@ func drawDashRanking(screen *ebiten.Image, st *swarm.StatsTracker, gx, gy, gw, g
 			col = color.RGBA{255, 100, 80, 220} // red
 		}
 
-		text := fmt.Sprintf("#%d Bot%d: %dd %davg",
-			i+1, entry.BotIdx, entry.Deliveries, entry.AvgTime)
+		// Medal emoji equivalent
+		medal := " "
+		if i == 0 {
+			medal = "*"
+		}
+
+		text := fmt.Sprintf("%s#%d Bot%d: %d Lieferungen (%d avg)",
+			medal, i+1, entry.BotIdx, entry.Deliveries, entry.AvgTime)
 		printColoredAt(screen, text, gx, gy+i*14, col)
 	}
 }
