@@ -16,6 +16,7 @@ cpu.prof
 
 # User data
 swarmsim_presets.json
+*.swarm
 
 # Logs
 *.log

@@ -849,6 +849,46 @@ func (g *Game) handleSwarmInput() {
 			ss.SensorNoiseOn, ss.SensorNoiseCfg.NoiseLevel*100, ss.SensorNoiseCfg.FailureRate*100)
 	}
 
+	// Ctrl+S: export program as .swarm file
+	if inpututil.IsKeyJustPressed(ebiten.KeyS) && ebiten.IsKeyPressed(ebiten.KeyControl) && !ed.Focused {
+		filename := fmt.Sprintf("%s_%d.swarm", ss.ProgramName, ss.Tick)
+		// Sanitize filename
+		filename = strings.ReplaceAll(filename, " ", "_")
+		filename = strings.ReplaceAll(filename, "/", "_")
+		err := swarm.ExportProgram(ss, filename)
+		if err != nil {
+			g.renderer.OverlayText = "Export-Fehler: " + err.Error()
+		} else {
+			g.renderer.OverlayText = "Exportiert: " + filename
+		}
+		g.renderer.OverlayTimer = 90
+	}
+
+	// Ctrl+O: import .swarm file (cycles through available files)
+	if inpututil.IsKeyJustPressed(ebiten.KeyO) && ebiten.IsKeyPressed(ebiten.KeyControl) && !ed.Focused {
+		files := swarm.ListSwarmFiles()
+		if len(files) > 0 {
+			// Cycle through files
+			idx := ss.Tick % len(files)
+			src, err := swarm.ImportProgram(ss, files[idx])
+			if err != nil {
+				g.renderer.OverlayText = "Import-Fehler: " + err.Error()
+			} else {
+				// Apply source to editor
+				ss.Editor.Lines = strings.Split(src, "\n")
+				ss.Editor.CursorLine = 0
+				ss.Editor.CursorCol = 0
+				ss.Editor.ScrollY = 0
+				g.deploySwarmProgram()
+				g.renderer.OverlayText = "Importiert: " + files[idx]
+			}
+			g.renderer.OverlayTimer = 90
+		} else {
+			g.renderer.OverlayText = "Keine .swarm Dateien gefunden"
+			g.renderer.OverlayTimer = 60
+		}
+	}
+
 	// Y key: toggle heatmap overlay
 	if inpututil.IsKeyJustPressed(ebiten.KeyY) && !ed.Focused && !ss.BotCountEdit {
 		ss.ShowHeatmap = !ss.ShowHeatmap

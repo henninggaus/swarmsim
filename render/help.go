@@ -141,6 +141,8 @@ func DrawHelpOverlay(screen *ebiten.Image, isSwarmMode bool, scrollY int) {
 		{"K", "Kommunikations-Graph: Nachrichten-Linien anzeigen"},
 		{"B", "Fitness-Baseline: aktuelle Kurve als Vergleich speichern"},
 		{"A", "Dashboard: Aktions-Heatmap / Bewegungs-Heatmap"},
+		{"Ctrl+S", "Programm als .swarm Datei exportieren"},
+		{"Ctrl+O", "Programm aus .swarm Datei importieren"},
 		{"Ctrl+Klick", "Bot-Genom auf alle anderen klonen"},
 		{"X", "Stats als CSV in Clipboard exportieren"},
 	})
