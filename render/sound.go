@@ -22,12 +22,17 @@ type SoundSystem struct {
 	pickupBuf    []byte // 800Hz sine, 50ms, fade-out
 	dropOKBuf    []byte // 400Hz→600Hz two-tone
 	dropFailBuf  []byte // 400Hz→200Hz descending sweep
-	collisionBuf []byte // white noise click, 5ms
+	collisionBuf  []byte // white noise click, 5ms
+	evolutionBuf  []byte // low gong for new generation
+	broadcastBuf  []byte // short blip for message broadcast
+	deployBuf     []byte // rising chime on deploy
+	resetBuf      []byte // descending sweep on reset
 
 	ambientPlayer *audio.Player
 	ambientStream *ambientNoise
 
-	collisionCooldown int // throttle collision clicks
+	collisionCooldown  int // throttle collision clicks
+	broadcastCooldown  int // throttle broadcast blips
 }
 
 // NewSoundSystem creates a sound system with pre-generated audio buffers.
@@ -41,6 +46,10 @@ func NewSoundSystem() *SoundSystem {
 	ss.dropOKBuf = generateTwoTone(400, 600, 0.03, 0.03, 0.3)
 	ss.dropFailBuf = generateSweep(400, 200, 0.08, 0.3)
 	ss.collisionBuf = generateNoise(0.005, 0.15)
+	ss.evolutionBuf = generateTwoTone(200, 300, 0.06, 0.08, 0.25) // low ascending gong
+	ss.broadcastBuf = generateSine(1200, 0.02, 0.15)               // short high blip
+	ss.deployBuf = generateTwoTone(500, 800, 0.04, 0.06, 0.25)    // rising chime
+	ss.resetBuf = generateSweep(600, 200, 0.12, 0.2)              // descending sweep
 
 	ss.ambientStream = &ambientNoise{
 		sampleRate: soundSampleRate,
@@ -73,6 +82,31 @@ func (ss *SoundSystem) PlayCollision() {
 	}
 	ss.collisionCooldown = 5
 	ss.playBuf(ss.collisionBuf)
+}
+
+// PlayEvolution plays the generation-complete gong.
+func (ss *SoundSystem) PlayEvolution() {
+	ss.playBuf(ss.evolutionBuf)
+}
+
+// PlayBroadcast plays a short blip for message broadcast (throttled).
+func (ss *SoundSystem) PlayBroadcast() {
+	if ss.broadcastCooldown > 0 {
+		ss.broadcastCooldown--
+		return
+	}
+	ss.broadcastCooldown = 10
+	ss.playBuf(ss.broadcastBuf)
+}
+
+// PlayDeploy plays a rising chime on program deploy.
+func (ss *SoundSystem) PlayDeploy() {
+	ss.playBuf(ss.deployBuf)
+}
+
+// PlayReset plays a descending sweep on simulation reset.
+func (ss *SoundSystem) PlayReset() {
+	ss.playBuf(ss.resetBuf)
 }
 
 func (ss *SoundSystem) playBuf(buf []byte) {

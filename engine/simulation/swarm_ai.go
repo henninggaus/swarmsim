@@ -1,7 +1,6 @@
 package simulation
 
 import (
-	"fmt"
 	"math"
 	"math/rand"
 	"swarmsim/domain/physics"
@@ -69,17 +68,33 @@ func (s *Simulation) updateSwarmMode() {
 	}
 
 	// Phase 2: Execute program on each bot (skip if anti-stuck breakout active)
-	if ss.Program != nil {
-		for i := range ss.Bots {
-			bot := &ss.Bots[i]
-			if bot.AntiStuckTimer > 0 {
-				// Breakout mode: forced random movement, ignore program
-				bot.Angle = bot.AntiStuckAngle
-				bot.Speed = swarm.SwarmBotSpeed
-				bot.LEDColor = [3]uint8{255, 255, 255} // white LED
-				bot.AntiStuckTimer--
-				continue
+	for i := range ss.Bots {
+		bot := &ss.Bots[i]
+		if bot.AntiStuckTimer > 0 {
+			// Breakout mode: forced random movement, ignore program
+			bot.Angle = bot.AntiStuckAngle
+			bot.Speed = swarm.SwarmBotSpeed
+			bot.LEDColor = [3]uint8{255, 255, 255} // white LED
+			bot.AntiStuckTimer--
+			continue
+		}
+		// Neuroevolution: use neural network if NEURO is ON
+		if ss.NeuroEnabled && bot.Brain != nil {
+			inputs := swarm.BuildNeuroInputs(bot, ss)
+			actionIdx := swarm.NeuroForward(bot.Brain, inputs)
+			swarm.ExecuteNeuroAction(actionIdx, bot, ss, i)
+			// Auto-pickup/drop for neuro bots: the net navigates, the system handles interaction
+			if ss.DeliveryOn {
+				if bot.CarryingPkg < 0 && bot.NearestPickupDist < 20 && bot.NearestPickupHasPkg {
+					executeSwarmAction(swarmscript.Action{Type: swarmscript.ActPickup}, bot, ss, i)
+				}
+				if bot.CarryingPkg >= 0 && bot.DropoffMatch && bot.NearestDropoffDist < 30 {
+					executeSwarmAction(swarmscript.Action{Type: swarmscript.ActDrop}, bot, ss, i)
+				}
 			}
+			continue
+		}
+		if ss.Program != nil {
 			executeSwarmProgram(ss, i)
 		}
 	}
@@ -200,16 +215,19 @@ func (s *Simulation) updateSwarmMode() {
 	if ss.DeliveryOn {
 		swarm.UpdateDeliverySystem(ss)
 		// Periodic delivery stats log
-		if ss.Tick%600 == 0 {
+		if ss.Tick%600 == 0 && ss.DeliveryStats.TotalDelivered > 0 {
 			carrying := 0
 			for ci := range ss.Bots {
 				if ss.Bots[ci].CarryingPkg >= 0 {
 					carrying++
 				}
 			}
-			fmt.Printf("[DELIVERY] tick=%d delivered=%d (correct=%d wrong=%d) carrying=%d\n",
-				ss.Tick, ss.DeliveryStats.TotalDelivered, ss.DeliveryStats.CorrectDelivered,
-				ss.DeliveryStats.WrongDelivered, carrying)
+			correctRate := 0
+			if ss.DeliveryStats.TotalDelivered > 0 {
+				correctRate = ss.DeliveryStats.CorrectDelivered * 100 / ss.DeliveryStats.TotalDelivered
+			}
+			logger.Info("DELIVERY", "Tick %d: %d geliefert (%d%% korrekt), %d Bots tragen Pakete",
+				ss.Tick, ss.DeliveryStats.TotalDelivered, correctRate, carrying)
 		}
 	}
 
@@ -280,6 +298,7 @@ func (s *Simulation) updateSwarmMode() {
 		ss.EvolutionTimer++
 		if ss.EvolutionTimer >= 1500 {
 			swarm.RunEvolution(ss)
+			ss.EvolutionSoundPending = true
 		}
 	}
 
@@ -289,8 +308,21 @@ func (s *Simulation) updateSwarmMode() {
 		if ss.GPTimer >= 2000 {
 			swarm.RunGPEvolution(ss)
 			ss.GPTimer = 0
+			ss.EvolutionSoundPending = true
 		}
 	}
+
+	// Phase 4.87: Neuroevolution
+	if ss.NeuroEnabled {
+		ss.NeuroTimer++
+		if ss.NeuroTimer >= 2000 {
+			swarm.RunNeuroEvolution(ss)
+			ss.EvolutionSoundPending = true
+		}
+	}
+
+	// Count broadcasts for sound
+	ss.BroadcastCount = len(ss.NextMessages)
 
 	// Phase 4.9: Challenge timer update
 	if ss.TeamsEnabled {

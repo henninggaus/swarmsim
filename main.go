@@ -783,6 +783,7 @@ func (g *Game) handleSwarmClick(mx, my int) {
 		g.deploySwarmProgram()
 		ss.DropdownOpen = false
 		ss.BotCountEdit = false
+		g.renderer.Sound.PlayDeploy()
 
 	case "reset":
 		ss.ResetBots()
@@ -791,6 +792,7 @@ func (g *Game) handleSwarmClick(mx, my int) {
 			ss.TruckState = swarm.NewSwarmTruckState(ss.Rng)
 		}
 		logger.Info("SWARM", "RESET — %d bots scattered", ss.BotCount)
+		g.renderer.Sound.PlayReset()
 		ss.DropdownOpen = false
 		ss.BotCountEdit = false
 
@@ -935,6 +937,11 @@ func (g *Game) handleSwarmClick(mx, my int) {
 			logger.Info("SWARM", "Cannot disable delivery while a delivery program is active")
 			break
 		}
+		// Neuro needs delivery for fitness
+		if ss.NeuroEnabled && ss.DeliveryOn {
+			logger.Info("SWARM", "Cannot disable delivery while Neuro is active")
+			break
+		}
 		ss.DeliveryOn = !ss.DeliveryOn
 		if ss.DeliveryOn {
 			// Force maze on
@@ -1006,7 +1013,9 @@ func (g *Game) handleSwarmClick(mx, my int) {
 		ss.EvolutionOn = !ss.EvolutionOn
 		if ss.EvolutionOn {
 			ss.GPEnabled = false // mutually exclusive
+			ss.NeuroEnabled = false
 			swarm.ClearGP(ss)
+			swarm.ClearNeuro(ss)
 			swarm.InitBotParams(ss)
 			ss.Generation = 0
 			ss.EvolutionTimer = 0
@@ -1039,14 +1048,40 @@ func (g *Game) handleSwarmClick(mx, my int) {
 	case "gp":
 		ss.GPEnabled = !ss.GPEnabled
 		if ss.GPEnabled {
-			// Turn off regular evolution (mutually exclusive)
+			// Turn off regular evolution and neuro (mutually exclusive)
 			ss.EvolutionOn = false
 			ss.ShowGenomeViz = false
+			ss.NeuroEnabled = false
+			swarm.ClearNeuro(ss)
 			swarm.InitGP(ss)
 			logger.Info("SWARM", "GP ON — %d bots, each with own random program", ss.BotCount)
 		} else {
 			swarm.ClearGP(ss)
 			logger.Info("SWARM", "GP OFF")
+		}
+		ed.Focused = false
+		ss.BotCountEdit = false
+
+	case "neuro":
+		ss.NeuroEnabled = !ss.NeuroEnabled
+		if ss.NeuroEnabled {
+			// Turn off regular evolution and GP (mutually exclusive)
+			ss.EvolutionOn = false
+			ss.ShowGenomeViz = false
+			ss.GPEnabled = false
+			swarm.ClearGP(ss)
+			// Auto-enable delivery if not already on
+			if !ss.DeliveryOn {
+				ss.DeliveryOn = true
+				ss.IsDeliveryProgram = true
+				swarm.GenerateDeliveryStations(ss)
+			}
+			swarm.InitNeuro(ss)
+			logger.Info("SWARM", "NEURO ON — %d Bots × %d Gewichte, Delivery automatisch aktiviert",
+				ss.BotCount, swarm.NeuroWeights)
+		} else {
+			swarm.ClearNeuro(ss)
+			logger.Info("SWARM", "NEURO OFF")
 		}
 		ed.Focused = false
 		ss.BotCountEdit = false
@@ -1355,6 +1390,10 @@ func (g *Game) autoReset(reason string) {
 	if ss.TruckToggle {
 		ss.TruckState = swarm.NewSwarmTruckState(ss.Rng)
 	}
+	// Re-initialize neuro brains after respawn
+	if ss.NeuroEnabled {
+		swarm.InitNeuro(ss)
+	}
 	ss.ResetFlashTimer = 30
 	logger.Info("SWARM", "Auto-reset: %s", reason)
 }
@@ -1438,11 +1477,30 @@ func (g *Game) loadSwarmPreset(idx int) {
 	// GP-program coupling
 	if swarm.IsGPPresetIdx(idx) {
 		ss.GPEnabled = true
-		ss.EvolutionOn = false // mutually exclusive
-		g.sim.Speed = 5.0     // auto 5x speed
+		ss.EvolutionOn = false  // mutually exclusive
+		ss.NeuroEnabled = false // mutually exclusive
+		swarm.ClearNeuro(ss)
+		g.sim.Speed = 5.0 // auto 5x speed
 	} else {
 		if ss.GPEnabled {
 			swarm.ClearGP(ss)
+		}
+	}
+
+	// Neuro-program coupling
+	if swarm.IsNeuroPresetIdx(idx) {
+		ss.NeuroEnabled = true
+		ss.EvolutionOn = false // mutually exclusive
+		ss.GPEnabled = false   // mutually exclusive
+		swarm.ClearGP(ss)
+		swarm.InitNeuro(ss)
+		g.sim.Speed = 5.0 // auto 5x speed for neuro
+		logger.Info("SWARM", "Neuro Delivery preset — NEURO auto-aktiviert, %d Bots × %d Gewichte",
+			ss.BotCount, swarm.NeuroWeights)
+	} else {
+		if ss.NeuroEnabled {
+			swarm.ClearNeuro(ss)
+			ss.NeuroEnabled = false
 		}
 	}
 

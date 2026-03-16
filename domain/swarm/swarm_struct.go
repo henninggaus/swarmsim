@@ -152,6 +152,9 @@ type SwarmBot struct {
 	OwnProgram       *swarmscript.SwarmProgram // nil when GP OFF
 	LastMatchedRules []int                     // indices of rules that matched last tick
 
+	// Neuroevolution (per-bot neural network, used when NeuroEnabled)
+	Brain *NeuroBrain // nil when NEURO OFF
+
 	// Teams (multiplayer mode)
 	Team int // 0=no team, 1=A (blue), 2=B (red)
 
@@ -364,6 +367,15 @@ type SwarmState struct {
 	GPEnabled    bool // GP toggle
 	GPGeneration int  // current GP generation
 	GPTimer      int  // ticks since last GP evolution
+
+	// Neuroevolution (each bot has its own neural network)
+	NeuroEnabled    bool // NEURO toggle
+	NeuroGeneration int  // current neuro generation
+	NeuroTimer      int  // ticks since last neuro evolution
+
+	// Sound events (consumed by renderer each frame)
+	EvolutionSoundPending bool // set true when a generation completes
+	BroadcastCount        int  // messages sent this tick (for sound throttling)
 
 	// Multiplayer teams
 	TeamsEnabled     bool

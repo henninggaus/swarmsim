@@ -274,6 +274,18 @@ func (r *Renderer) DrawSwarmMode(screen *ebiten.Image, s *simulation.Simulation,
 		processDeliveryEvents(r, ss)
 	}
 
+	// Sound events: evolution gong, broadcast blips
+	if r.Sound != nil && r.Sound.Enabled {
+		if ss.EvolutionSoundPending {
+			r.Sound.PlayEvolution()
+			ss.EvolutionSoundPending = false
+		}
+		if ss.BroadcastCount > 0 {
+			r.Sound.PlayBroadcast()
+			ss.BroadcastCount = 0
+		}
+	}
+
 	// Delivery particles (on arena)
 	if r.SwarmParticles != nil {
 		r.SwarmParticles.Update()
@@ -393,6 +405,9 @@ func drawSelectedBotInfo(screen *ebiten.Image, ss *swarm.SwarmState) {
 	if ss.GPEnabled && bot.OwnProgram != nil {
 		h = 520 // taller to fit GP program info
 	}
+	if ss.NeuroEnabled && bot.Brain != nil {
+		h = 500 // taller to fit neuro info
+	}
 	valCol := color.RGBA{200, 200, 220, 255}
 	dimCol := color.RGBA{140, 140, 160, 255}
 	headerCol := color.RGBA{0, 220, 255, 255}
@@ -411,74 +426,88 @@ func drawSelectedBotInfo(screen *ebiten.Image, ss *swarm.SwarmState) {
 	vector.StrokeRect(screen, float32(lx+70), float32(ly+2), 10, 10, 1, color.RGBA{255, 255, 255, 120}, false)
 	ly += lineH + 2
 
-	// --- Position ---
-	printColoredAt(screen, "Position", lx, ly, headerCol)
+	// --- Position & Bewegung ---
+	printColoredAt(screen, "Position & Bewegung", lx, ly, headerCol)
 	ly += lineH
 	printColoredAt(screen, fmt.Sprintf("X:%.0f Y:%.0f", bot.X, bot.Y), lx, ly, valCol)
 	ly += lineH
-	printColoredAt(screen, fmt.Sprintf("Angle:%.0f Speed:%.1f", bot.Angle*180/math.Pi, bot.Speed), lx, ly, valCol)
+	degAngle := bot.Angle * 180 / math.Pi
+	if degAngle < 0 {
+		degAngle += 360
+	}
+	printColoredAt(screen, fmt.Sprintf("Richtung:%.0f Tempo:%.1f", degAngle, bot.Speed), lx, ly, valCol)
 	ly += lineH + 2
 
-	// --- Status ---
-	printColoredAt(screen, "Status", lx, ly, headerCol)
+	// --- Interner Zustand ---
+	printColoredAt(screen, "Interner Zustand", lx, ly, headerCol)
 	ly += lineH
-	printColoredAt(screen, fmt.Sprintf("State:%d Cnt:%d T:%d", bot.State, bot.Counter, bot.Timer), lx, ly, valCol)
+	printColoredAt(screen, fmt.Sprintf("State:%d  Counter:%d  Timer:%d", bot.State, bot.Counter, bot.Timer), lx, ly, valCol)
 	ly += lineH
-	printColoredAt(screen, fmt.Sprintf("V1:%d V2:%d", bot.Value1, bot.Value2), lx, ly, valCol)
+	printColoredAt(screen, fmt.Sprintf("Value1:%d  Value2:%d", bot.Value1, bot.Value2), lx, ly, valCol)
 	ly += lineH
-	printColoredAt(screen, fmt.Sprintf("LED: %d,%d,%d", bot.LEDColor[0], bot.LEDColor[1], bot.LEDColor[2]), lx, ly, dimCol)
+	printColoredAt(screen, fmt.Sprintf("LED: R%d G%d B%d", bot.LEDColor[0], bot.LEDColor[1], bot.LEDColor[2]), lx, ly, dimCol)
 	ly += lineH + 2
 
-	// --- Sensors ---
-	printColoredAt(screen, "Sensors", lx, ly, headerCol)
+	// --- Sensoren ---
+	printColoredAt(screen, "Sensoren (Live-Werte)", lx, ly, headerCol)
 	ly += lineH
-	nearStr := "---"
+	nearStr := "keiner"
 	if bot.NearestIdx >= 0 {
-		nearStr = fmt.Sprintf("%.0fpx #%d", bot.NearestDist, bot.NearestIdx)
+		nearStr = fmt.Sprintf("%.0fpx (Bot #%d)", bot.NearestDist, bot.NearestIdx)
 	}
-	printColoredAt(screen, fmt.Sprintf("Neighbors:%d Near:%s", bot.NeighborCount, nearStr), lx, ly, valCol)
+	printColoredAt(screen, fmt.Sprintf("Naechster: %s", nearStr), lx, ly, valCol)
 	ly += lineH
-	obsStr := "No"
+	printColoredAt(screen, fmt.Sprintf("Nachbarn: %d (in 120px)", bot.NeighborCount), lx, ly, valCol)
+	ly += lineH
+	obsStr := "Nein"
 	if bot.ObstacleAhead {
-		obsStr = fmt.Sprintf("%.0fpx", bot.ObstacleDist)
+		obsStr = fmt.Sprintf("Ja (%.0fpx)", bot.ObstacleDist)
 	}
-	edgeStr := "-"
+	edgeStr := "Nein"
 	if bot.OnEdge {
-		edgeStr = "YES"
+		edgeStr = "Ja"
 	}
-	printColoredAt(screen, fmt.Sprintf("Obs:%s Edge:%s", obsStr, edgeStr), lx, ly, valCol)
+	printColoredAt(screen, fmt.Sprintf("Hindernis: %s  Rand: %s", obsStr, edgeStr), lx, ly, valCol)
 	ly += lineH
-	printColoredAt(screen, fmt.Sprintf("Light:%d Msg:%d", bot.LightValue, bot.ReceivedMsg), lx, ly, valCol)
+	lightStr := "---"
+	if ss.Light.Active {
+		lightStr = fmt.Sprintf("%d/100", bot.LightValue)
+	}
+	msgStr := "Nein"
+	if bot.ReceivedMsg > 0 {
+		msgStr = fmt.Sprintf("Typ %d", bot.ReceivedMsg)
+	}
+	printColoredAt(screen, fmt.Sprintf("Licht: %s  Msg: %s", lightStr, msgStr), lx, ly, valCol)
 	ly += lineH + 2
 
 	// --- Delivery (conditional) ---
 	if ss.DeliveryOn {
-		printColoredAt(screen, "Delivery", lx, ly, headerCol)
+		printColoredAt(screen, "Paket-Delivery", lx, ly, headerCol)
 		ly += lineH
-		carryStr := "None"
+		carryStr := "Leer (sucht)"
 		if bot.CarryingPkg >= 0 && bot.CarryingPkg < len(ss.Packages) {
-			carryStr = swarm.DeliveryColorName(ss.Packages[bot.CarryingPkg].Color)
+			carryStr = fmt.Sprintf("Traegt: %s", swarm.DeliveryColorName(ss.Packages[bot.CarryingPkg].Color))
 		}
-		printColoredAt(screen, fmt.Sprintf("Carrying: %s", carryStr), lx, ly, valCol)
+		printColoredAt(screen, carryStr, lx, ly, valCol)
 		ly += lineH
 		pDist := "---"
 		if bot.NearestPickupDist < 999 {
-			pDist = fmt.Sprintf("%.0f", bot.NearestPickupDist)
+			pDist = fmt.Sprintf("%.0fpx", bot.NearestPickupDist)
 		}
 		dDist := "---"
 		if bot.NearestDropoffDist < 999 {
-			dDist = fmt.Sprintf("%.0f", bot.NearestDropoffDist)
+			dDist = fmt.Sprintf("%.0fpx", bot.NearestDropoffDist)
 		}
 		matchStr := ""
 		if bot.DropoffMatch {
-			matchStr = " match!"
+			matchStr = " MATCH!"
 		}
-		printColoredAt(screen, fmt.Sprintf("P:%s D:%s%s", pDist, dDist, matchStr), lx, ly, valCol)
+		printColoredAt(screen, fmt.Sprintf("Pickup:%s Dropoff:%s%s", pDist, dDist, matchStr), lx, ly, valCol)
 		ly += lineH + 2
 	}
 
-	// --- Social ---
-	printColoredAt(screen, "Social", lx, ly, headerCol)
+	// --- Sozial ---
+	printColoredAt(screen, "Sozial & Ketten", lx, ly, headerCol)
 	ly += lineH
 	followStr := "None"
 	if bot.FollowTargetIdx >= 0 {
@@ -538,6 +567,47 @@ func drawSelectedBotInfo(screen *ebiten.Image, ss *swarm.SwarmState) {
 		}
 		if len(bot.OwnProgram.Rules) > maxShow {
 			printColoredAt(screen, fmt.Sprintf("  ...+%d more", len(bot.OwnProgram.Rules)-maxShow), lx, ly, dimCol)
+		}
+	}
+
+	// --- Neuro Brain (when NEURO enabled) ---
+	if ss.NeuroEnabled && bot.Brain != nil {
+		neuroCol := color.RGBA{255, 140, 50, 255}
+		printColoredAt(screen, "Neuronales Netz", lx, ly, neuroCol)
+		ly += lineH
+		fit := EvaluateGPFitnessRender(bot)
+		printColoredAt(screen, fmt.Sprintf("Gen:%d  Fitness:%.0f", ss.NeuroGeneration, fit), lx, ly, dimCol)
+		ly += lineH
+
+		// Show chosen action
+		actionName := "---"
+		if bot.Brain.ActionIdx >= 0 && bot.Brain.ActionIdx < len(swarm.NeuroActionNames) {
+			actionName = swarm.NeuroActionNames[bot.Brain.ActionIdx]
+		}
+		printColoredAt(screen, fmt.Sprintf("Aktion: %s", actionName), lx, ly, color.RGBA{255, 255, 100, 255})
+		ly += lineH
+
+		// Show top 3 input values
+		printColoredAt(screen, "Inputs:", lx, ly, color.RGBA{100, 200, 255, 200})
+		ly += lineH
+		for inp := 0; inp < swarm.NeuroInputs && inp < 6; inp++ {
+			v := bot.Brain.InputVals[inp]
+			printColoredAt(screen, fmt.Sprintf(" %s: %.2f", swarm.NeuroInputNames[inp], v), lx, ly, dimCol)
+			ly += lineH - 3
+		}
+		ly += 3
+
+		// Show output activations
+		printColoredAt(screen, "Outputs:", lx, ly, color.RGBA{255, 180, 100, 200})
+		ly += lineH
+		for o := 0; o < swarm.NeuroOutputs; o++ {
+			v := bot.Brain.OutputAct[o]
+			outCol := dimCol
+			if o == bot.Brain.ActionIdx {
+				outCol = color.RGBA{255, 255, 100, 255}
+			}
+			printColoredAt(screen, fmt.Sprintf(" %s: %.2f", swarm.NeuroActionNames[o], v), lx, ly, outCol)
+			ly += lineH - 3
 		}
 	}
 }
@@ -799,6 +869,12 @@ func drawStationLabels(screen *ebiten.Image, ss *swarm.SwarmState, offX, offY fl
 		// Label above station (with horizontal offset for nearby stations)
 		lx := sx - 6 + labelOffsetX[si]
 		printColoredAt(screen, label, lx, sy-40, col)
+		// Subtle type hint below label
+		typeHint := "Drop"
+		if st.IsPickup {
+			typeHint = "Pick"
+		}
+		printColoredAt(screen, typeHint, lx-2, sy-30, color.RGBA{col.R, col.G, col.B, 100})
 
 		if st.IsPickup {
 			// Respawn timer bar below pickup station (15px gap from edge: radius 25 + 15 = 40)
