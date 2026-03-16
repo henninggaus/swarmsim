@@ -710,6 +710,12 @@ func (g *Game) handleSwarmInput() {
 		logger.Info("SWARM", "Dashboard: %v", ss.DashboardOn)
 	}
 
+	// K key: toggle communication graph overlay
+	if inpututil.IsKeyJustPressed(ebiten.KeyK) && !ed.Focused && !ss.BotCountEdit {
+		ss.ShowCommGraph = !ss.ShowCommGraph
+		logger.Info("SWARM", "Comm graph: %v", ss.ShowCommGraph)
+	}
+
 	// A key: toggle action heatmap vs motion heatmap on dashboard
 	if inpututil.IsKeyJustPressed(ebiten.KeyA) && !ed.Focused && !ss.BotCountEdit {
 		if ss.DashboardOn && ss.StatsTracker != nil {

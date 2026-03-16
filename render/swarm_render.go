@@ -173,6 +173,29 @@ func (r *Renderer) DrawSwarmMode(screen *ebiten.Image, s *simulation.Simulation,
 		}
 	}
 
+	// Communication graph overlay (K key)
+	if ss.ShowCommGraph && len(ss.PrevMessages) > 0 {
+		commRange := float32(swarm.SwarmCommRange)
+		for _, msg := range ss.PrevMessages {
+			sx := float32(msg.X)
+			sy := float32(msg.Y)
+			// Draw small broadcast ring at sender
+			vector.StrokeCircle(a, sx, sy, commRange, 1, color.RGBA{100, 200, 255, 40}, false)
+			// Draw lines to receiving bots (within comm range)
+			for bi := range ss.Bots {
+				bot := &ss.Bots[bi]
+				dx := float32(bot.X) - sx
+				dy := float32(bot.Y) - sy
+				dist := dx*dx + dy*dy
+				if dist < commRange*commRange && dist > 4 {
+					alpha := uint8(120 - 80*dist/(commRange*commRange))
+					lineCol := color.RGBA{100, 200, 255, alpha}
+					vector.StrokeLine(a, sx, sy, float32(bot.X), float32(bot.Y), 1, lineCol, false)
+				}
+			}
+		}
+	}
+
 	// Draw bots
 	for i := range ss.Bots {
 		bot := &ss.Bots[i]

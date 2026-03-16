@@ -396,6 +396,8 @@ type SwarmState struct {
 	// Pheromone system (carrying bots leave trails)
 	PherGrid *SwarmPheromoneGrid
 
+	ShowCommGraph bool // K key toggle: show communication lines between bots
+
 	CollisionCount  int // obstacle collisions this tick (reset per tick)
 	ResetFlashTimer int // counts down from 30 for "RESET" flash
 
