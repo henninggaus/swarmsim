@@ -529,11 +529,21 @@ func DrawSwarmHUD(screen *ebiten.Image, s *simulation.Simulation, fps float64) {
 	ss := s.SwarmState
 
 	// FPS + speed at top of arena area
-	info := fmt.Sprintf("FPS:%.0f Speed:%.1fx", fps, s.Speed)
+	speedStr := fmt.Sprintf("%.1fx", s.Speed)
+	if s.Speed < 1.0 {
+		speedStr = fmt.Sprintf("%.3gx", s.Speed) // show 0.25x, 0.125x properly
+	}
+	info := fmt.Sprintf("FPS:%.0f Speed:%s", fps, speedStr)
 	if s.Paused {
 		info += " [PAUSED]"
 	}
 	ebitenutil.DebugPrintAt(screen, info, 360, 10)
+
+	// Slow-motion indicator
+	if s.Speed < 1.0 && !s.Paused {
+		label := fmt.Sprintf("ZEITLUPE %s", speedStr)
+		printColoredAt(screen, label, 600, 10, color.RGBA{100, 200, 255, 230})
+	}
 
 	// Arena info line
 	if ss != nil {

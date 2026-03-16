@@ -347,9 +347,13 @@ func (g *Game) handleGlobalInput() {
 		}
 	}
 
-	// +/-: speed
+	// +/-: speed (finer steps below 1x for slow-motion)
 	if inpututil.IsKeyJustPressed(ebiten.KeyEqual) || inpututil.IsKeyJustPressed(ebiten.KeyKPAdd) {
-		g.sim.Speed += 0.5
+		if g.sim.Speed < 1.0 {
+			g.sim.Speed *= 2 // 0.125 → 0.25 → 0.5 → 1.0
+		} else {
+			g.sim.Speed += 0.5
+		}
 		if g.sim.Speed > 10.0 {
 			g.sim.Speed = 10.0
 		}
@@ -357,9 +361,13 @@ func (g *Game) handleGlobalInput() {
 	if inpututil.IsKeyJustPressed(ebiten.KeyMinus) || inpututil.IsKeyJustPressed(ebiten.KeyKPSubtract) {
 		// In swarm mode, don't consume minus if editor is focused (for typing)
 		if !(g.sim.SwarmMode && g.sim.SwarmState != nil && g.sim.SwarmState.Editor != nil && g.sim.SwarmState.Editor.Focused) {
-			g.sim.Speed -= 0.5
-			if g.sim.Speed < 0.5 {
-				g.sim.Speed = 0.5
+			if g.sim.Speed <= 1.0 {
+				g.sim.Speed /= 2 // 1.0 → 0.5 → 0.25 → 0.125
+			} else {
+				g.sim.Speed -= 0.5
+			}
+			if g.sim.Speed < 0.125 {
+				g.sim.Speed = 0.125
 			}
 		}
 	}

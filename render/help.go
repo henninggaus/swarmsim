@@ -70,7 +70,7 @@ func DrawHelpOverlay(screen *ebiten.Image, isSwarmMode bool, scrollY int) {
 	ly += lineH + 2
 	helpKV(screen, px, &ly, []kv{
 		{"Space", "Pause / Fortsetzen"},
-		{"+/-", "Geschwindigkeit stufenweise aendern"},
+		{"+/-", "Geschwindigkeit (Zeitlupe: 0.125x bis 10x)"},
 		{"1-5", "Speed-Presets: 0.5x / 1x / 2x / 5x / 10x"},
 		{"H", "Diese Hilfe ein/ausblenden"},
 		{"F3", "Interaktives Tutorial starten (15 Schritte)"},
