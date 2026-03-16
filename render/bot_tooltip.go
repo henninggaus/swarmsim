@@ -51,6 +51,12 @@ func DrawBotTooltip(screen *ebiten.Image, ss *swarm.SwarmState, mx, my int) {
 		bot.LightValue, bot.ReceivedMsg, bot.ObstacleAhead)
 	lines = append(lines, sensorLine)
 
+	// Cooperative sensors
+	if bot.NeighborCount > 0 {
+		lines = append(lines, fmt.Sprintf("Gruppe: %d Bots  %d%% tragen  Spd:%d",
+			bot.GroupSize, bot.GroupCarry, bot.GroupSpeed))
+	}
+
 	// Mode-specific info
 	if ss.NeuroEnabled && bot.Brain != nil {
 		lines = append(lines, "Modus: NEURO")

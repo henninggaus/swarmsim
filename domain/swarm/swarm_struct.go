@@ -98,6 +98,11 @@ type SwarmBot struct {
 	MemoryCols int
 	MemoryRows int
 
+	// Cooperative sensors (sensor fusion from neighbors)
+	GroupCarry int // % of neighbors that are carrying (0-100)
+	GroupSpeed int // avg speed of neighbors * 100
+	GroupSize  int // connected cluster size (BFS)
+
 	// Anti-stuck tracking
 	StuckTicks      int     // how many ticks bot barely moved
 	StuckPrevX      float64 // position last tick for stuck detection

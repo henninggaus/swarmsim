@@ -238,6 +238,9 @@ func DrawHelpOverlay(screen *ebiten.Image, isSwarmMode bool, scrollY int) {
 		{"visited_here", "Wie oft aktuelle Zelle besucht (Memory)"},
 		{"visited_ahead", "Wie oft Zelle voraus besucht (Memory)"},
 		{"explored", "Prozent des Gebiets erkundet (Memory)"},
+		{"group_carry", "Prozent der Nachbarn die tragen (0-100)"},
+		{"group_speed", "Durchschnitts-Speed der Nachbarn"},
+		{"group_size", "Cluster-Groesse (Nachbarn + 1)"},
 	})
 	ly += 6
 

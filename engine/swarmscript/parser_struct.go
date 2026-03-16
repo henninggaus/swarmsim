@@ -67,6 +67,12 @@ const (
 	CondBotRight                                 // bot_right (neighbors right 90° cone)
 	CondHeading                                  // heading (0-359 degrees)
 	CondSpeed                                    // speed (current speed * 100)
+	CondVisitedHere                              // visited_here (times visited current cell)
+	CondVisitedAhead                             // visited_ahead (times visited cell ahead)
+	CondExplored                                 // explored (% of arena explored by this bot)
+	CondGroupCarry                               // group_carry (% of neighbors carrying)
+	CondGroupSpeed                               // group_speed (avg speed of neighbors * 100)
+	CondGroupSize                                // group_size (connected cluster size)
 )
 
 // Condition represents a single boolean check in a rule.
@@ -250,6 +256,15 @@ var conditionNames = map[string]ConditionType{
 	// Heading & speed
 	"heading": CondHeading,
 	"speed":   CondSpeed,
+	// Memory sensors
+	"visited_here":  CondVisitedHere,
+	"visited_ahead": CondVisitedAhead,
+	"explored":      CondExplored,
+	"visited":       CondVisitedHere,
+	// Cooperative sensors (sensor fusion)
+	"group_carry": CondGroupCarry,
+	"group_speed": CondGroupSpeed,
+	"group_size":  CondGroupSize,
 }
 
 // actionNames maps action name strings to (ActionType, paramCount).
@@ -394,6 +409,10 @@ var highlightConditions = map[string]bool{
 	"bot_ahead": true, "bot_behind": true, "bot_left": true, "bot_right": true,
 	"ahead": true, "behind": true,
 	"heading": true, "speed": true,
+	// Memory sensors
+	"visited_here": true, "visited_ahead": true, "explored": true, "visited": true,
+	// Cooperative sensors
+	"group_carry": true, "group_speed": true, "group_size": true,
 }
 
 var highlightActions = map[string]bool{
@@ -533,6 +552,18 @@ func ConditionTypeName(ct ConditionType) string {
 		return "heading"
 	case CondSpeed:
 		return "speed"
+	case CondVisitedHere:
+		return "visited"
+	case CondVisitedAhead:
+		return "visited_ahead"
+	case CondExplored:
+		return "explored"
+	case CondGroupCarry:
+		return "group_carry"
+	case CondGroupSpeed:
+		return "group_speed"
+	case CondGroupSize:
+		return "group_size"
 	}
 	return "unknown"
 }

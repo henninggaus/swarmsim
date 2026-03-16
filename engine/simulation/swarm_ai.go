@@ -568,6 +568,9 @@ func buildSwarmEnvironment(ss *swarm.SwarmState, i int) {
 	bot.BotBehind = 0
 	bot.BotLeft = 0
 	bot.BotRight = 0
+	bot.GroupCarry = 0
+	bot.GroupSpeed = 0
+	bot.GroupSize = 0
 
 	// Query neighbors within sensor range (carrying bots get extended 200px range)
 	sensorRange := swarm.SwarmSensorRange
@@ -577,6 +580,8 @@ func buildSwarmEnvironment(ss *swarm.SwarmState, i int) {
 	candidateIDs := ss.Hash.Query(bot.X, bot.Y, sensorRange)
 	var sumX, sumY float64
 	count := 0
+	var carryCount int
+	var speedSum float64
 
 	for _, cid := range candidateIDs {
 		if cid == i || cid < 0 || cid >= len(ss.Bots) {
@@ -628,16 +633,26 @@ func buildSwarmEnvironment(ss *swarm.SwarmState, i int) {
 		} else {
 			bot.BotBehind++
 		}
+
+		// Cooperative sensor accumulation
+		if other.CarryingPkg >= 0 {
+			carryCount++
+		}
+		speedSum += other.Speed
 	}
 
 	bot.NeighborCount = count
 	if count > 0 {
 		bot.AvgNeighborX = sumX / float64(count)
 		bot.AvgNeighborY = sumY / float64(count)
+		bot.GroupCarry = carryCount * 100 / count
+		bot.GroupSpeed = int(speedSum / float64(count) * 100)
 	}
 	if bot.NearestDist > 1e8 {
 		bot.NearestDist = 999
 	}
+	// Cluster size (simple: count + self; could be BFS but that's expensive per tick)
+	bot.GroupSize = count + 1
 
 	// On edge check (exempt bots in the ramp zone from left-edge detection)
 	onLeftEdge := bot.X < swarm.SwarmEdgeMargin
@@ -1277,6 +1292,12 @@ func evaluateSwarmCondition(cond swarmscript.Condition, bot *swarm.SwarmBot, sna
 		return compareInt(swarm.BotVisitedAhead(bot), cond.Op, cv)
 	case swarmscript.CondExplored:
 		return compareInt(swarm.BotExploredPercent(bot), cond.Op, cv)
+	case swarmscript.CondGroupCarry:
+		return compareInt(bot.GroupCarry, cond.Op, cv)
+	case swarmscript.CondGroupSpeed:
+		return compareInt(bot.GroupSpeed, cond.Op, cv)
+	case swarmscript.CondGroupSize:
+		return compareInt(bot.GroupSize, cond.Op, cv)
 	}
 
 	return false
