@@ -47,6 +47,9 @@ func TournamentStart(ss *SwarmState) {
 
 // TournamentLoadRound loads the current round's program and resets bots.
 func TournamentLoadRound(ss *SwarmState) {
+	if ss.TournamentRound >= len(ss.TournamentEntries) {
+		return
+	}
 	entry := &ss.TournamentEntries[ss.TournamentRound]
 	ss.Program = entry.Program
 	ss.ProgramText = entry.Source
@@ -76,6 +79,9 @@ func TournamentTick(ss *SwarmState) {
 	}
 
 	// Round complete — record results
+	if ss.TournamentRound >= len(ss.TournamentResults) {
+		return
+	}
 	r := &ss.TournamentResults[ss.TournamentRound]
 	r.Deliveries = ss.DeliveryStats.TotalDelivered
 	r.Correct = ss.DeliveryStats.CorrectDelivered

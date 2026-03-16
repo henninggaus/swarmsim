@@ -41,8 +41,8 @@ func DrawBotTooltip(screen *ebiten.Image, ss *swarm.SwarmState, mx, my int) {
 			bot.Stats.TotalDeliveries, bot.Stats.CorrectDeliveries, bot.Stats.WrongDeliveries))
 	}
 
-	// Energy
-	if bot.Energy > 0 || bot.Energy < 100 {
+	// Energy (only show when energy system is active)
+	if ss.EnergyEnabled {
 		lines = append(lines, fmt.Sprintf("Energie: %.0f%%", bot.Energy))
 	}
 
