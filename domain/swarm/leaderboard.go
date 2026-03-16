@@ -64,6 +64,11 @@ func SubmitScore(lb *LeaderboardState, entry LeaderboardEntry) bool {
 		entry.Efficiency = float64(entry.Correct) / float64(entry.Deliveries) * 100
 	}
 
+	// Skip zero-score entries
+	if entry.Score <= 0 {
+		return false
+	}
+
 	// Check if it qualifies
 	if len(lb.Entries) >= maxLeaderboardEntries {
 		worstScore := lb.Entries[len(lb.Entries)-1].Score
@@ -74,9 +79,12 @@ func SubmitScore(lb *LeaderboardState, entry LeaderboardEntry) bool {
 
 	lb.Entries = append(lb.Entries, entry)
 
-	// Sort by score descending
-	sort.Slice(lb.Entries, func(i, j int) bool {
-		return lb.Entries[i].Score > lb.Entries[j].Score
+	// Sort by score descending, then by ticks ascending (faster = better at same score)
+	sort.SliceStable(lb.Entries, func(i, j int) bool {
+		if lb.Entries[i].Score != lb.Entries[j].Score {
+			return lb.Entries[i].Score > lb.Entries[j].Score
+		}
+		return lb.Entries[i].Ticks < lb.Entries[j].Ticks
 	})
 
 	// Trim to max entries
@@ -84,19 +92,19 @@ func SubmitScore(lb *LeaderboardState, entry LeaderboardEntry) bool {
 		lb.Entries = lb.Entries[:maxLeaderboardEntries]
 	}
 
-	SaveLeaderboard(lb)
-	logger.Info("LEADERBOARD", "Neuer Eintrag: %s — Score: %d (Rang %d)",
-		entry.Name, entry.Score, leaderboardRank(lb, entry.Score))
-	return true
-}
-
-func leaderboardRank(lb *LeaderboardState, score int) int {
+	// Find actual rank of the newly inserted entry
+	rank := len(lb.Entries)
 	for i, e := range lb.Entries {
-		if e.Score == score {
-			return i + 1
+		if e.Name == entry.Name && e.Score == entry.Score && e.Ticks == entry.Ticks {
+			rank = i + 1
+			break
 		}
 	}
-	return len(lb.Entries)
+
+	SaveLeaderboard(lb)
+	logger.Info("LEADERBOARD", "Neuer Eintrag: %s — Score: %d (Rang %d)",
+		entry.Name, entry.Score, rank)
+	return true
 }
 
 // LeaderboardTop returns up to n top entries.

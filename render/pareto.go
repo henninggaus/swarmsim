@@ -43,7 +43,7 @@ func DrawParetoOverlay(screen *ebiten.Image, ss *swarm.SwarmState) {
 	y += lineH + 4
 
 	// Objective ranges for Pareto front (rank 0)
-	if len(pf.Fronts[0]) > 0 && len(pf.Objectives) > 0 {
+	if len(pf.Fronts) > 0 && len(pf.Fronts[0]) > 0 && len(pf.Objectives) > 0 {
 		printColoredAt(screen, "Ziele (Front 0):", px+8, y, color.RGBA{140, 150, 170, 255})
 		y += lineH + 2
 
@@ -113,12 +113,13 @@ func DrawParetoOverlay(screen *ebiten.Image, ss *swarm.SwarmState) {
 		}
 
 		// Draw all bots as dots (dim)
+		front0 := pf.Fronts[0] // safe: pf.Fronts checked at top
 		for i, objs := range pf.Objectives {
 			x := plotX + float32((objs[0]-minO0)/rangeO0)*plotW
 			y := plotY + plotH - float32((objs[1]-minO1)/rangeO1)*plotH
 			col := color.RGBA{60, 60, 80, 150}
 			// Pareto front bots are bright
-			for _, idx := range pf.Fronts[0] {
+			for _, idx := range front0 {
 				if idx == i {
 					col = color.RGBA{200, 130, 255, 255}
 					break
