@@ -49,8 +49,22 @@ func DrawBlockEditor(screen *ebiten.Image, ss *swarm.SwarmState) {
 	// Background
 	vector.DrawFilledRect(screen, 0, float32(editorCodeY), float32(editorPanelW), float32(editorCodeH), colorBlockBg, false)
 
-	// Clip region offset
-	y := editorCodeY + 2 - ss.BlockScrollY
+	// Column headers (always visible at top)
+	hdrY := editorCodeY + 1
+	hdrCol := color.RGBA{90, 100, 120, 200}
+	hintCol := color.RGBA{65, 70, 85, 180}
+	printColoredAt(screen, "IF", blockPadX, hdrY, hdrCol)
+	printColoredAt(screen, "Sensor", blockPadX+blockIfW, hdrY, hdrCol)
+	printColoredAt(screen, "Op", blockPadX+blockIfW+blockSensorW+2, hdrY, hdrCol)
+	printColoredAt(screen, "Wert", blockPadX+blockIfW+blockSensorW+blockOpW+4, hdrY, hdrCol)
+	ax := blockPadX + blockIfW + blockSensorW + blockOpW + blockValueW + 8
+	printColoredAt(screen, "THEN Aktion", ax, hdrY, hdrCol)
+	vector.DrawFilledRect(screen, float32(blockPadX), float32(hdrY+12), float32(editorPanelW-blockPadX*2), 1, color.RGBA{50, 55, 70, 150}, false)
+	// Sub-hints for columns
+	printColoredAt(screen, "(0-100)", blockPadX+blockIfW+blockSensorW+blockOpW+1, hdrY+11, hintCol)
+
+	// Clip region offset (after headers + hint row)
+	y := editorCodeY + 22 - ss.BlockScrollY
 
 	for ri, rule := range ss.BlockRules {
 		ruleH := len(rule.Conditions) * blockRuleH
@@ -200,7 +214,7 @@ func BlockEditorHitTest(mx, my int, ss *swarm.SwarmState) (action string, ruleId
 		return "", -1, -1
 	}
 
-	y := editorCodeY + 2 - ss.BlockScrollY
+	y := editorCodeY + 22 - ss.BlockScrollY
 
 	for ri, rule := range ss.BlockRules {
 		ruleH := len(rule.Conditions) * blockRuleH

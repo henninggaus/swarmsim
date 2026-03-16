@@ -212,15 +212,18 @@ func DrawCaptureOverlay(screen *ebiten.Image, r *Renderer) {
 		screen.DrawImage(img, op)
 	}
 
-	// "Encoding GIF..." overlay
+	// "Encoding GIF..." overlay with spinner
 	if r.GIFEncoding {
-		text := "Encoding GIF..."
+		spinChars := []string{"|", "/", "-", "\\"}
+		spin := spinChars[(r.RecBlinkTick/8)%4]
+		r.RecBlinkTick++
+		text := fmt.Sprintf("Encoding GIF... %s  (Bitte warten)", spin)
 		textW := len(text) * 6
 		x := sw/2 - textW/2
 		y := 5
-		ebitenutil.DrawRect(screen, float64(x-5), float64(y-2), float64(textW+10), 18,
+		ebitenutil.DrawRect(screen, float64(x-5), float64(y-2), float64(textW+10), 22,
 			color.RGBA{0, 0, 80, 220})
-		printColoredAt(screen, text, x, y, color.RGBA{120, 180, 255, 255})
+		printColoredAt(screen, text, x, y+2, color.RGBA{120, 180, 255, 255})
 	}
 
 	// Check if background encoding finished
@@ -233,18 +236,28 @@ func DrawCaptureOverlay(screen *ebiten.Image, r *Renderer) {
 		}
 	}
 
-	// REC indicator (blinking red dot + text)
+	// REC indicator (blinking red dot + frame counter)
 	if r.Recording {
 		r.RecBlinkTick++
+		// Always show frame count, blink the red dot
+		frameInfo := fmt.Sprintf("REC %d/%d", r.RecFrameCount, gifMaxFrames)
+		recX := sw - len(frameInfo)*6 - 20
+		recY := 5
+		// Red background
+		ebitenutil.DrawRect(screen, float64(recX-4), float64(recY-2), float64(len(frameInfo)*6+12), 18,
+			color.RGBA{150, 0, 0, 200})
+		// Blinking dot
 		if (r.RecBlinkTick/15)%2 == 0 {
-			recText := "* REC"
-			recX := sw - len(recText)*6 - 15
-			recY := 5
-			// Red background
-			ebitenutil.DrawRect(screen, float64(recX-4), float64(recY-2), float64(len(recText)*6+8), 18,
-				color.RGBA{150, 0, 0, 200})
-			printColoredAt(screen, recText, recX, recY, color.RGBA{255, 60, 60, 255})
+			printColoredAt(screen, "*", recX, recY, color.RGBA{255, 60, 60, 255})
 		}
+		printColoredAt(screen, frameInfo, recX+8, recY, color.RGBA{255, 120, 120, 255})
+		// Progress bar under REC indicator
+		barW := float32(len(frameInfo)*6 + 8)
+		progress := float32(r.RecFrameCount) / float32(gifMaxFrames)
+		ebitenutil.DrawRect(screen, float64(recX-2), float64(recY+16), float64(barW), 3,
+			color.RGBA{60, 0, 0, 200})
+		ebitenutil.DrawRect(screen, float64(recX-2), float64(recY+16), float64(barW*progress), 3,
+			color.RGBA{255, 60, 60, 255})
 	} else {
 		r.RecBlinkTick = 0
 	}

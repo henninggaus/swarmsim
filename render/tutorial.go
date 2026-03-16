@@ -32,85 +32,85 @@ type TutorialState struct {
 var TutorialSteps = []TutorialStep{
 	// Step 0: Welcome
 	{
-		Lines:     [3]string{"Willkommen bei SwarmSim! Ein Schwarm-Robotik-Simulator.", "Du programmierst autonome Bots die Aufgaben loesen —", "ohne zentrale Steuerung, nur mit lokalen Sensoren."},
+		Lines:     [3]string{"Willkommen bei SwarmSim! Ein Schwarm-Robotik-Simulator.", "Du programmierst autonome Bots mit einfachen Regeln —", "ohne zentrale Steuerung entstehen komplexe Muster."},
 		WaitInput: "",
 	},
 	// Step 1: Modes
 	{
-		Lines:     [3]string{"F1 = Classic Mode (Foraging, Evolution)", "F2 = Swarm Lab (Programmierbare Bots — hier wird's spannend!)", "Druecke F2 um das Swarm Lab zu oeffnen."},
+		Lines:     [3]string{"F1 = Classic Mode (5 Bot-Typen, Pheromone, Genom-Evolution)", "F2 = Swarm Lab (SwarmScript Editor — hier wird's spannend!)", "Druecke F2 um das Swarm Lab zu oeffnen."},
 		WaitInput: "key:F2",
 	},
 	// Step 2: Editor
 	{
-		Lines:     [3]string{"Links siehst du den SwarmScript Editor.", "Jede Zeile ist eine Regel: IF <Bedingung> THEN <Aktion>.", "Die Bots fuehren diese Regeln jeden Tick aus."},
+		Lines:     [3]string{"Links siehst du den SwarmScript Editor.", "Jede Zeile ist eine Regel: IF <Sensor> <Op> <Wert> THEN <Aktion>.", "Die erste passende Regel bestimmt was der Bot tut."},
 		ArrowX:    175, ArrowY: 300,
 		WaitInput: "",
 	},
 	// Step 3: First program
 	{
-		Lines:     [3]string{"Waehle 'Aggregation' im Dropdown und druecke DEPLOY.", "Die Bots werden sich zu Clustern zusammenfinden.", ""},
+		Lines:     [3]string{"Waehle 'Aggregation' im Dropdown und druecke DEPLOY.", "Aggregation: Bots drehen sich zum naechsten Nachbarn", "und finden sich zu Clustern zusammen (soziale Anziehung)."},
 		ArrowX:    100, ArrowY: 36,
 		WaitInput: "click:deploy_any",
 	},
 	// Step 4: Observe
 	{
-		Lines:     [3]string{"Schau zu wie die Bots sich bewegen. Sie sehen nur 120px weit", "und kennen keine globale Karte. Trotzdem finden sie zueinander.", ""},
+		Lines:     [3]string{"Beobachte: Jeder Bot sieht nur 120px weit — keine globale Karte!", "Trotzdem bilden sich Gruppen. Das ist emergentes Verhalten:", "komplexe Muster aus einfachen lokalen Regeln."},
 		WaitInput: "timer:300",
 	},
 	// Step 5: Switch program
 	{
-		Lines:     [3]string{"Jetzt waehle 'Dispersion' und druecke DEPLOY.", "Das Gegenteil passiert — die Bots stossen sich ab.", ""},
+		Lines:     [3]string{"Jetzt waehle 'Dispersion' und druecke DEPLOY.", "Das Gegenteil: Bots stossen sich ab und verteilen sich", "gleichmaessig — wie Gas-Molekuele in einem Raum."},
 		ArrowX:    100, ArrowY: 36,
 		WaitInput: "click:deploy_any",
 	},
 	// Step 6: Delivery on
 	{
-		Lines:     [3]string{"Klicke auf 'Delivery: ON'. Jetzt erscheinen farbige Stationen.", "Die Bots muessen Pakete von Pickup (gefuellt) zu", "Dropoff (Ring) der gleichen Farbe transportieren."},
+		Lines:     [3]string{"Klicke auf 'Delivery: ON'. Farbige Stationen erscheinen:", "Gefuellte Kreise = Pickup (Paket abholen),", "Ringe = Dropoff (Paket zur gleichen Farbe bringen)."},
 		ArrowX:    88, ArrowY: 725,
 		WaitInput: "click:delivery",
 	},
 	// Step 7: Delivery program
 	{
-		Lines:     [3]string{"Waehle 'Simple Delivery' und druecke DEPLOY.", "Beobachte wie die Bots Pakete aufheben und abliefern.", ""},
+		Lines:     [3]string{"Waehle 'Simple Delivery' und druecke DEPLOY.", "Bots sammeln Pakete ein (!) und liefern zur passenden", "Dropoff. Beobachte wie der LED-Gradient als Wegweiser wirkt!"},
 		ArrowX:    100, ArrowY: 36,
 		WaitInput: "click:deploy_any",
 	},
 	// Step 8: Stats
 	{
-		Lines:     [3]string{"Oben: Deliveries (geliefert), Correct (richtig), Wrong (falsch).", "AvgTime = durchschnittliche Lieferzeit in Ticks.", "Unten links: Carrying (tragen gerade) und Idle (suchen noch)."},
+		Lines:     [3]string{"Oben: Deliveries (geliefert), Correct (richtige Farbe), Wrong.", "AvgTime = durchschnittliche Lieferzeit in Ticks.", "Druecke D fuer das Dashboard mit Graphen und Heatmap."},
 		ArrowX:    600, ArrowY: 15,
 		WaitInput: "",
 	},
 	// Step 9: Bot select
 	{
-		Lines:     [3]string{"Klicke auf einen Bot um sein Info-Panel zu sehen.", "Du siehst seine Sensoren, seinen Zustand und seine Statistiken.", ""},
+		Lines:     [3]string{"Klicke auf einen Bot in der Arena!", "Du siehst sein Info-Panel: aktuelle Sensoren, Zustand,", "ob er ein Paket traegt und seine Lieferstatistiken."},
 		WaitInput: "click:bot",
 	},
 	// Step 10: Follow-cam
 	{
-		Lines:     [3]string{"Druecke F um dem Bot zu folgen. Die Kamera zentriert sich", "auf ihn und du siehst die Welt aus seiner Perspektive.", ""},
+		Lines:     [3]string{"Druecke F um dem Bot zu folgen. Die Kamera zentriert sich", "auf ihn. So siehst du die Welt aus Bot-Perspektive.", "Nochmal F oder Klick ins Leere zum Beenden."},
 		WaitInput: "key:F",
 	},
 	// Step 11: Block editor
 	{
-		Lines:     [3]string{"Klicke auf BLOCKS oben. Statt Text zu tippen,", "klickst du dir die Regeln aus Dropdowns zusammen.", ""},
+		Lines:     [3]string{"Klicke auf BLOCKS oben fuer den visuellen Editor.", "Statt Text zu tippen, waehlst du Sensoren, Operatoren", "und Aktionen aus Dropdown-Menues — ideal zum Experimentieren!"},
 		ArrowX:    288, ArrowY: 10,
 		WaitInput: "click:blocks",
 	},
 	// Step 12: Toggles
 	{
-		Lines:     [3]string{"Unten links: Arena-Konfiguration.", "Obstacles, Maze, Trucks, Evolution, GP (Gene Programmierung).", "Probiere verschiedene Kombinationen!"},
+		Lines:     [3]string{"Unten links: Arena-Konfiguration. Obstacles = Hindernisse,", "Maze = Labyrinth, Evolution = Param-Optimierung,", "GP = Programme evolvieren sich selbst! Hover fuer Details."},
 		ArrowX:    175, ArrowY: 710,
 		WaitInput: "",
 	},
 	// Step 13: Help
 	{
-		Lines:     [3]string{"Druecke H fuer die komplette Tastatur-Referenz.", "Druecke ` oder Oe fuer die Log-Konsole.", ""},
+		Lines:     [3]string{"Druecke H fuer die komplette Hilfe mit allen Sensoren,", "Aktionen und Algorithmus-Erklaerungen.", "Log-Konsole: ` oder Oe-Taste."},
 		WaitInput: "key:H",
 	},
 	// Step 14: Finish
 	{
-		Lines:     [3]string{"Das war's! Experimentiere mit verschiedenen Programmen,", "aktiviere Evolution und schau zu wie die Bots lernen.", "Tipp: 'Evolving Delivery' + Evolution ON — viel Spass!"},
+		Lines:     [3]string{"Fertig! Tipps: 'Evolving Delivery'+Evolution ON optimiert Parameter.", "GP: Random Start+GP ON = Programme evolvieren sich selbst!", "Neuro: Delivery = Neuronale Netze lernen ohne Code! Viel Spass!"},
 		WaitInput: "",
 	},
 }

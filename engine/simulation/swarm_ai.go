@@ -194,7 +194,29 @@ func (s *Simulation) updateSwarmMode() {
 				Y:     ss.Bots[i].Y,
 			})
 			ss.Bots[i].Stats.MessagesSent++
+			// Add visual wave ring
+			if ss.ShowMsgWaves {
+				ss.MsgWaves = append(ss.MsgWaves, swarm.MsgWave{
+					X: ss.Bots[i].X, Y: ss.Bots[i].Y,
+					Radius: 5, Timer: 30,
+					Value: ss.Bots[i].PendingMsg,
+				})
+			}
 		}
+	}
+
+	// Update wave rings (expand and fade)
+	if ss.ShowMsgWaves {
+		alive := 0
+		for i := range ss.MsgWaves {
+			ss.MsgWaves[i].Radius += 3
+			ss.MsgWaves[i].Timer--
+			if ss.MsgWaves[i].Timer > 0 {
+				ss.MsgWaves[alive] = ss.MsgWaves[i]
+				alive++
+			}
+		}
+		ss.MsgWaves = ss.MsgWaves[:alive]
 	}
 
 	// Phase 4: Physics — move bots, clamp to bounds

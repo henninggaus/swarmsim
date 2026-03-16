@@ -3,6 +3,7 @@ package swarm
 import (
 	"sort"
 	"swarmsim/engine/swarmscript"
+	"swarmsim/logger"
 )
 
 // EvaluateGPFitness computes fitness for a bot based on its lifetime stats.
@@ -107,6 +108,14 @@ func RunGPEvolution(ss *SwarmState) {
 	}
 
 	ss.GPGeneration++
+
+	// Log GP generation milestone
+	bestRules := 0
+	if ss.Bots[indices[0]].OwnProgram != nil {
+		bestRules = len(ss.Bots[indices[0]].OwnProgram.Rules)
+	}
+	logger.Info("GP", "Gen %d — Best: %.0f (%d Regeln), Avg: %.0f, %d Elite + %d Crossover + %d Neue",
+		ss.GPGeneration, ss.BestFitness, bestRules, ss.AvgFitness, eliteCount, n-eliteCount-freshCount, freshCount)
 }
 
 // InitGP initializes genetic programming: each bot gets a random program.

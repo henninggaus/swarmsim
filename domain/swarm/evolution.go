@@ -3,6 +3,7 @@ package swarm
 import (
 	"math"
 	"sort"
+	"swarmsim/logger"
 )
 
 // InitBotParams initializes per-bot parameter values from program hints + noise.
@@ -90,4 +91,8 @@ func RunEvolution(ss *SwarmState) {
 	}
 	ss.Generation++
 	ss.EvolutionTimer = 0
+
+	// Log evolution milestone
+	logger.Info("EVOLUTION", "Gen %d abgeschlossen — Best: %.0f, Avg: %.0f (%d Eltern -> %d Kinder)",
+		ss.Generation, ss.BestFitness, ss.AvgFitness, parentCount, n-parentCount)
 }

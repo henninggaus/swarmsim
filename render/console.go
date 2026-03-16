@@ -46,11 +46,16 @@ func DrawConsole(screen *ebiten.Image, entries []logger.LogEntry, isSwarmMode bo
 	// Top border
 	vector.StrokeLine(screen, float32(panelX), float32(panelY), float32(panelX+panelW), float32(panelY), 1, colorConsoleLine, false)
 
-	// Title
+	// Title with legend
 	if filterBotID >= 0 {
 		printColoredAt(screen, fmt.Sprintf("~ Bot #%d Logs [Tab:all]", filterBotID), panelX+consolePadding, panelY+2, color.RGBA{0, 220, 255, 255})
 	} else {
-		printColoredAt(screen, "~ Log", panelX+consolePadding, panelY+2, color.RGBA{100, 100, 120, 255})
+		printColoredAt(screen, "~ Log [`/Oe oeffnen]", panelX+consolePadding, panelY+2, color.RGBA{100, 100, 120, 255})
+		// Color legend on right side
+		legendX := panelX + panelW - 220
+		printColoredAt(screen, "Info", legendX, panelY+2, colorConsoleInfo)
+		printColoredAt(screen, "Warn", legendX+40, panelY+2, colorConsoleWarn)
+		printColoredAt(screen, "Error", legendX+80, panelY+2, colorConsoleError)
 	}
 
 	// Show last N entries
@@ -65,13 +70,17 @@ func DrawConsole(screen *ebiten.Image, entries []logger.LogEntry, isSwarmMode bo
 	y := panelY + lineH + consolePadding
 	for _, e := range visible {
 		col := consoleColorForLevel(e.Level)
-		line := "[" + e.Tag + "] " + e.Message
+		// Show timestamp + tag + message
+		timeStr := e.Time[len(e.Time)-5:] // last 5 chars = "04:05" (MM:SS)
+		line := timeStr + " [" + e.Tag + "] " + e.Message
 		// Truncate long lines
 		maxChars := (panelW - consolePadding*2) / charW
 		if len(line) > maxChars {
 			line = line[:maxChars-3] + "..."
 		}
-		printColoredAt(screen, line, panelX+consolePadding, y, col)
+		// Dim timestamp
+		printColoredAt(screen, timeStr, panelX+consolePadding, y, color.RGBA{80, 80, 100, 200})
+		printColoredAt(screen, line[5:], panelX+consolePadding+5*charW, y, col)
 		y += lineH
 	}
 }

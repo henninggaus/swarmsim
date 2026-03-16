@@ -1,8 +1,25 @@
+// Package render — Color scheme for SwarmSim.
+//
+// Design principles:
+//   - Dark background (10-30 brightness) for long coding/observation sessions
+//   - Bright saturated colors for interactive elements (bots, buttons, delivery stations)
+//   - Muted/dim colors for passive elements (grid, borders, disabled UI)
+//   - Alpha transparency for overlays, sensor radii, and pheromone layers
+//   - 3D effects on obstacles via highlight (top-left) and shadow (bottom-right) edges
+//   - Consistent color coding: green=health/success, red=error/danger, yellow=energy/warning
+//   - Bot types use distinct hues for fast visual identification at any zoom level
 package render
 
 import "image/color"
 
-// Bot type colors.
+// ═══════════════════════════════════════════════════════
+// CLASSIC MODE — Bot types & world elements
+// ═══════════════════════════════════════════════════════
+//
+// Each bot type has a unique color for instant identification:
+//   Scout=Cyan (fast explorer), Worker=Orange (resource gatherer),
+//   Leader=Gold (coordination), Tank=DarkGreen (combat/defense),
+//   Healer=Pink (support/repair)
 var (
 	ColorScout  = color.RGBA{0, 255, 255, 255}   // Cyan
 	ColorWorker = color.RGBA{255, 165, 0, 255}   // Orange
@@ -22,35 +39,35 @@ var (
 	ColorBackground = color.RGBA{20, 20, 30, 255}
 	ColorGrid       = color.RGBA{40, 40, 55, 255}
 
-	// Energy bar
-	ColorEnergyBar = color.RGBA{255, 220, 0, 255}
-	ColorEnergyBg  = color.RGBA{80, 60, 0, 255}
+	// ─── Status bars ───
+	ColorEnergyBar = color.RGBA{255, 220, 0, 255} // yellow energy fill
+	ColorEnergyBg  = color.RGBA{80, 60, 0, 255}   // dark energy background
 
-	// Pheromone colors
-	ColorPherSearch = color.RGBA{50, 80, 255, 0} // blue
-	ColorPherFound  = color.RGBA{0, 220, 50, 0}  // green
-	ColorPherDanger = color.RGBA{255, 40, 30, 0} // red
+	// ─── Pheromone visualization ───
+	// Alpha starts at 0, dynamically adjusted by pheromone intensity
+	ColorPherSearch = color.RGBA{50, 80, 255, 0} // blue = exploring/searching
+	ColorPherFound  = color.RGBA{0, 220, 50, 0}  // green = resource found
+	ColorPherDanger = color.RGBA{255, 40, 30, 0} // red = danger zone
 
-	// Genome overlay
-	ColorGenomeBar = color.RGBA{100, 200, 255, 220}
-	ColorGenomeBg  = color.RGBA{0, 0, 0, 200}
+	// ─── Genome & Evolution overlays ───
+	ColorGenomeBar = color.RGBA{100, 200, 255, 220} // genome parameter bar fill
+	ColorGenomeBg  = color.RGBA{0, 0, 0, 200}       // genome panel background
 
-	// Fitness graph
-	ColorFitnessLine = color.RGBA{0, 255, 100, 255}
-	ColorFitnessBg   = color.RGBA{0, 0, 0, 160}
+	// ─── Fitness tracking ───
+	ColorFitnessLine = color.RGBA{0, 255, 100, 255} // fitness graph line (green)
+	ColorFitnessBg   = color.RGBA{0, 0, 0, 160}     // fitness graph background
 
-	// Bot disabled (zero energy)
-	ColorBotDisabled = color.RGBA{100, 100, 100, 180}
+	// ─── Special states ───
+	ColorBotDisabled = color.RGBA{100, 100, 100, 180} // grayed out (zero energy)
 
-	// Heavy resource
-	ColorHeavyResource = color.RGBA{255, 215, 0, 255} // Gold
+	// ─── Resource types ───
+	ColorHeavyResource = color.RGBA{255, 215, 0, 255} // gold = heavy (needs 2 bots)
+	ColorCoopParticle  = color.RGBA{255, 200, 50, 255} // sparkle during cooperative pickup
+	ColorDeliveryGlow  = color.RGBA{100, 255, 100, 200} // green glow at home base on delivery
 
-	// Cooperative pickup particles
-	ColorCoopParticle = color.RGBA{255, 200, 50, 255} // Gold sparkle
-
-	// Home base delivery glow
-	ColorDeliveryGlow = color.RGBA{100, 255, 100, 200} // Green glow
-
+	// ═══════════════════════════════════════════════════════
+	// TRUCK MODE — Logistics simulation colors
+	// ═══════════════════════════════════════════════════════
 	// Truck mode colors
 	ColorTruckCabin = color.RGBA{60, 60, 70, 255}
 	ColorTruckCargo = color.RGBA{180, 160, 130, 255}
@@ -65,7 +82,8 @@ var (
 	ColorPkgPallet    = color.RGBA{150, 150, 150, 255}
 	ColorPkgLongItem  = color.RGBA{80, 120, 200, 255}
 
-	// Sort zone colors (fill tints)
+	// ─── Sort zone colors ─── (4 zones A-D for package sorting)
+	// Fill tints (low alpha for transparent zone overlays)
 	ColorZoneA = color.RGBA{100, 150, 255, 60}
 	ColorZoneB = color.RGBA{100, 255, 100, 60}
 	ColorZoneC = color.RGBA{255, 180, 80, 60}
@@ -84,13 +102,17 @@ var (
 	ColorCorrectDelivery = color.RGBA{50, 255, 50, 255}
 	ColorWrongDelivery   = color.RGBA{255, 50, 50, 255}
 
-	// Swarm mode - editor
+	// ═══════════════════════════════════════════════════════
+	// SWARM LAB MODE — Editor & Arena colors
+	// ═══════════════════════════════════════════════════════
+
+	// ─── Editor panel ───
 	ColorSwarmEditorBg  = color.RGBA{25, 25, 35, 255}
 	ColorSwarmEditorSep = color.RGBA{60, 60, 80, 255}
 	ColorSwarmLineNum   = color.RGBA{80, 80, 100, 255}
 	ColorSwarmCursor    = color.RGBA{255, 255, 255, 200}
 
-	// Swarm mode - syntax highlighting
+	// ─── Syntax highlighting (SwarmScript) ───
 	ColorSwarmKeyword   = color.RGBA{0, 255, 255, 255}   // IF/THEN/AND = cyan
 	ColorSwarmCondition = color.RGBA{0, 255, 100, 255}   // sensor names = green
 	ColorSwarmAction    = color.RGBA{255, 180, 50, 255}  // action names = orange
@@ -98,32 +120,32 @@ var (
 	ColorSwarmComment   = color.RGBA{100, 100, 100, 255} // comments = gray
 	ColorSwarmOperator  = color.RGBA{200, 200, 200, 255} // operators = white
 
-	// Swarm mode - UI buttons
+	// ─── UI buttons ───
 	ColorSwarmBtnDeploy = color.RGBA{40, 140, 40, 255}  // deploy button
 	ColorSwarmBtnReset  = color.RGBA{180, 120, 30, 255} // reset button
 	ColorSwarmBtnPreset = color.RGBA{50, 80, 160, 255}  // preset dropdown
 	ColorSwarmBtnHover  = color.RGBA{80, 120, 200, 255} // button hover
 	ColorSwarmError     = color.RGBA{255, 60, 60, 255}  // error message
 
-	// Swarm mode - arena
+	// ─── Arena rendering ───
 	ColorSwarmArenaBg     = color.RGBA{10, 10, 15, 255}
 	ColorSwarmArenaGrid   = color.RGBA{25, 25, 35, 255}
 	ColorSwarmArenaBorder = color.RGBA{60, 60, 80, 255}
 	ColorSwarmLight       = color.RGBA{255, 255, 100, 80} // light glow
 	ColorSwarmBotBlink    = color.RGBA{0, 255, 0, 200}    // deploy blink
 
-	// Swarm mode - obstacles & maze
+	// ─── Obstacles & maze ─── (3D effect: highlight=top-left, shadow=bottom-right)
 	ColorSwarmObstacle   = color.RGBA{100, 100, 110, 255} // obstacle body
 	ColorSwarmObstacleHi = color.RGBA{130, 130, 140, 255} // obstacle highlight (top-left)
 	ColorSwarmObstacleLo = color.RGBA{60, 60, 70, 255}    // obstacle shadow (bottom-right)
 	ColorSwarmMazeWall   = color.RGBA{150, 150, 150, 255} // maze wall color
 	ColorSwarmMazeBorder = color.RGBA{180, 180, 180, 255} // maze wall border stroke
 
-	// Swarm mode - toggle buttons
+	// ─── Toggle buttons ───
 	ColorSwarmBtnToggleOn  = color.RGBA{40, 140, 40, 255} // toggle on (green)
 	ColorSwarmBtnToggleOff = color.RGBA{80, 80, 90, 255}  // toggle off (gray)
 
-	// Swarm mode - follow lines & trails
+	// ─── Follow camera, trails & selection ───
 	ColorSwarmTrail    = color.RGBA{255, 255, 255, 60} // trail dot
 	ColorSwarmSelected = color.RGBA{255, 255, 0, 200}  // selected bot ring
 	ColorSwarmInfoBg   = color.RGBA{20, 20, 30, 220}   // info panel bg
