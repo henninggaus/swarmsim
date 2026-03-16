@@ -461,6 +461,10 @@ type SwarmState struct {
 	EnergyEnabled bool // energy system toggle
 	MemoryEnabled bool // bot spatial memory system toggle
 
+	// Pareto multi-objective evolution
+	ParetoEnabled bool         // use Pareto ranking instead of scalar fitness
+	ParetoFront   *ParetoFront // latest Pareto front (computed each generation)
+
 	CollisionCount  int // obstacle collisions this tick (reset per tick)
 	ResetFlashTimer int // counts down from 30 for "RESET" flash
 

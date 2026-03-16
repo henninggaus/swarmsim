@@ -30,7 +30,15 @@ func RunEvolution(ss *SwarmState) {
 		return
 	}
 
-	// 1. Sort bots by fitness (descending)
+	// 1. Compute fitness (Pareto or scalar)
+	if ss.ParetoEnabled {
+		pf := ComputeParetoFronts(ss)
+		ss.ParetoFront = pf
+		for i := range ss.Bots {
+			ss.Bots[i].Fitness = ParetoRankFitness(pf, i)
+		}
+	}
+
 	indices := make([]int, n)
 	for i := range indices {
 		indices[i] = i

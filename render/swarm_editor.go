@@ -344,8 +344,12 @@ func drawSwarmEditorBottom(screen *ebiten.Image, ss *swarm.SwarmState, ed *swarm
 
 	// GP/Neuro status line
 	if ss.GPEnabled {
-		gpInfo := fmt.Sprintf("Gen:%d Best:%.0f Avg:%.0f T:%d/2000",
-			ss.GPGeneration, ss.BestFitness, ss.AvgFitness, ss.GPTimer)
+		paretoTag := ""
+		if ss.ParetoEnabled {
+			paretoTag = " [PARETO]"
+		}
+		gpInfo := fmt.Sprintf("Gen:%d Best:%.0f Avg:%.0f T:%d/2000%s",
+			ss.GPGeneration, ss.BestFitness, ss.AvgFitness, ss.GPTimer, paretoTag)
 		printColoredAt(screen, gpInfo, 5, editorSep2Y+2, color.RGBA{0, 180, 160, 200})
 	}
 	if ss.NeuroEnabled {

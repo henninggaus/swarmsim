@@ -26,8 +26,17 @@ func RunGPEvolution(ss *SwarmState) {
 
 	// 1. Evaluate fitness for all bots
 	fitnesses := make([]float64, n)
-	for i := range ss.Bots {
-		fitnesses[i] = EvaluateGPFitness(&ss.Bots[i])
+	if ss.ParetoEnabled {
+		// Multi-objective Pareto ranking (NSGA-II style)
+		pf := ComputeParetoFronts(ss)
+		ss.ParetoFront = pf
+		for i := range ss.Bots {
+			fitnesses[i] = ParetoRankFitness(pf, i)
+		}
+	} else {
+		for i := range ss.Bots {
+			fitnesses[i] = EvaluateGPFitness(&ss.Bots[i])
+		}
 	}
 
 	// 2. Sort indices by fitness (descending)

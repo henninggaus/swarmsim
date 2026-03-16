@@ -575,6 +575,11 @@ func (r *Renderer) DrawSwarmMode(screen *ebiten.Image, s *simulation.Simulation,
 		DrawLiveChart(screen, ss)
 	}
 
+	// Pareto front overlay (when Pareto evolution active)
+	if ss.ParetoEnabled && ss.ParetoFront != nil {
+		DrawParetoOverlay(screen, ss)
+	}
+
 	// Arena editor mode indicator
 	if ss.ArenaEditMode {
 		toolNames := []string{"Hindernis", "Station", "Loeschen"}

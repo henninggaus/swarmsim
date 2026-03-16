@@ -813,6 +813,17 @@ func (g *Game) handleSwarmInput() {
 		logger.Info("SWARM", "Live-Chart: %v", ss.ShowLiveChart)
 	}
 
+	// Slash key: toggle Pareto multi-objective evolution
+	if inpututil.IsKeyJustPressed(ebiten.KeySlash) && !ed.Focused && !ss.BotCountEdit {
+		ss.ParetoEnabled = !ss.ParetoEnabled
+		if ss.ParetoEnabled {
+			logger.Info("SWARM", "Pareto-Modus: ON (Multi-Objective)")
+		} else {
+			ss.ParetoFront = nil
+			logger.Info("SWARM", "Pareto-Modus: OFF (Skalare Fitness)")
+		}
+	}
+
 	// Comma key: toggle bot spatial memory
 	if inpututil.IsKeyJustPressed(ebiten.KeyComma) && !ed.Focused && !ss.BotCountEdit {
 		ss.MemoryEnabled = !ss.MemoryEnabled
