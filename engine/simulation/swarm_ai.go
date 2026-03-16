@@ -57,6 +57,9 @@ func (s *Simulation) updateSwarmMode() {
 		buildSwarmEnvironment(ss, i)
 	}
 
+	// Phase 1.1: Apply sensor noise and failures
+	swarm.ApplySensorNoise(ss)
+
 	// Phase 1.5: Rebuild ramp semaphore count
 	if ss.TruckToggle {
 		ss.RampBotCount = 0

@@ -580,6 +580,11 @@ func DrawSwarmHUD(screen *ebiten.Image, s *simulation.Simulation, fps float64) {
 			printColoredAt(screen, "MEMORY", 1030, 35, color.RGBA{200, 150, 255, 220})
 		}
 
+		// Sensor noise indicator
+		if ss.SensorNoiseOn {
+			printColoredAt(screen, "RAUSCHEN", 1110, 35, color.RGBA{255, 120, 80, 220})
+		}
+
 		// Reset flash indicator
 		if ss.ResetFlashTimer > 0 {
 			flashAlpha := uint8(255)

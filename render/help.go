@@ -135,6 +135,7 @@ func DrawHelpOverlay(screen *ebiten.Image, isSwarmMode bool, scrollY int) {
 		{".", "Live-Chart: Lieferstatistik als Liniendiagramm"},
 		{",", "Bot-Gedaechtnis: Bots merken sich besuchte Zellen"},
 		{"/", "Pareto-Modus: Multi-Objective Evolution (NSGA-II)"},
+		{"\\", "Sensor-Rauschen: Noise + Ausfaelle (realistisch)"},
 		{"Z", "Replay-Modus: Zeitverlauf mit Pfeiltasten scrubben"},
 		{"I", "Energie-System: Bots verbrauchen Energie"},
 		{"K", "Kommunikations-Graph: Nachrichten-Linien anzeigen"},

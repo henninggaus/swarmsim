@@ -465,6 +465,10 @@ type SwarmState struct {
 	ParetoEnabled bool         // use Pareto ranking instead of scalar fitness
 	ParetoFront   *ParetoFront // latest Pareto front (computed each generation)
 
+	// Sensor noise & failures
+	SensorNoiseOn  bool              // toggle sensor noise system
+	SensorNoiseCfg SensorNoiseConfig // noise parameters
+
 	CollisionCount  int // obstacle collisions this tick (reset per tick)
 	ResetFlashTimer int // counts down from 30 for "RESET" flash
 

@@ -835,6 +835,20 @@ func (g *Game) handleSwarmInput() {
 		logger.Info("SWARM", "Bot-Gedaechtnis: %v", ss.MemoryEnabled)
 	}
 
+	// Backslash key: toggle sensor noise
+	if inpututil.IsKeyJustPressed(ebiten.KeyBackslash) && !ed.Focused && !ss.BotCountEdit {
+		ss.SensorNoiseOn = !ss.SensorNoiseOn
+		if ss.SensorNoiseOn && ss.SensorNoiseCfg.NoiseLevel == 0 {
+			// Default noise config
+			ss.SensorNoiseCfg = swarm.SensorNoiseConfig{
+				NoiseLevel:  0.15,
+				FailureRate: 0.02,
+			}
+		}
+		logger.Info("SWARM", "Sensor-Rauschen: %v (Noise:%.0f%% Fail:%.0f%%)",
+			ss.SensorNoiseOn, ss.SensorNoiseCfg.NoiseLevel*100, ss.SensorNoiseCfg.FailureRate*100)
+	}
+
 	// Y key: toggle heatmap overlay
 	if inpututil.IsKeyJustPressed(ebiten.KeyY) && !ed.Focused && !ss.BotCountEdit {
 		ss.ShowHeatmap = !ss.ShowHeatmap
