@@ -358,6 +358,11 @@ func (s *Simulation) updateSwarmMode() {
 		}
 	}
 
+	// Phase 4.93: Heatmap accumulation (every 5 ticks for performance)
+	if ss.ShowHeatmap && ss.Tick%5 == 0 {
+		swarm.UpdateHeatmap(ss)
+	}
+
 	// Phase 4.95: Accumulate lifetime stats (before StuckPrevX/Y is overwritten)
 	for i := range ss.Bots {
 		bot := &ss.Bots[i]

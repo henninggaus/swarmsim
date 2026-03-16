@@ -211,6 +211,46 @@ func (r *Renderer) DrawSwarmMode(screen *ebiten.Image, s *simulation.Simulation,
 		}
 	}
 
+	// Heatmap overlay (Y key) — drawn under bots
+	if ss.ShowHeatmap && ss.HeatmapGrid != nil {
+		cellW := float32(swarm.HeatmapCellSize)
+		// Find max for normalization
+		maxVal := 1.0
+		for _, v := range ss.HeatmapGrid {
+			if v > maxVal {
+				maxVal = v
+			}
+		}
+		for row := 0; row < ss.HeatmapRows; row++ {
+			for col := 0; col < ss.HeatmapCols; col++ {
+				v := ss.HeatmapGrid[row*ss.HeatmapCols+col]
+				if v < 1 {
+					continue
+				}
+				intensity := v / maxVal
+				// Color gradient: blue → green → yellow → red
+				var hr, hg, hb uint8
+				if intensity < 0.33 {
+					t := intensity / 0.33
+					hb = uint8(200 * (1 - t))
+					hg = uint8(200 * t)
+				} else if intensity < 0.66 {
+					t := (intensity - 0.33) / 0.33
+					hg = uint8(200 * (1 - t))
+					hr = uint8(255 * t)
+					hg += uint8(100 * t) // yellow
+				} else {
+					t := (intensity - 0.66) / 0.34
+					hr = 255
+					hg = uint8(100 * (1 - t))
+				}
+				alpha := uint8(40 + 100*intensity)
+				vector.DrawFilledRect(a, float32(col)*cellW, float32(row)*cellW,
+					cellW, cellW, color.RGBA{hr, hg, hb, alpha}, false)
+			}
+		}
+	}
+
 	// Draw bots
 	for i := range ss.Bots {
 		bot := &ss.Bots[i]

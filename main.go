@@ -727,6 +727,18 @@ func (g *Game) handleSwarmInput() {
 		logger.Info("SWARM", "Trails: %v", ss.ShowTrails)
 	}
 
+	// Y key: toggle heatmap overlay
+	if inpututil.IsKeyJustPressed(ebiten.KeyY) && !ed.Focused && !ss.BotCountEdit {
+		ss.ShowHeatmap = !ss.ShowHeatmap
+		if ss.ShowHeatmap && ss.HeatmapGrid == nil {
+			swarm.InitHeatmap(ss)
+		}
+		if !ss.ShowHeatmap {
+			swarm.ClearHeatmap(ss)
+		}
+		logger.Info("SWARM", "Heatmap: %v", ss.ShowHeatmap)
+	}
+
 	// W key: cycle color filter (off → red → green → blue → carrying → idle → off)
 	if inpututil.IsKeyJustPressed(ebiten.KeyW) && !ed.Focused && !ss.BotCountEdit {
 		ss.ColorFilter = (ss.ColorFilter + 1) % 6

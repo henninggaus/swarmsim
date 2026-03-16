@@ -340,6 +340,12 @@ type SwarmState struct {
 	// Color filter (W key): 0=off, 1=red, 2=green, 3=blue, 4=carrying, 5=idle
 	ColorFilter int
 
+	// Heatmap overlay (Y key)
+	ShowHeatmap bool
+	HeatmapGrid []float64 // flat grid of visit counts
+	HeatmapCols int
+	HeatmapRows int
+
 	// Selected bot for info overlay
 	SelectedBot int // -1 = none
 	CompareBot  int // -1 = none, Shift+click to set second bot for comparison
