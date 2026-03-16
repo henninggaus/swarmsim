@@ -807,6 +807,12 @@ func (g *Game) handleSwarmInput() {
 		}
 	}
 
+	// Period key: toggle live chart
+	if inpututil.IsKeyJustPressed(ebiten.KeyPeriod) && !ed.Focused && !ss.BotCountEdit {
+		ss.ShowLiveChart = !ss.ShowLiveChart
+		logger.Info("SWARM", "Live-Chart: %v", ss.ShowLiveChart)
+	}
+
 	// Y key: toggle heatmap overlay
 	if inpututil.IsKeyJustPressed(ebiten.KeyY) && !ed.Focused && !ss.BotCountEdit {
 		ss.ShowHeatmap = !ss.ShowHeatmap

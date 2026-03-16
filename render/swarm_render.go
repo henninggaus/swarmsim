@@ -570,6 +570,11 @@ func (r *Renderer) DrawSwarmMode(screen *ebiten.Image, s *simulation.Simulation,
 		DrawFormationOverlay(screen, ss)
 	}
 
+	// Live chart overlay (. key)
+	if ss.ShowLiveChart {
+		DrawLiveChart(screen, ss)
+	}
+
 	// Arena editor mode indicator
 	if ss.ArenaEditMode {
 		toolNames := []string{"Hindernis", "Station", "Loeschen"}

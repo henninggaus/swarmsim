@@ -354,6 +354,9 @@ type SwarmState struct {
 	// Parameter preset system (F8 save, F9 load)
 	PresetIdx int // current preset index for cycling
 
+	// Live chart overlay (. key)
+	ShowLiveChart bool
+
 	// Auto-Optimizer
 	AutoOptimizer *AutoOptimizerState
 
