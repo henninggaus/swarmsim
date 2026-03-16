@@ -357,6 +357,45 @@ func (s *Simulation) updateSwarmMode() {
 		}
 	}
 
+	// Phase 4.97: Energy system
+	if ss.EnergyEnabled {
+		for i := range ss.Bots {
+			bot := &ss.Bots[i]
+			// Drain energy when moving
+			if bot.Speed > 0 {
+				bot.Energy -= 0.05 // ~2000 ticks of movement on full charge
+				if bot.Energy < 0 {
+					bot.Energy = 0
+				}
+			}
+			// Zero energy: force stop
+			if bot.Energy <= 0 {
+				bot.Speed = 0
+			}
+			// Recharge near stations (within 40px of any pickup or dropoff)
+			if ss.DeliveryOn {
+				for si := range ss.Stations {
+					st := &ss.Stations[si]
+					dx := bot.X - st.X
+					dy := bot.Y - st.Y
+					if dx*dx+dy*dy < 1600 { // 40px radius
+						bot.Energy += 0.5 // recharges ~200x faster than drain
+						if bot.Energy > 100 {
+							bot.Energy = 100
+						}
+						break
+					}
+				}
+			} else {
+				// Without delivery: slow passive recharge
+				bot.Energy += 0.02
+				if bot.Energy > 100 {
+					bot.Energy = 100
+				}
+			}
+		}
+	}
+
 	// Phase 5: Anti-stuck detection & cooldown
 	for i := range ss.Bots {
 		bot := &ss.Bots[i]

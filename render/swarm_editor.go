@@ -354,6 +354,23 @@ func drawSwarmEditorBottom(screen *ebiten.Image, ss *swarm.SwarmState, ed *swarm
 		printColoredAt(screen, neuroInfo, 5, editorSep2Y+2, color.RGBA{255, 140, 50, 200})
 	}
 
+	// Energy status
+	if ss.EnergyEnabled {
+		avgEnergy := 0.0
+		minEnergy := 100.0
+		for i := range ss.Bots {
+			avgEnergy += ss.Bots[i].Energy
+			if ss.Bots[i].Energy < minEnergy {
+				minEnergy = ss.Bots[i].Energy
+			}
+		}
+		if len(ss.Bots) > 0 {
+			avgEnergy /= float64(len(ss.Bots))
+		}
+		energyInfo := fmt.Sprintf("Energy: Avg:%.0f%% Min:%.0f%% (I=toggle)", avgEnergy, minEnergy)
+		printColoredAt(screen, energyInfo, 5, editorSep2Y+14, color.RGBA{220, 180, 50, 200})
+	}
+
 	// Separator 2
 	vector.StrokeLine(screen, 5, float32(editorSep2Y), float32(editorPanelW-5), float32(editorSep2Y), 1, ColorSwarmEditorSep, false)
 

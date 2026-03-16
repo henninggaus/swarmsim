@@ -250,6 +250,27 @@ func (r *Renderer) DrawSwarmMode(screen *ebiten.Image, s *simulation.Simulation,
 			vector.DrawFilledCircle(a, bx, by, radius+2, blinkCol, false)
 		}
 
+		// Energy bar under bot
+		if ss.EnergyEnabled {
+			barW := float32(16)
+			barH := float32(3)
+			barX := bx - barW/2
+			barY := by + radius + 3
+			// Background
+			vector.DrawFilledRect(a, barX, barY, barW, barH, color.RGBA{40, 40, 40, 180}, false)
+			// Fill based on energy
+			fill := float32(bot.Energy) / 100.0 * barW
+			var eCol color.RGBA
+			if bot.Energy > 50 {
+				eCol = color.RGBA{80, 220, 80, 200}
+			} else if bot.Energy > 20 {
+				eCol = color.RGBA{220, 200, 50, 200}
+			} else {
+				eCol = color.RGBA{220, 50, 50, 200}
+			}
+			vector.DrawFilledRect(a, barX, barY, fill, barH, eCol, false)
+		}
+
 		if i == ss.SelectedBot {
 			pulse := float32(2.0 + 2.0*math.Sin(float64(ss.Tick)*0.12))
 			pulseAlpha := uint8(150 + int(50*math.Sin(float64(ss.Tick)*0.08)))

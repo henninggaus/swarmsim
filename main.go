@@ -714,6 +714,20 @@ func (g *Game) handleSwarmInput() {
 		logger.Info("SWARM", "Dashboard: %v", ss.DashboardOn)
 	}
 
+	// I key: toggle energy system
+	if inpututil.IsKeyJustPressed(ebiten.KeyI) && !ed.Focused && !ss.BotCountEdit {
+		ss.EnergyEnabled = !ss.EnergyEnabled
+		if ss.EnergyEnabled {
+			// Initialize all bots with full energy
+			for i := range ss.Bots {
+				ss.Bots[i].Energy = 100
+			}
+			logger.Info("SWARM", "Energy system ON — Bots verbrauchen Energie bei Bewegung")
+		} else {
+			logger.Info("SWARM", "Energy system OFF")
+		}
+	}
+
 	// B key: bookmark current fitness curve as baseline for comparison
 	if inpututil.IsKeyJustPressed(ebiten.KeyB) && !ed.Focused && !ss.BotCountEdit {
 		if len(ss.FitnessHistory) > 1 {

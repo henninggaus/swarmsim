@@ -48,6 +48,9 @@ type SwarmBot struct {
 
 	LEDColor [3]uint8 // visual LED color (R, G, B)
 
+	// Energy system
+	Energy float64 // 0.0 - 100.0, drains with movement, recharges at stations
+
 	// Internal state variables (user-programmable)
 	State   int
 	Counter int
@@ -401,6 +404,7 @@ type SwarmState struct {
 	PherGrid *SwarmPheromoneGrid
 
 	ShowCommGraph bool // K key toggle: show communication lines between bots
+	EnergyEnabled bool // energy system toggle
 
 	CollisionCount  int // obstacle collisions this tick (reset per tick)
 	ResetFlashTimer int // counts down from 30 for "RESET" flash

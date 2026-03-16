@@ -38,6 +38,7 @@ func NewSwarmState(rng *rand.Rand, botCount int) *SwarmState {
 		"Maze Explorer",
 		"GP: Random Start",
 		"GP: Seeded Start",
+		"Neuro: Delivery",
 	}
 	ss.PresetPrograms = []string{
 		presetAggregation, presetDispersion, presetOrbit, presetColorWave, presetFlocking,
@@ -47,6 +48,7 @@ func NewSwarmState(rng *rand.Rand, botCount int) *SwarmState {
 		presetEvolvingDelivery, presetEvolvingTruckUnload,
 		presetMazeExplorer,
 		presetGPRandomStart, presetGPSeededStart,
+		presetNeuroDelivery,
 	}
 
 	// Initialize editor with default preset
@@ -151,6 +153,7 @@ func (ss *SwarmState) ResetBots() {
 		ss.Bots[i].NearestDropoffIdx = -1
 		ss.Bots[i].NearestMatchLEDDist = 999
 		ss.Bots[i].NearestMatchLEDAngle = 0
+		ss.Bots[i].Energy = 100 // full energy on reset
 	}
 	ss.Tick = 0
 	ss.PrevMessages = nil
@@ -486,9 +489,9 @@ func DeliveryColorName(c int) string {
 	return "?"
 }
 
-// IsDeliveryPresetIdx returns true if the preset index is a delivery program (10-12, 15, 17-19).
+// IsDeliveryPresetIdx returns true if the preset index is a delivery program (10-12, 15, 17-20).
 func IsDeliveryPresetIdx(idx int) bool {
-	return idx >= 10 && idx <= 12 || idx == 15 || idx >= 17 && idx <= 19
+	return idx >= 10 && idx <= 12 || idx == 15 || idx >= 17 && idx <= 20
 }
 
 // IsTruckPresetIdx returns true if the preset index is a truck program (13-14).
@@ -504,6 +507,11 @@ func IsEvolutionPresetIdx(idx int) bool {
 // IsGPPresetIdx returns true for genetic programming presets (idx 18-19).
 func IsGPPresetIdx(idx int) bool {
 	return idx >= 18 && idx <= 19
+}
+
+// IsNeuroPresetIdx returns true for neuroevolution presets (idx 20).
+func IsNeuroPresetIdx(idx int) bool {
+	return idx == 20
 }
 
 // ScanUsedParams scans the current program and sets ss.UsedParams for each $A-$Z found.
@@ -665,57 +673,113 @@ func NeighborDelta(ax, ay, bx, by float64, ss *SwarmState) (float64, float64) {
 
 // --- Preset Programs ---
 
-var presetAggregation = `# Bots cluster together
-# Speed resets to 0 each tick
+var presetAggregation = `# === AGGREGATION ===
+# Bots finden sich zu Clustern zusammen.
+# Algorithmus: Soziale Anziehung — wie Schwarmfische.
+# Jeder Bot dreht sich zum naechsten Nachbarn und bewegt
+# sich auf ihn zu. Gleichzeitig wird ein Mindestabstand
+# eingehalten (Separation), damit Bots nicht kollidieren.
+#
+# Keine Nachbarn? -> Zufaellig suchen
 IF neighbors == 0 THEN FWD
 IF neighbors == 0 AND rnd < 5 THEN TURN_RANDOM
+# Nachbar weit weg (>30px)? -> Annaehern
 IF near_dist > 30 THEN TURN_TO_NEAREST
 IF near_dist > 30 THEN FWD
+# Nachbar zu nah (<15px)? -> Abstand halten
 IF near_dist < 15 THEN TURN_FROM_NEAREST
 IF near_dist < 15 THEN FWD
+# Am Rand? -> Umdrehen
 IF edge == 1 THEN TURN_RIGHT 180`
 
-var presetDispersion = `# Bots spread out evenly
+var presetDispersion = `# === DISPERSION ===
+# Bots verteilen sich gleichmaessig im Raum.
+# Gegenteil von Aggregation: Jeder Bot stoesst
+# Nachbarn in einem Radius von 40px ab.
+# Ergebnis: Bots verteilen sich wie Gas-Molekuele.
+#
+# Nachbar zu nah (<40px)? -> Abstossen
 IF near_dist < 40 THEN TURN_FROM_NEAREST
 IF near_dist < 40 THEN FWD
+# Allein? -> Zufaellig wandern
 IF neighbors == 0 THEN TURN_RANDOM
 IF neighbors == 0 THEN FWD
+# Am Rand? -> Umdrehen
 IF edge == 1 THEN TURN_RIGHT 180`
 
-var presetOrbit = `# Bots orbit the light source (L key)
+var presetOrbit = `# === ORBIT ===
+# Bots umkreisen die Lichtquelle (Phototaxis).
+# Benoetigt: Light ON (Taste L zum Positionieren).
+# Algorithmus: Bei hellem Licht (>80) 90 Grad drehen
+# erzeugt Kreisbahnen. Bei schwachem Licht zur Quelle
+# navigieren. Simuliert Nachtfalter um eine Lampe.
+#
+# Helles Licht? -> 90 Grad drehen = Kreisbahn
 IF light > 80 THEN TURN_RIGHT 90
 IF light > 80 THEN FWD
+# Schwaches Licht? -> Zur Quelle navigieren
 IF light < 30 THEN TURN_TO_LIGHT
 IF light < 30 THEN FWD
+# Kollisionsvermeidung
 IF near_dist < 12 THEN TURN_FROM_NEAREST
 IF near_dist < 12 THEN FWD
+# Fallback: geradeaus
 IF true THEN FWD`
 
-var presetColorWave = `# Red flash wave through swarm
+var presetColorWave = `# === COLOR WAVE ===
+# Eine rote Farbwelle breitet sich durch den Schwarm aus.
+# Zeigt Informationsausbreitung in dezentralen Systemen.
+# Algorithmus: State-Machine mit 2 Zustaenden:
+#   State 0 = normal (grau), wartet auf Nachricht
+#   State 1 = aktiviert (rot), sendet Nachricht weiter
+# Jeder Bot der eine Nachricht empfaengt wird rot und
+# leitet sie an seine Nachbarn weiter. Nach 60 Ticks
+# kehrt er zum Normalzustand zurueck.
+#
+# Nachricht empfangen? -> Rot werden, weiterleiten
 IF state == 0 AND msg == 1 THEN SET_STATE 1
 IF state == 0 AND msg == 1 THEN SET_LED 255 0 0
 IF state == 0 AND msg == 1 THEN SEND_MESSAGE 1
 IF state == 0 AND msg == 1 THEN SET_TIMER 60
+# Timer abgelaufen? -> Zurueck zu grau
 IF state == 1 AND timer == 0 THEN SET_STATE 0
 IF state == 1 AND timer == 0 THEN SET_LED 60 60 60
+# Zufaellig eine Welle starten (1% Chance)
 IF state == 0 AND rnd < 1 THEN SEND_MESSAGE 1
 IF state == 0 AND rnd < 1 THEN SET_STATE 1
 IF state == 0 AND rnd < 1 THEN SET_LED 255 0 0
 IF state == 0 AND rnd < 1 THEN SET_TIMER 60
+# Kollisionsvermeidung
 IF near_dist < 15 THEN TURN_FROM_NEAREST
 IF near_dist < 15 THEN FWD`
 
-var presetFlocking = `# Boids-like flocking behavior
+var presetFlocking = `# === FLOCKING (Boids) ===
+# Schwarmverhalten wie bei Voegeln oder Fischschwaermen.
+# Basiert auf Craig Reynolds' Boids-Algorithmus (1986).
+# Drei Regeln erzeugen realistisches Schwarmverhalten:
+#   1. Separation: Zu nahe (<12px) -> abstossen
+#   2. Cohesion: Zu weit (>40px) -> zur Gruppe zurueck
+#   3. Alignment: Implizit durch FWD (gleiche Richtung)
+# Ergebnis: Bots bilden natuerlich wirkende Schwaerme.
+#
+# 1. Separation: Mindestabstand halten
 IF near_dist < 12 THEN TURN_FROM_NEAREST
 IF near_dist < 12 THEN FWD
+# 2. Cohesion: Zur Mitte der Nachbarn steuern
 IF near_dist > 40 THEN TURN_TO_CENTER
 IF near_dist > 40 THEN FWD
+# Allein? -> Zufaellig suchen
 IF neighbors == 0 THEN TURN_RANDOM
+# Am Rand? -> Umdrehen
 IF edge == 1 THEN TURN_RIGHT 180
+# 3. Alignment: Geradeaus (Richtung beibehalten)
 IF true THEN FWD`
 
-var presetSnakeFormation = `# Bots form chains and slither
-# state: 0=lone 1=head 2=follower
+var presetSnakeFormation = `# === SNAKE FORMATION ===
+# Bots bilden Ketten und schlängeln sich durch die Arena.
+# Emergente Formation: Aus Follow-Mechanik entstehen
+# Schlangen ohne zentrale Steuerung.
+# State-Machine: 0=einsam 1=Kopf 2=Folger
 IF leader == 0 AND follower == 0 THEN SET_STATE 0
 IF leader == 0 AND follower == 1 THEN SET_STATE 1
 IF leader == 1 THEN SET_STATE 2
@@ -739,8 +803,12 @@ IF chain_len > 12 AND follower == 0 THEN UNFOLLOW
 IF edge == 1 THEN TURN_RIGHT 180
 IF obs_ahead == 1 THEN AVOID_OBSTACLE`
 
-var presetObstacleNav = `# Navigate obstacles toward light
-# Enable Obstacles or Maze + Light!
+var presetObstacleNav = `# === OBSTACLE NAVIGATION ===
+# Benoetigt: Obstacles ON + Light ON
+# Bots navigieren um Hindernisse zur Lichtquelle.
+# Kombination aus reaktiver Navigation (AVOID_OBSTACLE)
+# und Zielverfolgung (TURN_TO_LIGHT). Testet wie gut
+# Bots mit einfachen Regeln komplexe Umgebungen meistern.
 IF obs_ahead == 1 THEN AVOID_OBSTACLE
 IF obs_ahead == 1 THEN FWD_SLOW
 IF obs_ahead == 1 THEN SET_LED 255 0 0
@@ -751,76 +819,129 @@ IF edge == 1 THEN TURN_RIGHT 180
 IF rnd < 3 THEN TURN_RIGHT 10
 IF true THEN FWD`
 
-var presetPulseSync = `# Synchronized LED pulses (fireflies)
+var presetPulseSync = `# === PULSE SYNC ===
+# Synchronisierte Lichtblitze wie Gluehwuermchen.
+# Biologisches Vorbild: Kuramoto-Modell (1975).
+# Algorithmus: Jeder Bot hat einen internen Timer.
+# Wenn der Timer ablaeuft, blitzt der Bot orange auf
+# und sendet eine Nachricht. Nachbarn verkuerzen ihren
+# Timer, sodass sie frueher blitzen. Ueber Zeit
+# synchronisieren sich alle Bots zu einem Rhythmus.
+#
+# State 0: Initialisierung -> Timer starten
 IF state == 0 THEN SET_TIMER 60
 IF state == 0 THEN SET_STATE 1
 IF state == 0 THEN SET_LED 20 20 20
+# State 1: Warten bis Timer ablaeuft -> Blitz!
 IF state == 1 AND timer == 0 THEN SET_LED 255 99 0
 IF state == 1 AND timer == 0 THEN SEND_MESSAGE 1
 IF state == 1 AND timer == 0 THEN SET_STATE 2
 IF state == 1 AND timer == 0 THEN SET_TIMER 5
+# State 2: Blitz-Ende -> Wieder dunkel, neuer Zyklus
 IF state == 2 AND timer == 0 THEN SET_LED 20 20 20
 IF state == 2 AND timer == 0 THEN SET_TIMER 55
 IF state == 2 AND timer == 0 THEN SET_STATE 1
+# Nachricht empfangen -> Timer verkuerzen (Synchronisation!)
 IF state == 1 AND msg == 1 THEN SET_TIMER 40
+# Langsame Bewegung + Abstand halten
 IF near_dist < 12 THEN TURN_FROM_NEAREST
 IF near_dist < 12 THEN FWD_SLOW
 IF rnd < 2 THEN TURN_RANDOM`
 
-var presetTrailFollow = `# Copy nearest neighbor LED color
+var presetTrailFollow = `# === TRAIL FOLLOW ===
+# Bots kopieren die LED-Farbe des naechsten Nachbarn.
+# Zeigt wie lokale Nachahmung zu globalen Mustern fuehrt.
+# Einzelne Bots setzen zufaellig rote LEDs — diese Farbe
+# breitet sich durch den Schwarm aus wie ein Virus.
+# Tipp: Trails einschalten (T) fuer Bewegungsspuren.
+#
+# Zu weit weg vom Nachbarn -> Annaehern
 IF near_dist > 25 THEN TURN_TO_NEAREST
 IF near_dist > 25 THEN FWD
+# Nachbar sichtbar? -> LED-Farbe kopieren
 IF neighbors > 0 THEN COPY_LED
+# Allein? -> Weiss, zufaellig suchen
 IF neighbors == 0 THEN SET_LED 255 255 255
 IF neighbors == 0 THEN TURN_RANDOM
 IF neighbors == 0 THEN FWD
+# Zu nah? -> Abstand halten
 IF near_dist < 12 THEN TURN_FROM_NEAREST
 IF near_dist < 12 THEN FWD
 IF edge == 1 THEN TURN_RIGHT 180
+# 1% Chance: neue rote LED setzen (Farbquelle)
 IF rnd < 1 THEN SET_LED 255 0 0`
 
-var presetAntColony = `# Ant foraging (use Light!)
-# State 0=search 1=return 2=base
+var presetAntColony = `# === ANT COLONY ===
+# Vereinfachter Ameisenalgorithmus (Ameisen-Foraging).
+# Benoetigt: Light ON (simuliert Futterquelle).
+# Algorithmus mit 3 Zustaenden:
+#   State 0 = Suchen (orange): zufaellig erkunden
+#   State 1 = Zurueckkehren (gruen): Futter gefunden!
+#   State 2 = An Basis (grau): kurz pausieren
+# Bots die Futter finden senden Nachrichten an Nachbarn.
+# Suchende Bots folgen diesen Nachrichten zum Futter.
+#
+# State 0: Suchen — zufaellig erkunden
 IF state == 0 THEN FWD
 IF state == 0 AND rnd < 5 THEN TURN_RANDOM
+# Futter gefunden (Licht hell)? -> Zurueckkehren
 IF state == 0 AND light > 50 THEN SET_STATE 1
 IF state == 0 AND light > 50 THEN SET_LED 0 255 0
 IF state == 0 AND light > 50 THEN TURN_RIGHT 180
+# State 1: Zurueck zur Basis, Nachricht senden
 IF state == 1 THEN FWD
 IF state == 1 THEN SEND_MESSAGE 2
+# Am Rand (=Basis)? -> Kurz pausieren
 IF state == 1 AND edge == 1 THEN SET_STATE 2
 IF state == 1 AND edge == 1 THEN SET_LED 99 99 99
 IF state == 1 AND edge == 1 THEN SET_TIMER 30
+# State 2: Pause an Basis -> Wieder suchen
 IF state == 2 AND timer == 0 THEN SET_STATE 0
 IF state == 2 AND timer == 0 THEN SET_LED 255 99 0
 IF state == 2 AND timer == 0 THEN TURN_RIGHT 180
+# Nachricht empfangen? -> Zum Sender drehen (Futter!)
 IF state == 0 AND msg == 2 THEN TURN_TO_NEAREST
+# Kollisionsvermeidung
 IF near_dist < 15 THEN TURN_FROM_NEAREST
 IF obs_ahead == 1 THEN AVOID_OBSTACLE`
 
-var presetSimpleDelivery = `# Smart Delivery — enable Delivery!
-# LED gradient, separation, deliver
-# --- Explore (lowest priority) ---
+var presetSimpleDelivery = `# === SIMPLE DELIVERY ===
+# Benoetigt: Delivery ON
+# Bots explorieren, sammeln Pakete ein und liefern sie
+# zur farblich passenden Dropoff-Station.
+# Algorithmus: Prioritaetsbasierte Regeln (von oben
+# nach unten). Hoehere Prioritaet ueberschreibt niedrigere.
+# LED-Gradient: Bots nahe einer Dropoff setzen ihre LED
+# auf die Stationsfarbe, andere kopieren diese — so
+# entsteht ein Farbgradient als Wegweiser.
+#
+# --- Prio 1: Explore (niedrigste Prioritaet) ---
 IF rnd < 8 THEN TURN_RANDOM
 IF true THEN FWD
-# --- Separation ---
+# --- Prio 2: Abstand halten (Separation) ---
 IF near_dist < 15 THEN TURN_FROM_NEAREST
 IF near_dist < 15 THEN FWD
-# --- LED gradient ---
+# --- Prio 3: LED-Gradient aufbauen ---
+# Nahe einer Dropoff? -> LED auf Stationsfarbe setzen
 IF d_dist < 200 THEN LED_DROPOFF
+# Weit weg? -> LED des naechsten Bots kopieren
 IF d_dist > 200 THEN COPY_LED
-# --- Pickup (pkg available only) ---
+# --- Prio 4: Pakete aufheben (nur wenn leer) ---
+# carry==0: kein Paket, p_dist: Abstand zur Pickup
 IF carry == 0 AND p_dist < 20 THEN PICKUP
+# has_pkg: diese Pickup hat ein Paket bereit
 IF has_pkg == 1 THEN GOTO_PICKUP
 IF has_pkg == 1 THEN FWD
-# --- Deliver: LED gradient ---
+# --- Prio 5: Liefern per LED-Gradient ---
+# led_dist: Abstand zum naechsten Bot mit passender LED
 IF led_dist < 200 THEN GOTO_LED
 IF led_dist < 200 THEN FWD
-# --- Deliver: direct ---
+# --- Prio 6: Direkt zur Dropoff ---
+# match==1: passende Dropoff ist im Sensorradius
 IF match == 1 AND d_dist < 25 THEN DROP
 IF match == 1 THEN GOTO_DROPOFF
 IF match == 1 THEN FWD
-# --- Navigation LAST ---
+# --- Navigation (IMMER aktiv) ---
 IF obs_ahead == 1 THEN AVOID_OBSTACLE
 IF edge == 1 THEN TURN_RIGHT 180`
 
@@ -955,17 +1076,28 @@ IF edge == 1 THEN TURN_RIGHT 180
 IF rnd < 5 THEN TURN_RANDOM
 IF true THEN FWD`
 
-var presetEvolvingDelivery = `# Evolving Delivery — uses $A-$Z params!
-# 1. Carrying + see dropoff: deliver
+var presetEvolvingDelivery = `# === EVOLVING DELIVERY ===
+# Benoetigt: Delivery ON + Evolution ON
+# Wie Simple Delivery, aber mit evolvierbaren Parametern.
+# Die Werte $A-$E werden durch den Genetischen Algorithmus
+# ueber Generationen hinweg optimiert.
+# $A = Drop-Abstand (Start: 25px)
+# $B = Pickup-Reichweite (Start: 30px)
+# $C = Pickup-Suchradius (Start: 200px)
+# $D = Separation-Abstand (Start: 20px)
+# $E = Zufalls-Drehwahrscheinlichkeit (Start: 30%)
+# Beobachte wie die Fitness ueber Generationen steigt!
+#
+# 1. Paket tragen + Dropoff sehen -> Abliefern
 IF carry == 1 AND match == 1 AND d_dist < $A:25 THEN DROP
 IF carry == 1 AND match == 1 THEN GOTO_DROPOFF
-# 2. Carrying + hear beacon: follow
+# 2. Paket tragen + Beacon hoeren -> Folgen
 IF carry == 1 AND heard_beacon == 1 THEN GOTO_BEACON
 IF carry == 1 AND heard_beacon == 1 THEN FWD
-# 3. Carrying + lost: spiral
+# 3. Paket tragen + verloren -> Spiralsuche
 IF carry == 1 AND exploring == 1 THEN SPIRAL
 IF carry == 1 THEN FWD
-# 4. Not carrying: pickup
+# 4. Leer -> Paket aufheben
 IF carry == 0 AND p_dist < $B:30 AND has_pkg == 1 THEN PICKUP
 IF carry == 0 AND p_dist < $C:200 THEN GOTO_PICKUP
 IF carry == 0 THEN FWD
@@ -997,35 +1129,61 @@ IF obs_ahead == 1 THEN AVOID_OBSTACLE
 IF edge == 1 THEN TURN_RIGHT 180
 IF true THEN FWD`
 
-var presetMazeExplorer = `# Maze Explorer — right-hand wall following!
-# Wall-following + Delivery im Labyrinth
-# Schalte Maze + Delivery ein!
+var presetMazeExplorer = `# === MAZE EXPLORER ===
+# Benoetigt: Maze ON (optional: Delivery ON)
+# Rechte-Hand-Regel (Wall-Following): Klassischer
+# Robotik-Algorithmus zum Finden des Ausgangs.
+# Prinzip: Immer die rechte Wand berühren.
+#   - Wand rechts? -> Geradeaus
+#   - Keine Wand rechts? -> Rechts abbiegen
+#   - Wand vorne? -> Links ausweichen
+# Mit Delivery kombiniert: Pakete im Labyrinth liefern.
+#
+# --- Delivery (wenn aktiv) ---
 IF carry == 1 AND match == 1 AND d_dist < 25 THEN DROP
 IF carry == 1 AND match == 1 THEN GOTO_DROPOFF
 IF carry == 1 AND match == 1 THEN FWD
 IF carry == 0 AND p_dist < 20 AND has_pkg == 1 THEN PICKUP
 IF carry == 0 AND has_pkg == 1 THEN GOTO_PICKUP
 IF carry == 0 AND has_pkg == 1 THEN FWD
+# --- Kollisionsvermeidung ---
 IF near_dist < 12 THEN TURN_FROM_NEAREST
+# --- Rechte-Hand-Regel ---
+# Wand vorne? -> Links drehen (90 Grad)
 IF wall_front == 1 THEN TURN_LEFT 90
+# Keine Wand rechts? -> Rechts drehen (Luecke folgen)
 IF wall_right == 0 THEN TURN_RIGHT 90
+# Sonst: Geradeaus (Wand bleibt rechts)
 IF true THEN FWD`
 
-var presetGPRandomStart = `# GP: Random Start
-# Genetic Programming — jeder Bot bekommt ein eigenes
-# zufaellig generiertes Programm.
-# Schalte GP ON und Delivery ON!
-# Dieses Programm wird ignoriert wenn GP aktiv ist.
+var presetGPRandomStart = `# === GP: RANDOM START ===
+# Benoetigt: GP ON + Delivery ON
+# Genetische Programmierung — jeder Bot bekommt ein
+# eigenes, komplett zufaellig generiertes Programm.
+# Die Evolution sucht die besten Strategien von Null.
+# Dieses Seed-Programm wird beim Start ueberschrieben.
+#
+# Crossover: Regeln zwischen erfolgreichen Bots tauschen
+# Mutation: Sensoren, Schwellwerte, Aktionen aendern
+# Fitness: Deliveries*30 + Pickups*15 + Dist*0.01
+# 10% jeder Generation sind komplett neue Programme.
+# Tipp: Beobachte Export Best fuer das beste Programm!
+#
 IF carry == 0 AND has_pkg == 1 THEN PICKUP
 IF carry == 1 AND match == 1 THEN GOTO_DROPOFF
 IF carry == 1 AND d_dist < 30 THEN DROP
 IF obs_ahead == 1 THEN AVOID_OBSTACLE
 IF true THEN FWD`
 
-var presetGPSeededStart = `# GP: Seeded Start
+var presetGPSeededStart = `# === GP: SEEDED START ===
+# Benoetigt: GP ON + Delivery ON
+# Wie GP Random, aber mit Vorsprung:
 # 50% der Bots starten mit mutiertem Simple Delivery
 # 50% starten komplett zufaellig
-# So hat die Evolution einen Vorsprung!
+# Vorteil: Die Evolution hat eine funktionierende
+# Basis und muss nicht alles von Null lernen.
+# Oft schnellere Konvergenz als Random Start.
+#
 IF near_dist < 12 THEN TURN_FROM_NEAREST
 IF carry == 0 AND has_pkg == 1 AND p_dist < 20 THEN PICKUP
 IF carry == 0 AND has_pkg == 1 THEN GOTO_PICKUP
@@ -1033,4 +1191,36 @@ IF carry == 1 AND match == 1 AND d_dist < 30 THEN DROP
 IF carry == 1 AND match == 1 THEN GOTO_DROPOFF
 IF carry == 1 THEN FWD
 IF obs_ahead == 1 THEN AVOID_OBSTACLE
+IF true THEN FWD`
+
+var presetNeuroDelivery = `# === NEURO: DELIVERY ===
+# Benoetigt: NEURO ON (wird automatisch aktiviert)
+# Neuronales Netz statt Regeln!
+#
+# Architektur: 12 Sensoren -> 6 Hidden -> 8 Aktionen
+# 120 Gewichte pro Bot, evolviert durch Selektion.
+#
+# Dieses Programm wird NICHT ausgefuehrt wenn NEURO ON ist.
+# Das neuronale Netz entscheidet direkt ueber Aktionen.
+# Der Editor zeigt die Netz-Visualisierung stattdessen.
+#
+# === Wie funktioniert es? ===
+# Jeder Bot hat ein eigenes Netz mit zufaelligen Gewichten.
+# Alle 2000 Ticks: Fitness bewerten, Top 20% vererben.
+# Crossover: Gewichte zweier Eltern mischen.
+# Mutation: 15% Chance, kleines Gauss-Rauschen.
+# 10% komplett neue Zufalls-Netze (frisches Blut).
+#
+# === Sensoren (Inputs) ===
+# near_dist, neighbors, edge, carry,
+# p_dist, d_dist, match, has_pkg,
+# obs_ahead, light, rnd, bias
+#
+# === Aktionen (Outputs) ===
+# FWD, TURN_LEFT, TURN_RIGHT, TURN_TO_NEAREST,
+# TURN_FROM_NEAREST, PICKUP, DROP, GOTO_DROPOFF
+#
+# Tipp: Beobachte wie die Fitness ueber Generationen steigt!
+# Am Anfang bewegen sich die Bots zufaellig. Nach einigen
+# Generationen lernen sie Pakete aufzuheben und zu liefern.
 IF true THEN FWD`
