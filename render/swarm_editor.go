@@ -590,7 +590,7 @@ func DrawSwarmHUD(screen *ebiten.Image, s *simulation.Simulation, fps float64) {
 	// Help text at very bottom — two lines for readability
 	printColoredAt(screen, "SPACE:Pause  L:Licht  T:Trails  D:Dashboard  M:Minimap  C:Challenge",
 		360, sh-28, color.RGBA{120, 130, 150, 180})
-	printColoredAt(screen, "N:Neue Runde  V:Genom  S:Sound  +/-:Speed  H:Hilfe (alle Tasten)",
+	printColoredAt(screen, "1-5:Speed(0.5x-10x)  V:Genom  S:Sound  +/-:Speed  H:Hilfe",
 		360, sh-14, color.RGBA{120, 130, 150, 180})
 
 	// Scenario title overlay

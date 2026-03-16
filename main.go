@@ -307,8 +307,8 @@ func (g *Game) handleGlobalInput() {
 	// +/-: speed
 	if inpututil.IsKeyJustPressed(ebiten.KeyEqual) || inpututil.IsKeyJustPressed(ebiten.KeyKPAdd) {
 		g.sim.Speed += 0.5
-		if g.sim.Speed > 5.0 {
-			g.sim.Speed = 5.0
+		if g.sim.Speed > 10.0 {
+			g.sim.Speed = 10.0
 		}
 	}
 	if inpututil.IsKeyJustPressed(ebiten.KeyMinus) || inpututil.IsKeyJustPressed(ebiten.KeyKPSubtract) {
@@ -822,6 +822,23 @@ func (g *Game) handleSwarmInput() {
 		if ss.DashboardOn && ss.StatsTracker != nil {
 			ss.StatsTracker.ShowActionHeat = !ss.StatsTracker.ShowActionHeat
 			logger.Info("SWARM", "Action heatmap: %v", ss.StatsTracker.ShowActionHeat)
+		}
+	}
+
+	// Speed presets: number keys 1-5 (when editor not focused)
+	if !ed.Focused && !ss.BotCountEdit {
+		speedPresets := map[ebiten.Key]float64{
+			ebiten.KeyDigit1: 0.5,
+			ebiten.KeyDigit2: 1.0,
+			ebiten.KeyDigit3: 2.0,
+			ebiten.KeyDigit4: 5.0,
+			ebiten.KeyDigit5: 10.0,
+		}
+		for key, speed := range speedPresets {
+			if inpututil.IsKeyJustPressed(key) {
+				g.sim.Speed = speed
+				logger.Info("SWARM", "Speed preset: %.1fx (key %d)", speed, key-ebiten.KeyDigit0)
+			}
 		}
 	}
 
