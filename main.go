@@ -131,6 +131,11 @@ func (g *Game) Update() (retErr error) {
 			g.sim.Paused = g.replayWasPause
 			return nil
 		}
+		// Close tournament overlay
+		if g.sim.SwarmMode && g.sim.SwarmState != nil && g.sim.SwarmState.TournamentOn {
+			swarm.TournamentStop(g.sim.SwarmState)
+			return nil
+		}
 		// Cancel follow-cam before quitting
 		if g.sim.SwarmMode && g.sim.SwarmState != nil && g.sim.SwarmState.FollowCamBot >= 0 {
 			g.sim.SwarmState.FollowCamBot = -1
@@ -911,6 +916,46 @@ func (g *Game) handleSwarmInput() {
 		} else if ss.SelectedBot >= 0 {
 			ss.FollowCamBot = ss.SelectedBot
 			logger.Info("SWARM", "Follow-cam ON: Bot #%d", ss.FollowCamBot)
+		}
+	}
+
+	// U key: tournament mode
+	if inpututil.IsKeyJustPressed(ebiten.KeyU) && !ed.Focused && !ss.BotCountEdit {
+		if !ss.TournamentOn {
+			// Add current program to tournament roster and open tournament
+			name := ss.ProgramName
+			if name == "" {
+				name = "Custom"
+			}
+			source := strings.Join(ed.Lines, "\n")
+			swarm.TournamentAddEntry(ss, name, source)
+			ss.TournamentOn = true
+		} else if ss.TournamentPhase == 0 {
+			// Already in tournament idle — add current program
+			name := ss.ProgramName
+			if name == "" {
+				name = "Custom"
+			}
+			source := strings.Join(ed.Lines, "\n")
+			swarm.TournamentAddEntry(ss, name, source)
+		} else if ss.TournamentPhase == 2 {
+			// Results shown — reset for new tournament
+			ss.TournamentEntries = nil
+			ss.TournamentResults = nil
+			ss.TournamentPhase = 0
+			logger.Info("SWARM", "Tournament reset")
+		}
+	}
+
+	// Enter key in tournament idle: start the tournament
+	if ss.TournamentOn && ss.TournamentPhase == 0 &&
+		inpututil.IsKeyJustPressed(ebiten.KeyEnter) && !ed.Focused {
+		if len(ss.TournamentEntries) >= 2 {
+			if !ss.DeliveryOn {
+				ss.DeliveryOn = true
+				swarm.GenerateDeliveryStations(ss)
+			}
+			swarm.TournamentStart(ss)
 		}
 	}
 

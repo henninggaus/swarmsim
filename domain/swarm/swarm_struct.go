@@ -425,6 +425,15 @@ type SwarmState struct {
 	// Population diversity (updated each generation)
 	Diversity *DiversityMetrics
 
+	// Tournament mode
+	TournamentOn      bool
+	TournamentEntries []TournamentEntry
+	TournamentRound   int // current round being played
+	TournamentPhase   int // 0=idle, 1=running, 2=results
+	TournamentTimer   int // ticks remaining in current round
+	TournamentResults []TournamentResult
+	TournamentScroll  int
+
 	// Genom-Browser overlay (G key)
 	GenomeBrowserOn     bool
 	GenomeBrowserSort   int // 0=fitness, 1=age, 2=deliveries
@@ -467,6 +476,22 @@ type BlockDropdown struct {
 	ScrollY   int    // scroll offset in dropdown
 	HoverIdx  int    // hovered item index (-1 = none)
 	Items     []string
+}
+
+// TournamentEntry is a saved program for tournament mode.
+type TournamentEntry struct {
+	Name    string
+	Source  string // SwarmScript source code
+	Program *swarmscript.SwarmProgram
+}
+
+// TournamentResult tracks a program's tournament performance.
+type TournamentResult struct {
+	Name       string
+	Deliveries int
+	Correct    int
+	Wrong      int
+	Score      int
 }
 
 // AllObstacles returns combined obstacles and maze walls.

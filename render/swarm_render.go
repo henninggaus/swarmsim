@@ -445,6 +445,11 @@ func (r *Renderer) DrawSwarmMode(screen *ebiten.Image, s *simulation.Simulation,
 		DrawGenomeBrowser(screen, ss)
 	}
 
+	// Tournament overlay (U key)
+	if ss.TournamentOn {
+		DrawTournamentOverlay(screen, ss)
+	}
+
 	// Arena editor mode indicator
 	if ss.ArenaEditMode {
 		toolNames := []string{"Hindernis", "Station", "Loeschen"}

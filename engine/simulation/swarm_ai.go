@@ -335,6 +335,11 @@ func (s *Simulation) updateSwarmMode() {
 	// Count broadcasts for sound
 	ss.BroadcastCount = len(ss.NextMessages)
 
+	// Phase 4.88: Tournament timer
+	if ss.TournamentOn && ss.TournamentPhase == 1 {
+		swarm.TournamentTick(ss)
+	}
+
 	// Phase 4.9: Challenge timer update
 	if ss.TeamsEnabled {
 		swarm.UpdateChallenge(ss)
