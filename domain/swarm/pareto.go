@@ -12,9 +12,10 @@ type ParetoObjective struct {
 
 // ParetoFront tracks non-dominated solutions in multi-objective evolution.
 type ParetoFront struct {
-	Fronts     [][]int // fronts[0] = rank-0 (Pareto front), fronts[1] = rank-1, etc.
-	BotCount   int
-	Objectives [][]float64 // [botIdx][objectiveIdx]
+	Fronts           [][]int     // fronts[0] = rank-0 (Pareto front), fronts[1] = rank-1, etc.
+	BotCount         int
+	Objectives       [][]float64 // [botIdx][objectiveIdx]
+	CrowdingDistance  []float64   // [botIdx] pre-computed crowding distance
 }
 
 // ComputeParetoFronts assigns Pareto ranks to all bots using NSGA-II fast non-dominated sorting.
@@ -73,11 +74,22 @@ func ComputeParetoFronts(ss *SwarmState) *ParetoFront {
 		currentFront = nextFront
 	}
 
-	return &ParetoFront{
-		Fronts:     fronts,
-		BotCount:   n,
-		Objectives: objectives,
+	pf := &ParetoFront{
+		Fronts:          fronts,
+		BotCount:        n,
+		Objectives:      objectives,
+		CrowdingDistance: make([]float64, n),
 	}
+
+	// Pre-compute crowding distances for all fronts
+	for _, front := range fronts {
+		dists := computeAllCrowdingDistances(pf, front)
+		for i, idx := range front {
+			pf.CrowdingDistance[idx] = dists[i]
+		}
+	}
+
+	return pf
 }
 
 // botObjectives returns the multi-objective fitness vector for a bot.
@@ -112,61 +124,70 @@ func dominates(a, b []float64) bool {
 }
 
 // ParetoRankFitness converts Pareto rank to a scalar fitness value for selection.
-// Rank 0 (Pareto front) gets highest fitness. Uses crowding distance within each front.
+// Rank 0 (Pareto front) gets highest fitness. Uses pre-computed crowding distance.
 func ParetoRankFitness(pf *ParetoFront, botIdx int) float64 {
+	if botIdx < 0 || botIdx >= pf.BotCount {
+		return 0
+	}
 	for rank, front := range pf.Fronts {
 		for _, idx := range front {
 			if idx == botIdx {
-				// Base fitness from rank (higher rank = lower fitness)
 				baseFitness := float64(pf.BotCount-rank) * 100
-				// Add crowding distance bonus within front
-				crowding := crowdingDistance(pf, front, botIdx)
-				return baseFitness + crowding
+				return baseFitness + pf.CrowdingDistance[botIdx]
 			}
 		}
 	}
 	return 0
 }
 
-// crowdingDistance estimates the crowding distance for a solution within its front.
-// Solutions with more diverse objective values get higher crowding distance.
-func crowdingDistance(pf *ParetoFront, front []int, targetIdx int) float64 {
-	if len(front) <= 2 {
-		return 50 // small front, give decent bonus
+// computeAllCrowdingDistances computes crowding distance for every member of a front at once.
+// This avoids redundant re-sorting per bot — sorts once per objective for the whole front.
+// Returns a map from bot index to crowding distance.
+func computeAllCrowdingDistances(pf *ParetoFront, front []int) []float64 {
+	n := len(front)
+	// Indexed by position in front, not by bot index
+	distances := make([]float64, n)
+
+	if n <= 2 {
+		for i := range distances {
+			distances[i] = 50
+		}
+		return distances
+	}
+
+	// Build reverse lookup: botIdx → position in front
+	posOf := make(map[int]int, n)
+	for i, idx := range front {
+		posOf[idx] = i
 	}
 
 	numObj := len(pf.Objectives[0])
-	distances := make(map[int]float64)
-	for _, idx := range front {
-		distances[idx] = 0
-	}
+	sorted := make([]int, n) // reuse across objectives
 
 	for obj := 0; obj < numObj; obj++ {
-		// Sort front by this objective
-		sorted := make([]int, len(front))
 		copy(sorted, front)
 		sort.Slice(sorted, func(a, b int) bool {
 			return pf.Objectives[sorted[a]][obj] < pf.Objectives[sorted[b]][obj]
 		})
 
 		// Boundary solutions get max distance
-		distances[sorted[0]] += 1000
-		distances[sorted[len(sorted)-1]] += 1000
+		distances[posOf[sorted[0]]] += 1000
+		distances[posOf[sorted[n-1]]] += 1000
 
 		// Range for normalization
-		objRange := pf.Objectives[sorted[len(sorted)-1]][obj] - pf.Objectives[sorted[0]][obj]
+		objRange := pf.Objectives[sorted[n-1]][obj] - pf.Objectives[sorted[0]][obj]
 		if objRange < 0.001 {
 			continue
 		}
 
 		// Inner solutions
-		for i := 1; i < len(sorted)-1; i++ {
+		for i := 1; i < n-1; i++ {
 			d := (pf.Objectives[sorted[i+1]][obj] - pf.Objectives[sorted[i-1]][obj]) / objRange
-			distances[sorted[i]] += d * 50
+			distances[posOf[sorted[i]]] += d * 50
 		}
 	}
 
-	return distances[targetIdx]
+	return distances
 }
 
 // ParetoFrontSize returns the number of solutions on the Pareto front (rank 0).

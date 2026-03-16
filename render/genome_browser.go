@@ -66,7 +66,7 @@ func DrawGenomeBrowser(screen *ebiten.Image, ss *swarm.SwarmState) {
 	cy += 16
 
 	// Sort mode indicator
-	sortNames := []string{"Fitness", "Alter (Ticks)", "Deliveries"}
+	sortNames := []string{"Fitness", "Alter (Ticks)", "Lieferungen"}
 	sortInfo := fmt.Sprintf("Sortierung: %s  (Tab=wechseln, Mausrad=scrollen)", sortNames[ss.GenomeBrowserSort])
 	printColoredAt(screen, sortInfo, cx, cy, dimCol)
 	cy += 14
@@ -76,8 +76,8 @@ func DrawGenomeBrowser(screen *ebiten.Image, ss *swarm.SwarmState) {
 	printColoredAt(screen, "#", cx, headerY, goldCol)
 	printColoredAt(screen, "Bot", cx+20, headerY, goldCol)
 	printColoredAt(screen, "Fitness", cx+60, headerY, goldCol)
-	printColoredAt(screen, "Age", cx+120, headerY, goldCol)
-	printColoredAt(screen, "Deliv", cx+170, headerY, goldCol)
+	printColoredAt(screen, "Alter", cx+120, headerY, goldCol)
+	printColoredAt(screen, "Lief.", cx+170, headerY, goldCol)
 	printColoredAt(screen, "Genom-Info", cx+220, headerY, goldCol)
 	cy += 14
 

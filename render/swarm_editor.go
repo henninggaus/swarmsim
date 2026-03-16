@@ -605,7 +605,7 @@ func DrawSwarmHUD(screen *ebiten.Image, s *simulation.Simulation, fps float64) {
 				}
 				avgTime = sum / len(ds.DeliveryTimes)
 			}
-			dInfo := fmt.Sprintf("Deliveries:%d | Correct:%d | Wrong:%d | AvgTime:%d",
+			dInfo := fmt.Sprintf("Lieferungen:%d | Richtig:%d | Falsch:%d | Avg:%d",
 				ds.TotalDelivered, ds.CorrectDelivered, ds.WrongDelivered, avgTime)
 			printColoredAt(screen, dInfo, 420, 15, color.RGBA{255, 200, 100, 255})
 		}

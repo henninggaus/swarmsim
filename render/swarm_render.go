@@ -491,16 +491,18 @@ func (r *Renderer) DrawSwarmMode(screen *ebiten.Image, s *simulation.Simulation,
 		drawTeamsScoreboard(screen, ss, sw)
 	}
 
+	// Tick HUD string cache once per frame
+	upd := hudCacheTick()
+
 	// Follow-cam HUD indicator
 	if ss.FollowCamBot >= 0 && ss.FollowCamBot < len(ss.Bots) {
-		label := fmt.Sprintf("Following Bot #%d [F to stop]", ss.FollowCamBot)
+		label := cachedFollowCam(upd, ss.FollowCamBot)
 		printColoredAt(screen, label, 500, 855, color.RGBA{0, 255, 255, 220})
 	}
 
 	// Evolution HUD + fitness graph
 	if ss.EvolutionOn {
-		evoInfo := fmt.Sprintf("Gen: %d | Best: %.0f | Avg: %.1f | Timer: %d/1500",
-			ss.Generation, ss.BestFitness, ss.AvgFitness, ss.EvolutionTimer)
+		evoInfo := cachedEvoInfo(upd, ss.Generation, ss.BestFitness, ss.AvgFitness, ss.EvolutionTimer, simulation.EvolutionInterval)
 		printColoredAt(screen, evoInfo, 420, 48, color.RGBA{180, 50, 180, 255})
 		// Fitness graph (150x50px)
 		if len(ss.FitnessHistory) > 1 {
@@ -510,8 +512,7 @@ func (r *Renderer) DrawSwarmMode(screen *ebiten.Image, s *simulation.Simulation,
 
 	// GP HUD + fitness graph
 	if ss.GPEnabled {
-		gpInfo := fmt.Sprintf("GP Gen:%d | Best:%.0f | Avg:%.0f | %d/2000",
-			ss.GPGeneration, ss.BestFitness, ss.AvgFitness, ss.GPTimer)
+		gpInfo := cachedGPInfo(upd, ss.GPGeneration, ss.BestFitness, ss.AvgFitness, ss.GPTimer, simulation.GPEvolutionInterval)
 		printColoredAt(screen, gpInfo, 420, 48, color.RGBA{0, 180, 160, 255})
 		if len(ss.FitnessHistory) > 1 {
 			drawSwarmFitnessGraph(screen, ss, 420, 60, 150, 50)
@@ -523,16 +524,12 @@ func (r *Renderer) DrawSwarmMode(screen *ebiten.Image, s *simulation.Simulation,
 		chain := ss.ScenarioChain
 		if chain.Active {
 			step := &chain.Steps[chain.StepIdx]
-			chainInfo := fmt.Sprintf("SZENARIO-KETTE: %s | %d/%d Ticks | Score:%d | F5=Stop",
-				step.Name, step.TickLimit-chain.Timer, step.TickLimit, chain.TotalScore)
+			chainInfo := cachedChainInfo(upd, step.Name, step.TickLimit-chain.Timer, step.TickLimit, chain.TotalScore)
 			vector.DrawFilledRect(screen, 360, float32(sh-76), float32(sw-365), 16,
 				color.RGBA{20, 60, 80, 200}, false)
 			printColoredAt(screen, chainInfo, 365, sh-75, color.RGBA{80, 220, 255, 255})
 		} else if chain.Complete {
-			result := fmt.Sprintf("KETTE FERTIG! Gesamt-Score: %d", chain.TotalScore)
-			for i, s := range chain.StepScores {
-				result += fmt.Sprintf(" | S%d:%d", i+1, s)
-			}
+			result := cachedChainDone(upd, chain.TotalScore, chain.StepScores)
 			vector.DrawFilledRect(screen, 360, float32(sh-76), float32(sw-365), 16,
 				color.RGBA{20, 80, 20, 200}, false)
 			printColoredAt(screen, result, 365, sh-75, color.RGBA{80, 255, 120, 255})
@@ -542,8 +539,7 @@ func (r *Renderer) DrawSwarmMode(screen *ebiten.Image, s *simulation.Simulation,
 	// Auto-Optimizer HUD
 	if ss.AutoOptimizer != nil && ss.AutoOptimizer.Active {
 		opt := ss.AutoOptimizer
-		optInfo := fmt.Sprintf("AUTO-OPTIMIZER: Trial %d/%d | Score:%.0f | Best:%.0f | F4=Stop",
-			opt.Trial+1, opt.MaxTrials, opt.CurrentScore, opt.BestScore)
+		optInfo := cachedOptInfo(upd, opt.Trial, opt.MaxTrials, opt.CurrentScore, opt.BestScore)
 		// Background bar
 		vector.DrawFilledRect(screen, 360, float32(sh-60), float32(sw-365), 16,
 			color.RGBA{80, 20, 20, 200}, false)
@@ -905,9 +901,9 @@ func drawBotComparisonPanel(screen *ebiten.Image, ss *swarm.SwarmState) {
 	// Stats rows
 	compareRow("Distance", botA.Stats.TotalDistance, botB.Stats.TotalDistance, true)
 	compareRow("Pickups", float64(botA.Stats.TotalPickups), float64(botB.Stats.TotalPickups), true)
-	compareRow("Deliveries", float64(botA.Stats.TotalDeliveries), float64(botB.Stats.TotalDeliveries), true)
-	compareRow("Correct", float64(botA.Stats.CorrectDeliveries), float64(botB.Stats.CorrectDeliveries), true)
-	compareRow("Wrong", float64(botA.Stats.WrongDeliveries), float64(botB.Stats.WrongDeliveries), false)
+	compareRow("Lieferungen", float64(botA.Stats.TotalDeliveries), float64(botB.Stats.TotalDeliveries), true)
+	compareRow("Richtig", float64(botA.Stats.CorrectDeliveries), float64(botB.Stats.CorrectDeliveries), true)
+	compareRow("Falsch", float64(botA.Stats.WrongDeliveries), float64(botB.Stats.WrongDeliveries), false)
 	compareRow("Msgs TX", float64(botA.Stats.MessagesSent), float64(botB.Stats.MessagesSent), true)
 	compareRow("Msgs RX", float64(botA.Stats.MessagesReceived), float64(botB.Stats.MessagesReceived), true)
 	compareRow("Stuck", float64(botA.Stats.AntiStuckCount), float64(botB.Stats.AntiStuckCount), false)

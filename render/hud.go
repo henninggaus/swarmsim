@@ -27,18 +27,18 @@ func DrawHUD(screen *ebiten.Image, s *simulation.Simulation, fps float64, r *Ren
 	sw := screen.Bounds().Dx()
 	sh := screen.Bounds().Dy()
 
+	// Tick HUD cache for classic mode
+	upd := hudCacheTick()
+
 	// Top-left: FPS, Tick, Speed
-	info := fmt.Sprintf("FPS: %.0f  Tick: %d  Speed: %.1fx", fps, s.Tick, s.Speed)
-	if s.Paused {
-		info += "  [PAUSED]"
-	}
+	info := cachedClassicInfo(upd, fps, s.Tick, s.Speed, s.Paused)
 	ebitenutil.DebugPrintAt(screen, info, 10, 10)
 
 	// Mode-specific top HUD
 	drawWaveHUD(screen, s, sw)
 
 	// Classic Mode scenario indicator (top-left, line 2)
-	scenLabel := fmt.Sprintf("Classic: %s [N:Next]", s.ScenarioTitle)
+	scenLabel := fmt.Sprintf("Classic: %s [N:Naechstes]", s.ScenarioTitle)
 	printColoredAt(screen, scenLabel, 10, 26, color.RGBA{180, 200, 220, 200})
 
 	// Top-center: Generation info (shift down if wave HUD active)
@@ -46,8 +46,7 @@ func DrawHUD(screen *ebiten.Image, s *simulation.Simulation, fps float64, r *Ren
 	if s.Cfg.WaveEnabled {
 		genY = 95
 	}
-	genInfo := fmt.Sprintf("Gen: %d  Tick: %d/%d  Best: %.0f  Avg: %.0f",
-		s.Generation, s.GenerationTick, s.Cfg.GenerationLength, s.BestFitness, s.AvgFitness)
+	genInfo := cachedClassicGen(upd, s.Generation, s.GenerationTick, s.Cfg.GenerationLength, s.BestFitness, s.AvgFitness)
 	genW := len(genInfo) * 6
 	ebitenutil.DebugPrintAt(screen, genInfo, sw/2-genW/2, genY)
 
@@ -71,7 +70,7 @@ func DrawHUD(screen *ebiten.Image, s *simulation.Simulation, fps float64, r *Ren
 			available++
 		}
 	}
-	resInfo := fmt.Sprintf("Resources: %d  Delivered: %d  Score: %d  Msgs: %d (total: %d)", available, s.Delivered, s.Score, s.ActiveMsgs, s.TotalMsgsSent)
+	resInfo := cachedClassicRes(upd, available, s.Delivered, s.Score, s.ActiveMsgs, s.TotalMsgsSent)
 	ebitenutil.DebugPrintAt(screen, resInfo, 10, sh-45)
 
 	pherModes := []string{"Pher:OFF", "Pher:FOUND", "Pher:ALL"}
@@ -281,7 +280,7 @@ func drawWaveHUD(screen *ebiten.Image, s *simulation.Simulation, sw int) {
 	screen.DrawImage(scoreImg, op)
 
 	// Wave info line below score
-	waveInfo := fmt.Sprintf("Wave %d  |  Next wave in: %d ticks", s.WaveNumber, s.WaveTicksLeft)
+	waveInfo := fmt.Sprintf("Welle %d  |  Naechste Welle in: %d Ticks", s.WaveNumber, s.WaveTicksLeft)
 	waveW := len(waveInfo) * 6
 	ebitenutil.DebugPrintAt(screen, waveInfo, sw/2-waveW/2, 75)
 }

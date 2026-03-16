@@ -21,8 +21,8 @@ func (s *Simulation) updateSwarmMode() {
 	ss.PrevMessages = ss.NextMessages
 	ss.NextMessages = nil
 
-	// Dropoff beacons: stations emit virtual SEND_DROPOFF messages every 30 ticks
-	if ss.DeliveryOn && ss.Tick%30 == 0 {
+	// Dropoff beacons: stations emit virtual SEND_DROPOFF messages periodically
+	if ss.DeliveryOn && ss.Tick%DropoffBeaconInterval == 0 {
 		for si := range ss.Stations {
 			st := &ss.Stations[si]
 			if st.IsPickup {
@@ -115,7 +115,7 @@ func (s *Simulation) updateSwarmMode() {
 			continue // already in breakout
 		}
 
-		// (A) Scatter: >3 close neighbors → forced TURN_FROM_NEAREST + FWD for 15 ticks
+		// (A) Scatter: >3 close neighbors → forced TURN_FROM_NEAREST + FWD
 		if bot.ScatterTimer > 0 {
 			if bot.NearestIdx >= 0 {
 				other := &ss.Bots[bot.NearestIdx]
@@ -129,8 +129,8 @@ func (s *Simulation) updateSwarmMode() {
 			continue
 		}
 		if bot.CloseNeighbors > 3 && bot.ScatterCooldown == 0 {
-			bot.ScatterTimer = 15
-			bot.ScatterCooldown = 30
+			bot.ScatterTimer = ScatterDuration
+			bot.ScatterCooldown = ScatterCooldownTicks
 			if bot.NearestIdx >= 0 {
 				other := &ss.Bots[bot.NearestIdx]
 				dx, dy := swarm.NeighborDelta(bot.X, bot.Y, other.X, other.Y, ss)
@@ -140,7 +140,7 @@ func (s *Simulation) updateSwarmMode() {
 			continue
 		}
 
-		// (B) Idle exploration: carry==0 bots that stay still for 60 ticks → forced random FWD 30 ticks
+		// (B) Idle exploration: carry==0 bots that stay still → forced random FWD
 		if bot.IdleMoveTimer > 0 {
 			// Active exploration override
 			if ss.Rng.Float64() < 0.1 {
@@ -155,8 +155,8 @@ func (s *Simulation) updateSwarmMode() {
 		}
 		if bot.CarryingPkg < 0 && bot.Speed < 0.5 {
 			bot.IdleMoveTicks++
-			if bot.IdleMoveTicks >= 60 {
-				bot.IdleMoveTimer = 30
+			if bot.IdleMoveTicks >= IdleThreshold {
+				bot.IdleMoveTimer = IdleExploreDuration
 				bot.Angle = ss.Rng.Float64() * 2 * math.Pi
 				bot.Speed = swarm.SwarmBotSpeed
 				bot.IdleMoveTicks = 0
@@ -240,7 +240,7 @@ func (s *Simulation) updateSwarmMode() {
 	if ss.DeliveryOn {
 		swarm.UpdateDeliverySystem(ss)
 		// Periodic delivery stats log
-		if ss.Tick%600 == 0 && ss.DeliveryStats.TotalDelivered > 0 {
+		if ss.Tick%DeliveryLogInterval == 0 && ss.DeliveryStats.TotalDelivered > 0 {
 			carrying := 0
 			for ci := range ss.Bots {
 				if ss.Bots[ci].CarryingPkg >= 0 {
@@ -276,7 +276,7 @@ func (s *Simulation) updateSwarmMode() {
 		swarm.UpdateSwarmTruck(ss)
 
 		// Debug logging: truck sensor values every 200 ticks
-		if ss.Tick%200 == 0 {
+		if ss.Tick%TruckDebugLogInterval == 0 {
 			onRampCount := 0
 			truckHereCount := 0
 			carryingCount := 0
@@ -326,7 +326,7 @@ func (s *Simulation) updateSwarmMode() {
 	// Phase 4.8: Evolution system
 	if ss.EvolutionOn {
 		ss.EvolutionTimer++
-		if ss.EvolutionTimer >= 1500 {
+		if ss.EvolutionTimer >= EvolutionInterval {
 			swarm.RunEvolution(ss)
 			ss.EvolutionSoundPending = true
 			dm := swarm.MeasureParamDiversity(ss)
@@ -337,7 +337,7 @@ func (s *Simulation) updateSwarmMode() {
 	// Phase 4.85: Genetic Programming evolution
 	if ss.GPEnabled {
 		ss.GPTimer++
-		if ss.GPTimer >= 2000 {
+		if ss.GPTimer >= GPEvolutionInterval {
 			swarm.RunGPEvolution(ss)
 			ss.GPTimer = 0
 			ss.EvolutionSoundPending = true
@@ -349,7 +349,7 @@ func (s *Simulation) updateSwarmMode() {
 	// Phase 4.87: Neuroevolution
 	if ss.NeuroEnabled {
 		ss.NeuroTimer++
-		if ss.NeuroTimer >= 2000 {
+		if ss.NeuroTimer >= NeuroEvolutionInterval {
 			swarm.RunNeuroEvolution(ss)
 			ss.EvolutionSoundPending = true
 			dm := swarm.MeasureNeuroDiversity(ss)
@@ -374,11 +374,11 @@ func (s *Simulation) updateSwarmMode() {
 	if ss.StatsTracker != nil {
 		ss.StatsTracker.Update(ss)
 		// Heatmap update every 100 ticks
-		if ss.Tick%100 == 0 {
+		if ss.Tick%HeatmapUpdateInterval == 0 {
 			ss.StatsTracker.UpdateHeatmap(ss)
 		}
-		// Rankings update every 500 ticks
-		if ss.Tick%500 == 0 {
+		// Rankings update periodically
+		if ss.Tick%RankingsUpdateInterval == 0 {
 			ss.StatsTracker.UpdateRankings(ss)
 		}
 	}
@@ -393,13 +393,13 @@ func (s *Simulation) updateSwarmMode() {
 		swarm.AutoOptimizerTick(ss)
 	}
 
-	// Phase 4.93: Heatmap accumulation (every 5 ticks for performance)
-	if ss.ShowHeatmap && ss.Tick%5 == 0 {
+	// Phase 4.93: Heatmap accumulation (periodic for performance)
+	if ss.ShowHeatmap && ss.Tick%SwarmHeatmapInterval == 0 {
 		swarm.UpdateHeatmap(ss)
 	}
 
-	// Phase 4.94: Bot spatial memory update (every 5 ticks)
-	if ss.MemoryEnabled && ss.Tick%5 == 0 {
+	// Phase 4.94: Bot spatial memory update (periodic)
+	if ss.MemoryEnabled && ss.Tick%MemoryUpdateInterval == 0 {
 		swarm.UpdateBotMemory(ss)
 	}
 

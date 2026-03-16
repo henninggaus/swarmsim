@@ -91,7 +91,7 @@ func DrawTournamentOverlay(screen *ebiten.Image, ss *swarm.SwarmState) {
 
 		// Current stats
 		ds := &ss.DeliveryStats
-		statsInfo := fmt.Sprintf("Deliveries: %d | Correct: %d | Wrong: %d",
+		statsInfo := fmt.Sprintf("Lieferungen: %d | Richtig: %d | Falsch: %d",
 			ds.TotalDelivered, ds.CorrectDelivered, ds.WrongDelivered)
 		printColoredAt(screen, statsInfo, cx, cy, valCol)
 		cy += 18
@@ -130,8 +130,8 @@ func DrawTournamentOverlay(screen *ebiten.Image, ss *swarm.SwarmState) {
 		printColoredAt(screen, "#", cx, cy, headerCol)
 		printColoredAt(screen, "Programm", cx+20, cy, headerCol)
 		printColoredAt(screen, "Score", cx+200, cy, headerCol)
-		printColoredAt(screen, "Correct", cx+260, cy, headerCol)
-		printColoredAt(screen, "Wrong", cx+320, cy, headerCol)
+		printColoredAt(screen, "Richtig", cx+260, cy, headerCol)
+		printColoredAt(screen, "Falsch", cx+320, cy, headerCol)
 		cy += 14
 		vector.StrokeLine(screen, float32(cx), float32(cy), float32(panelX+panelW-10), float32(cy),
 			1, color.RGBA{60, 80, 120, 150}, false)
