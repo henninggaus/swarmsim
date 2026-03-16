@@ -87,6 +87,12 @@ type SwarmBot struct {
 	NearestIdx    int     // index of nearest neighbor (-1 if none)
 	PherAhead     float64 // pheromone intensity 20px ahead (0.0-1.0)
 
+	// Directional sensors (90° cones around heading)
+	BotAhead  int // neighbors in front cone
+	BotBehind int // neighbors in rear cone
+	BotLeft   int // neighbors in left cone
+	BotRight  int // neighbors in right cone
+
 	// Anti-stuck tracking
 	StuckTicks      int     // how many ticks bot barely moved
 	StuckPrevX      float64 // position last tick for stuck detection

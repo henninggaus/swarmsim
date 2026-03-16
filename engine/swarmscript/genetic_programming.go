@@ -27,6 +27,10 @@ var gpSensorPool = []gpSensorEntry{
 	{CondObstacleAhead, 0, 1}, // wall_front alias
 	{CondOnRamp, 0, 1},
 	{CondTruckHere, 0, 1},
+	{CondBotAhead, 0, 5},
+	{CondBotBehind, 0, 5},
+	{CondBotLeft, 0, 5},
+	{CondBotRight, 0, 5},
 }
 
 // gpActionEntry defines an action template for random generation.
@@ -377,6 +381,18 @@ func condTypeName(t ConditionType) string {
 		return "heard_dropoff"
 	case CondPherAhead:
 		return "pheromone"
+	case CondBotAhead:
+		return "bot_ahead"
+	case CondBotBehind:
+		return "bot_behind"
+	case CondBotLeft:
+		return "bot_left"
+	case CondBotRight:
+		return "bot_right"
+	case CondHeading:
+		return "heading"
+	case CondSpeed:
+		return "speed"
 	default:
 		return "true"
 	}

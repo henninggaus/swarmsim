@@ -556,6 +556,10 @@ func buildSwarmEnvironment(ss *swarm.SwarmState, i int) {
 	bot.NearestLEDB = 0
 	bot.ObstacleAhead = false
 	bot.ObstacleDist = 999
+	bot.BotAhead = 0
+	bot.BotBehind = 0
+	bot.BotLeft = 0
+	bot.BotRight = 0
 
 	// Query neighbors within sensor range (carrying bots get extended 200px range)
 	sensorRange := swarm.SwarmSensorRange
@@ -595,6 +599,26 @@ func buildSwarmEnvironment(ss *swarm.SwarmState, i int) {
 			bot.NearestLEDR = other.LEDColor[0]
 			bot.NearestLEDG = other.LEDColor[1]
 			bot.NearestLEDB = other.LEDColor[2]
+		}
+
+		// Directional classification (90° cones relative to heading)
+		angleToOther := math.Atan2(dy, dx)
+		relAngle := angleToOther - bot.Angle
+		// Normalize to [-π, π]
+		for relAngle > math.Pi {
+			relAngle -= 2 * math.Pi
+		}
+		for relAngle < -math.Pi {
+			relAngle += 2 * math.Pi
+		}
+		if relAngle >= -math.Pi/4 && relAngle < math.Pi/4 {
+			bot.BotAhead++
+		} else if relAngle >= math.Pi/4 && relAngle < 3*math.Pi/4 {
+			bot.BotRight++
+		} else if relAngle >= -3*math.Pi/4 && relAngle < -math.Pi/4 {
+			bot.BotLeft++
+		} else {
+			bot.BotBehind++
 		}
 	}
 
@@ -1221,6 +1245,23 @@ func evaluateSwarmCondition(cond swarmscript.Condition, bot *swarm.SwarmBot, sna
 			score = ss.TeamAScore
 		}
 		return compareInt(score, cond.Op, cv)
+
+	case swarmscript.CondBotAhead:
+		return compareInt(bot.BotAhead, cond.Op, cv)
+	case swarmscript.CondBotBehind:
+		return compareInt(bot.BotBehind, cond.Op, cv)
+	case swarmscript.CondBotLeft:
+		return compareInt(bot.BotLeft, cond.Op, cv)
+	case swarmscript.CondBotRight:
+		return compareInt(bot.BotRight, cond.Op, cv)
+	case swarmscript.CondHeading:
+		deg := int(bot.Angle * 180 / math.Pi)
+		if deg < 0 {
+			deg += 360
+		}
+		return compareInt(deg, cond.Op, cv)
+	case swarmscript.CondSpeed:
+		return compareInt(int(bot.Speed*100), cond.Op, cv)
 	}
 
 	return false

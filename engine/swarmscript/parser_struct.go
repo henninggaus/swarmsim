@@ -61,6 +61,12 @@ const (
 	CondTeam                                     // team (1=A, 2=B, 0=none)
 	CondTeamScore                                // team_score (own team's score)
 	CondEnemyScore                               // enemy_score (opponent's score)
+	CondBotAhead                                 // bot_ahead (neighbors in front 90° cone)
+	CondBotBehind                                // bot_behind (neighbors behind 90° cone)
+	CondBotLeft                                  // bot_left (neighbors left 90° cone)
+	CondBotRight                                 // bot_right (neighbors right 90° cone)
+	CondHeading                                  // heading (0-359 degrees)
+	CondSpeed                                    // speed (current speed * 100)
 )
 
 // Condition represents a single boolean check in a rule.
@@ -234,6 +240,16 @@ var conditionNames = map[string]ConditionType{
 	"team":        CondTeam,
 	"team_score":  CondTeamScore,
 	"enemy_score": CondEnemyScore,
+	// Directional sensors (90° cones)
+	"bot_ahead":  CondBotAhead,
+	"bot_behind": CondBotBehind,
+	"bot_left":   CondBotLeft,
+	"bot_right":  CondBotRight,
+	"ahead":      CondBotAhead,
+	"behind":     CondBotBehind,
+	// Heading & speed
+	"heading": CondHeading,
+	"speed":   CondSpeed,
 }
 
 // actionNames maps action name strings to (ActionType, paramCount).
@@ -374,6 +390,10 @@ var highlightConditions = map[string]bool{
 	"pheromone": true, "pher": true, "pher_ahead": true,
 	// Team sensors
 	"team": true, "team_score": true, "enemy_score": true,
+	// Directional sensors
+	"bot_ahead": true, "bot_behind": true, "bot_left": true, "bot_right": true,
+	"ahead": true, "behind": true,
+	"heading": true, "speed": true,
 }
 
 var highlightActions = map[string]bool{
@@ -501,6 +521,18 @@ func ConditionTypeName(ct ConditionType) string {
 		return "wall_left"
 	case CondPherAhead:
 		return "pher"
+	case CondBotAhead:
+		return "bot_ahead"
+	case CondBotBehind:
+		return "bot_behind"
+	case CondBotLeft:
+		return "bot_left"
+	case CondBotRight:
+		return "bot_right"
+	case CondHeading:
+		return "heading"
+	case CondSpeed:
+		return "speed"
 	}
 	return "unknown"
 }
