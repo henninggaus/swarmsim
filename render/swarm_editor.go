@@ -556,6 +556,11 @@ func DrawSwarmHUD(screen *ebiten.Image, s *simulation.Simulation, fps float64) {
 			printColoredAt(screen, filterNames[ss.ColorFilter], 850, 35, filterColors[ss.ColorFilter])
 		}
 
+		// Message wave indicator
+		if ss.ShowMsgWaves {
+			printColoredAt(screen, "WELLEN", 950, 35, color.RGBA{100, 200, 255, 220})
+		}
+
 		// Reset flash indicator
 		if ss.ResetFlashTimer > 0 {
 			flashAlpha := uint8(255)

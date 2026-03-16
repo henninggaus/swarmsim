@@ -773,6 +773,15 @@ func (g *Game) handleSwarmInput() {
 		logger.Info("SWARM", "Color filter: %s", filterNames[ss.ColorFilter])
 	}
 
+	// P key: toggle message wave visualization
+	if inpututil.IsKeyJustPressed(ebiten.KeyP) && !ed.Focused && !ss.BotCountEdit {
+		ss.ShowMsgWaves = !ss.ShowMsgWaves
+		if !ss.ShowMsgWaves {
+			ss.MsgWaves = nil
+		}
+		logger.Info("SWARM", "Message waves: %v", ss.ShowMsgWaves)
+	}
+
 	// C key: challenge (teams) or toggle routes (delivery)
 	if inpututil.IsKeyJustPressed(ebiten.KeyC) && !ed.Focused && !ss.BotCountEdit {
 		if ss.TeamsEnabled {

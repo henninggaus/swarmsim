@@ -251,6 +251,28 @@ func (r *Renderer) DrawSwarmMode(screen *ebiten.Image, s *simulation.Simulation,
 		}
 	}
 
+	// Draw message wave rings
+	if ss.ShowMsgWaves {
+		for _, w := range ss.MsgWaves {
+			progress := 1.0 - float64(w.Timer)/30.0
+			alpha := uint8(120 * (1.0 - progress))
+			if alpha < 5 {
+				continue
+			}
+			// Color based on broadcast value
+			var wr, wg, wb uint8
+			if w.Value > 0 {
+				wr, wg, wb = 100, 200, 255 // blue-cyan for positive
+			} else if w.Value < 0 {
+				wr, wg, wb = 255, 100, 100 // red for negative
+			} else {
+				wr, wg, wb = 200, 200, 200 // gray for zero
+			}
+			wCol := color.RGBA{wr, wg, wb, alpha}
+			vector.StrokeCircle(a, float32(w.X), float32(w.Y), float32(w.Radius), 1.5, wCol, false)
+		}
+	}
+
 	// Draw bots
 	for i := range ss.Bots {
 		bot := &ss.Bots[i]
