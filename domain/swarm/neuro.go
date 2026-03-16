@@ -157,8 +157,12 @@ func BuildNeuroInputs(bot *SwarmBot, ss *SwarmState) [NeuroInputs]float64 {
 		inp[8] = 1.0
 	}
 
-	// light: normalized 0-1
-	inp[9] = float64(bot.LightValue) / 100.0
+	// light: normalized 0-1 (clamped)
+	lv := float64(bot.LightValue)
+	if lv > 100 {
+		lv = 100
+	}
+	inp[9] = lv / 100.0
 
 	// rnd: random noise for exploration
 	inp[10] = ss.Rng.Float64()

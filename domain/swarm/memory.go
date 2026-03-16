@@ -32,6 +32,9 @@ func UpdateBotMemory(ss *SwarmState) {
 		if bot.MemoryGrid == nil {
 			continue
 		}
+		if bot.X < 0 || bot.Y < 0 {
+			continue
+		}
 		c := int(bot.X) / MemoryCellSize
 		r := int(bot.Y) / MemoryCellSize
 		if c >= 0 && c < bot.MemoryCols && r >= 0 && r < bot.MemoryRows {
