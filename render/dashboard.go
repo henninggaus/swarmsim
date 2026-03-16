@@ -66,6 +66,45 @@ func DrawDashboard(screen *ebiten.Image, ss *swarm.SwarmState, x, y, w, h int) {
 		cy += 55
 	}
 
+	// 1c. Population Diversity
+	if (ss.EvolutionOn || ss.GPEnabled || ss.NeuroEnabled) && ss.Diversity != nil {
+		drawDashSectionHeader(screen, cx, cy, w-15, "POPULATIONS-DIVERSITAET", sectionCol)
+		cy += 14
+		dm := ss.Diversity
+		// Diversity bar
+		barW := w - 15
+		barH := 12
+		vector.DrawFilledRect(screen, float32(cx), float32(cy), float32(barW), float32(barH),
+			color.RGBA{5, 5, 15, 200}, false)
+		// Fill based on avg distance (0-1)
+		fillW := float32(dm.AvgDistance) * float32(barW)
+		if fillW > float32(barW) {
+			fillW = float32(barW)
+		}
+		// Color: red (low) -> yellow -> green (high)
+		var barCol color.RGBA
+		if dm.AvgDistance < 0.15 {
+			barCol = color.RGBA{255, 60, 60, 220}
+		} else if dm.AvgDistance < 0.4 {
+			barCol = color.RGBA{255, 200, 50, 220}
+		} else {
+			barCol = color.RGBA{80, 220, 80, 220}
+		}
+		vector.DrawFilledRect(screen, float32(cx), float32(cy), fillW, float32(barH), barCol, false)
+		// Label
+		pctStr := fmt.Sprintf("%.0f%%", dm.AvgDistance*100)
+		printColoredAt(screen, pctStr, cx+barW/2-len(pctStr)*charW/2, cy, color.RGBA{255, 255, 255, 220})
+		cy += barH + 2
+		// Stats line
+		printColoredAt(screen, fmt.Sprintf("Unique: %d  Min: %.1f%%", dm.UniqueCount, dm.MinDistance*100), cx, cy, dimCol)
+		cy += lineH
+		if dm.Stagnant {
+			printColoredAt(screen, "!! STAGNATION — mehr Mutation noetig", cx, cy, color.RGBA{255, 80, 80, 220})
+			cy += lineH
+		}
+		cy += 4
+	}
+
 	// 2. Delivery Rate Bar Chart
 	if ss.DeliveryOn && len(st.DeliveryBuckets) > 0 {
 		drawDashSectionHeader(screen, cx, cy, w-15, "LIEFERRATE", sectionCol)

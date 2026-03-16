@@ -299,6 +299,8 @@ func (s *Simulation) updateSwarmMode() {
 		if ss.EvolutionTimer >= 1500 {
 			swarm.RunEvolution(ss)
 			ss.EvolutionSoundPending = true
+			dm := swarm.MeasureParamDiversity(ss)
+			ss.Diversity = &dm
 		}
 	}
 
@@ -309,6 +311,8 @@ func (s *Simulation) updateSwarmMode() {
 			swarm.RunGPEvolution(ss)
 			ss.GPTimer = 0
 			ss.EvolutionSoundPending = true
+			dm := swarm.MeasureGPDiversity(ss)
+			ss.Diversity = &dm
 		}
 	}
 
@@ -318,6 +322,8 @@ func (s *Simulation) updateSwarmMode() {
 		if ss.NeuroTimer >= 2000 {
 			swarm.RunNeuroEvolution(ss)
 			ss.EvolutionSoundPending = true
+			dm := swarm.MeasureNeuroDiversity(ss)
+			ss.Diversity = &dm
 		}
 	}
 

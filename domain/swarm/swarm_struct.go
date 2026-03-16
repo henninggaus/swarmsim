@@ -416,6 +416,9 @@ type SwarmState struct {
 	// Replay system
 	ReplayBuf *ReplayBuffer // ring buffer of state snapshots
 
+	// Population diversity (updated each generation)
+	Diversity *DiversityMetrics
+
 	// Clipboard flash (visual feedback on copy)
 	ClipboardFlash int // >0 = flash timer (counts down)
 
