@@ -842,6 +842,16 @@ func (g *Game) handleSwarmInput() {
 		}
 	}
 
+	// X key: export stats as CSV to clipboard
+	if inpututil.IsKeyJustPressed(ebiten.KeyX) && !ed.Focused && !ss.BotCountEdit {
+		csv := g.buildStatsCSV()
+		if csv != "" {
+			render.ClipboardWrite(csv)
+			ss.ClipboardFlash = 30
+			logger.Info("SWARM", "Stats exported to clipboard (%d bytes)", len(csv))
+		}
+	}
+
 	// V key: toggle genome visualization (when editor not focused + evolution on)
 	if inpututil.IsKeyJustPressed(ebiten.KeyV) && !ed.Focused && !ss.BotCountEdit {
 		if ss.EvolutionOn {
@@ -2121,6 +2131,79 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	if g.panicTimer > 0 && g.panicMsg != "" {
 		render.DrawPanicBanner(screen, g.panicMsg, g.panicTimer)
 	}
+}
+
+// buildStatsCSV builds a CSV export of fitness history and delivery stats.
+func (g *Game) buildStatsCSV() string {
+	ss := g.sim.SwarmState
+	if ss == nil {
+		return ""
+	}
+	var b strings.Builder
+
+	// Fitness history
+	if len(ss.FitnessHistory) > 0 {
+		b.WriteString("# FITNESS HISTORY\n")
+		b.WriteString("Generation,BestFitness,AvgFitness\n")
+		for i, h := range ss.FitnessHistory {
+			b.WriteString(fmt.Sprintf("%d,%.2f,%.2f\n", i+1, h.Best, h.Avg))
+		}
+		b.WriteString("\n")
+	}
+
+	// Delivery stats
+	if ss.DeliveryOn {
+		ds := &ss.DeliveryStats
+		b.WriteString("# DELIVERY STATS\n")
+		b.WriteString(fmt.Sprintf("TotalDelivered,%d\n", ds.TotalDelivered))
+		b.WriteString(fmt.Sprintf("CorrectDelivered,%d\n", ds.CorrectDelivered))
+		b.WriteString(fmt.Sprintf("WrongDelivered,%d\n", ds.WrongDelivered))
+		b.WriteString(fmt.Sprintf("Tick,%d\n", ss.Tick))
+		b.WriteString("\n")
+	}
+
+	// Delivery rate buckets
+	if ss.StatsTracker != nil && len(ss.StatsTracker.DeliveryBuckets) > 0 {
+		b.WriteString("# DELIVERY RATE (per 500 ticks)\n")
+		b.WriteString("Window,Total,Correct,Wrong\n")
+		st := ss.StatsTracker
+		for i := 0; i < len(st.DeliveryBuckets); i++ {
+			correct := 0
+			wrong := 0
+			if i < len(st.CorrectBuckets) {
+				correct = st.CorrectBuckets[i]
+			}
+			if i < len(st.WrongBuckets) {
+				wrong = st.WrongBuckets[i]
+			}
+			b.WriteString(fmt.Sprintf("%d,%d,%d,%d\n", i+1, st.DeliveryBuckets[i], correct, wrong))
+		}
+		b.WriteString("\n")
+	}
+
+	// Bot rankings
+	if ss.StatsTracker != nil && len(ss.StatsTracker.BotRankings) > 0 {
+		b.WriteString("# BOT RANKINGS\n")
+		b.WriteString("Rank,BotIdx,Deliveries,AvgTime\n")
+		for i, r := range ss.StatsTracker.BotRankings {
+			if i >= 20 {
+				break
+			}
+			b.WriteString(fmt.Sprintf("%d,%d,%d,%d\n", i+1, r.BotIdx, r.Deliveries, r.AvgTime))
+		}
+		b.WriteString("\n")
+	}
+
+	// Diversity
+	if ss.Diversity != nil {
+		b.WriteString("# DIVERSITY\n")
+		b.WriteString(fmt.Sprintf("AvgDistance,%.4f\n", ss.Diversity.AvgDistance))
+		b.WriteString(fmt.Sprintf("MinDistance,%.4f\n", ss.Diversity.MinDistance))
+		b.WriteString(fmt.Sprintf("UniqueGenotypes,%d\n", ss.Diversity.UniqueCount))
+		b.WriteString(fmt.Sprintf("Stagnant,%v\n", ss.Diversity.Stagnant))
+	}
+
+	return b.String()
 }
 
 // Layou returns the logical screen size.

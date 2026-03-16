@@ -119,6 +119,7 @@ func DrawHelpOverlay(screen *ebiten.Image, isSwarmMode bool, scrollY int) {
 		{"M", "Minimap (Uebersichtskarte) ein/aus"},
 		{"N", "Neue Runde (Trucks/Teams zuruecksetzen)"},
 		{"V", "Genom-Visualisierung (bei Evolution)"},
+		{"X", "Stats als CSV in Clipboard exportieren"},
 	})
 	ly += 8
 
