@@ -710,6 +710,23 @@ func (g *Game) handleSwarmInput() {
 		logger.Info("SWARM", "Dashboard: %v", ss.DashboardOn)
 	}
 
+	// B key: bookmark current fitness curve as baseline for comparison
+	if inpututil.IsKeyJustPressed(ebiten.KeyB) && !ed.Focused && !ss.BotCountEdit {
+		if len(ss.FitnessHistory) > 1 {
+			ss.BaselineFitness = make([]swarm.FitnessRecord, len(ss.FitnessHistory))
+			copy(ss.BaselineFitness, ss.FitnessHistory)
+			gen := ss.Generation
+			if ss.GPEnabled {
+				gen = ss.GPGeneration
+			}
+			if ss.NeuroEnabled {
+				gen = ss.NeuroGeneration
+			}
+			ss.BaselineLabel = fmt.Sprintf("Baseline Gen %d", gen)
+			logger.Info("SWARM", "Fitness baseline saved (%d generations)", len(ss.BaselineFitness))
+		}
+	}
+
 	// K key: toggle communication graph overlay
 	if inpututil.IsKeyJustPressed(ebiten.KeyK) && !ed.Focused && !ss.BotCountEdit {
 		ss.ShowCommGraph = !ss.ShowCommGraph

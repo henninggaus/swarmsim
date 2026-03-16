@@ -38,7 +38,11 @@ func DrawDashboard(screen *ebiten.Image, ss *swarm.SwarmState, x, y, w, h int) {
 
 	// 1. Fitness Graph (if evolution, GP, or neuro active)
 	if (ss.EvolutionOn || ss.GPEnabled || ss.NeuroEnabled) && len(ss.FitnessHistory) > 1 {
-		drawDashSectionHeader(screen, cx, cy, w-15, "FITNESS-VERLAUF", sectionCol)
+		label := "FITNESS-VERLAUF (B=Baseline)"
+		if len(ss.BaselineFitness) > 0 {
+			label = "FITNESS-VERLAUF (Blau=Baseline)"
+		}
+		drawDashSectionHeader(screen, cx, cy, w-15, label, sectionCol)
 		cy += 14
 		printColoredAt(screen, "Gruen=Best  Gelb=Durchschnitt", cx, cy, dimCol)
 		cy += 10
@@ -144,11 +148,38 @@ func drawDashFitnessGraph(screen *ebiten.Image, ss *swarm.SwarmState, gx, gy, gw
 		}
 	}
 
+	// Include baseline in max calculation
+	baseline := ss.BaselineFitness
+	for _, h := range baseline {
+		if h.Best > maxFit {
+			maxFit = h.Best
+		}
+	}
+
 	// Axis labels
 	printColoredAt(screen, fmt.Sprintf("%.0f", maxFit), gx+2, gy+2, color.RGBA{80, 80, 100, 150})
 	printColoredAt(screen, "0", gx+2, gy+gh-lineH, color.RGBA{80, 80, 100, 150})
 
-	// Draw lines
+	// Draw baseline comparison (dim blue, behind current)
+	if len(baseline) > 1 {
+		bStart := 0
+		bN := len(baseline)
+		if bN > 50 {
+			bStart = bN - 50
+		}
+		bPts := bN - bStart
+		for i := 1; i < bPts; i++ {
+			x0 := float32(gx) + float32(i-1)/float32(bPts-1)*float32(gw)
+			x1 := float32(gx) + float32(i)/float32(bPts-1)*float32(gw)
+			y0b := float32(gy+gh) - float32(baseline[bStart+i-1].Best/maxFit)*float32(gh)
+			y1b := float32(gy+gh) - float32(baseline[bStart+i].Best/maxFit)*float32(gh)
+			vector.StrokeLine(screen, x0, y0b, x1, y1b, 1, color.RGBA{80, 120, 200, 100}, false)
+		}
+		// Label
+		printColoredAt(screen, ss.BaselineLabel, gx+gw/2, gy+2, color.RGBA{80, 120, 200, 120})
+	}
+
+	// Draw current lines
 	start := 0
 	if n > 50 {
 		start = n - 50

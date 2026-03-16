@@ -363,6 +363,10 @@ type SwarmState struct {
 	ShowGenomeViz    bool     // V key toggle: show genome visualization overlay
 	FitnessHistory   []FitnessRecord // per-generation fitness history for graph
 
+	// Fitness comparison baseline (B key saves current curve)
+	BaselineFitness []FitnessRecord // saved fitness curve for overlay comparison
+	BaselineLabel   string          // label for the baseline (e.g. "GP Gen 25")
+
 	// Genetic Programming (each bot evolves its own program)
 	GPEnabled    bool // GP toggle
 	GPGeneration int  // current GP generation
