@@ -419,6 +419,11 @@ type SwarmState struct {
 	// Population diversity (updated each generation)
 	Diversity *DiversityMetrics
 
+	// Genom-Browser overlay (G key)
+	GenomeBrowserOn     bool
+	GenomeBrowserSort   int // 0=fitness, 1=age, 2=deliveries
+	GenomeBrowserScroll int // scroll offset in list
+
 	// Clipboard flash (visual feedback on copy)
 	ClipboardFlash int // >0 = flash timer (counts down)
 

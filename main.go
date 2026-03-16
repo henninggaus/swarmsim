@@ -860,6 +860,33 @@ func (g *Game) handleSwarmInput() {
 		}
 	}
 
+	// G key: toggle Genom-Browser (when any evolution mode is active)
+	if inpututil.IsKeyJustPressed(ebiten.KeyG) && !ed.Focused && !ss.BotCountEdit {
+		if ss.EvolutionOn || ss.GPEnabled || ss.NeuroEnabled {
+			ss.GenomeBrowserOn = !ss.GenomeBrowserOn
+			ss.GenomeBrowserScroll = 0
+			logger.Info("SWARM", "Genom-Browser: %v", ss.GenomeBrowserOn)
+		}
+	}
+
+	// G+Up/Down: scroll Genom-Browser, G+Tab: change sort
+	if ss.GenomeBrowserOn {
+		_, wy := ebiten.Wheel()
+		if wy < 0 {
+			ss.GenomeBrowserScroll += 3
+		} else if wy > 0 {
+			ss.GenomeBrowserScroll -= 3
+			if ss.GenomeBrowserScroll < 0 {
+				ss.GenomeBrowserScroll = 0
+			}
+		}
+		if inpututil.IsKeyJustPressed(ebiten.KeyTab) && !ed.Focused {
+			ss.GenomeBrowserSort = (ss.GenomeBrowserSort + 1) % 3
+			logger.Info("SWARM", "Genom-Browser sort: %d", ss.GenomeBrowserSort)
+			return
+		}
+	}
+
 	// Tab key: toggle console bot filter (when editor not focused)
 	if inpututil.IsKeyJustPressed(ebiten.KeyTab) && !ed.Focused && !ss.BotCountEdit {
 		if g.consoleFilterBot >= 0 {
@@ -1187,6 +1214,7 @@ func (g *Game) handleSwarmClick(mx, my int) {
 			logger.Info("SWARM", "Evolution ON — %d used params", countUsedParams(ss))
 		} else {
 			ss.ShowGenomeViz = false
+			ss.GenomeBrowserOn = false
 			logger.Info("SWARM", "Evolution OFF")
 		}
 		ed.Focused = false

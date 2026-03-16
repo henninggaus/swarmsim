@@ -440,6 +440,11 @@ func (r *Renderer) DrawSwarmMode(screen *ebiten.Image, s *simulation.Simulation,
 		drawGenomeVisualization(screen, ss)
 	}
 
+	// Genom-Browser overlay (G key)
+	if ss.GenomeBrowserOn {
+		DrawGenomeBrowser(screen, ss)
+	}
+
 	// Statistics dashboard
 	if ss.DashboardOn && ss.StatsTracker != nil {
 		DrawDashboard(screen, ss, sw-260, 55, 250, sh-70)
