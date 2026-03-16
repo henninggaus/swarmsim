@@ -1139,8 +1139,21 @@ func (g *Game) handleSwarmInput() {
 
 	// J key: toggle dynamic environment (moving obstacles + package expiry)
 	if inpututil.IsKeyJustPressed(ebiten.KeyJ) && !ed.Focused && !ss.BotCountEdit {
-		ss.DynamicEnv = !ss.DynamicEnv
-		logger.Info("SWARM", "Dynamic environment: %v", ss.DynamicEnv)
+		if ebiten.IsKeyPressed(ebiten.KeyShift) {
+			// Shift+J: toggle patrol/rotating obstacles
+			if swarm.HasMovingObstacles(ss) {
+				swarm.ClearMovingObstacles(ss)
+				logger.Info("SWARM", "Moving obstacles: OFF")
+			} else {
+				swarm.GeneratePatrolObstacles(ss, 3)
+				swarm.GenerateRotatingObstacles(ss, 2)
+				ss.ObstaclesOn = true
+				logger.Info("SWARM", "Moving obstacles: ON (3 Patrol + 2 Rotation)")
+			}
+		} else {
+			ss.DynamicEnv = !ss.DynamicEnv
+			logger.Info("SWARM", "Dynamic environment: %v", ss.DynamicEnv)
+		}
 	}
 
 	// F key: toggle follow-cam (when editor not focused)

@@ -121,6 +121,7 @@ func DrawHelpOverlay(screen *ebiten.Image, isSwarmMode bool, scrollY int) {
 		{"V", "Genom-Visualisierung (bei Evolution)"},
 		{"G", "Genom-Browser: sortierbare Bot-Liste (Evo/GP/Neuro)"},
 		{"J", "Dynamische Umgebung (bewegl. Hindernisse + Paket-Verfall)"},
+		{"Shift+J", "Patrouille/Rotation-Hindernisse ein/aus"},
 		{"O", "Arena-Editor: Hindernisse/Stationen platzieren (1/2/3)"},
 		{"U", "Turnier-Modus: Programme gegeneinander antreten lassen"},
 		{"Q", "Einzelschritt-Debugger (Q=1 Tick, Space=weiter)"},

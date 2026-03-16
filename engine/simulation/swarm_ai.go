@@ -403,6 +403,11 @@ func (s *Simulation) updateSwarmMode() {
 		swarm.UpdateBotMemory(ss)
 	}
 
+	// Phase 4.94b: Update moving obstacles (patrol + rotation)
+	if swarm.HasMovingObstacles(ss) {
+		swarm.UpdateMovingObstacles(ss)
+	}
+
 	// Phase 4.95: Accumulate lifetime stats (before StuckPrevX/Y is overwritten)
 	for i := range ss.Bots {
 		bot := &ss.Bots[i]
