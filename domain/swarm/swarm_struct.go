@@ -413,6 +413,9 @@ type SwarmState struct {
 	StatsTracker *StatsTracker
 	DashboardOn  bool // D key toggle
 
+	// Replay system
+	ReplayBuf *ReplayBuffer // ring buffer of state snapshots
+
 	// Clipboard flash (visual feedback on copy)
 	ClipboardFlash int // >0 = flash timer (counts down)
 

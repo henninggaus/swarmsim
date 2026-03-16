@@ -74,6 +74,11 @@ type Game struct {
 
 	// Tooltips
 	tooltip render.TooltipState
+
+	// Replay / time travel
+	replayMode     bool
+	replayIdx      int // current snapshot index in replay buffer
+	replayWasPause bool // was sim paused before entering replay?
 }
 
 // NewGame creates a new game instance.
@@ -117,6 +122,12 @@ func (g *Game) Update() (retErr error) {
 		}
 		if g.showHelp {
 			g.showHelp = false
+			return nil
+		}
+		// Exit replay mode
+		if g.replayMode {
+			g.replayMode = false
+			g.sim.Paused = g.replayWasPause
 			return nil
 		}
 		// Cancel follow-cam before quitting
@@ -262,13 +273,25 @@ func (g *Game) Update() (retErr error) {
 		}
 	}
 
-	// Fixed timestep for simulation
-	dt := 1.0 / 60.0 * g.sim.Speed
-	g.tickAcc += dt
-	tickInterval := 1.0 / float64(g.sim.Cfg.TickRate)
-	for g.tickAcc >= tickInterval {
-		g.sim.Update()
-		g.tickAcc -= tickInterval
+	// Fixed timestep for simulation (skip during replay)
+	if !g.replayMode {
+		dt := 1.0 / 60.0 * g.sim.Speed
+		g.tickAcc += dt
+		tickInterval := 1.0 / float64(g.sim.Cfg.TickRate)
+		for g.tickAcc >= tickInterval {
+			g.sim.Update()
+			g.tickAcc -= tickInterval
+			// Record replay snapshot every 10 ticks
+			if g.sim.SwarmMode && g.sim.SwarmState != nil {
+				ss := g.sim.SwarmState
+				if ss.ReplayBuf == nil {
+					ss.ReplayBuf = swarm.NewReplayBuffer(500)
+				}
+				if ss.Tick%10 == 0 {
+					ss.ReplayBuf.Record(ss)
+				}
+			}
+		}
 	}
 
 	return nil
@@ -712,6 +735,49 @@ func (g *Game) handleSwarmInput() {
 			ss.StatsTracker = swarm.NewStatsTracker()
 		}
 		logger.Info("SWARM", "Dashboard: %v", ss.DashboardOn)
+	}
+
+	// Z key: toggle replay mode
+	if inpututil.IsKeyJustPressed(ebiten.KeyZ) && !ed.Focused && !ss.BotCountEdit {
+		if !g.replayMode {
+			if ss.ReplayBuf != nil && ss.ReplayBuf.Count > 0 {
+				g.replayMode = true
+				g.replayIdx = ss.ReplayBuf.Count - 1 // start at newest
+				g.replayWasPause = g.sim.Paused
+				g.sim.Paused = true
+				logger.Info("SWARM", "Replay ON — %d snapshots, Arrow keys to scrub, ESC to exit", ss.ReplayBuf.Count)
+			}
+		} else {
+			g.replayMode = false
+			g.sim.Paused = g.replayWasPause
+			logger.Info("SWARM", "Replay OFF")
+		}
+	}
+
+	// Replay navigation (when in replay mode)
+	if g.replayMode && ss.ReplayBuf != nil {
+		step := 1
+		if ebiten.IsKeyPressed(ebiten.KeyShift) {
+			step = 10
+		}
+		if inpututil.IsKeyJustPressed(ebiten.KeyLeft) || (ebiten.IsKeyPressed(ebiten.KeyLeft) && ss.Tick%3 == 0) {
+			g.replayIdx -= step
+			if g.replayIdx < 0 {
+				g.replayIdx = 0
+			}
+		}
+		if inpututil.IsKeyJustPressed(ebiten.KeyRight) || (ebiten.IsKeyPressed(ebiten.KeyRight) && ss.Tick%3 == 0) {
+			g.replayIdx += step
+			if g.replayIdx >= ss.ReplayBuf.Count {
+				g.replayIdx = ss.ReplayBuf.Count - 1
+			}
+		}
+		if inpututil.IsKeyJustPressed(ebiten.KeyHome) {
+			g.replayIdx = 0
+		}
+		if inpututil.IsKeyJustPressed(ebiten.KeyEnd) {
+			g.replayIdx = ss.ReplayBuf.Count - 1
+		}
 	}
 
 	// I key: toggle energy system
@@ -1958,6 +2024,11 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	g.renderer.Draw(screen, g.sim)
 	render.DrawHUD(screen, g.sim, ebiten.ActualFPS(), g.renderer)
+
+	// Replay overlay
+	if g.replayMode && g.sim.SwarmState != nil && g.sim.SwarmState.ReplayBuf != nil {
+		render.DrawReplayOverlay(screen, g.sim.SwarmState, g.replayIdx)
+	}
 
 	// Sound: ambient volume + collision clicks
 	if g.renderer.Sound != nil && g.renderer.Sound.Enabled {
