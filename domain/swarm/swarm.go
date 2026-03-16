@@ -58,6 +58,9 @@ func NewSwarmState(rng *rand.Rand, botCount int) *SwarmState {
 		Focused:    true,
 	}
 
+	// Achievement system (always active)
+	ss.AchievementState = NewAchievementState()
+
 	// Spawn bots
 	ss.spawnBots(botCount)
 

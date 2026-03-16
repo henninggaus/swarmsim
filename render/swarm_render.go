@@ -37,6 +37,11 @@ func (r *Renderer) DrawSwarmMode(screen *ebiten.Image, s *simulation.Simulation,
 	// Arena background
 	vector.DrawFilledRect(a, 0, 0, float32(ss.ArenaW), float32(ss.ArenaH), ColorSwarmArenaBg, false)
 
+	// Aurora background effect (before grid, for subtle under-layer)
+	if ss.AuroraOn {
+		drawAurora(a, ss.Tick)
+	}
+
 	// Arena grid
 	gridStep := 50.0
 	for gx := gridStep; gx < ss.ArenaW; gx += gridStep {
@@ -273,6 +278,21 @@ func (r *Renderer) DrawSwarmMode(screen *ebiten.Image, s *simulation.Simulation,
 		}
 	}
 
+	// Prediction arrows overlay (before bots)
+	if ss.ShowPrediction {
+		drawPredictionArrows(a, ss)
+	}
+
+	// Congestion zone overlay (before bots)
+	if ss.ShowZones {
+		drawCongestionOverlay(a, ss)
+	}
+
+	// Swarm center of mass overlay (before bots)
+	if ss.ShowSwarmCenter {
+		drawSwarmCenterOverlay(a, ss)
+	}
+
 	// Draw bots
 	for i := range ss.Bots {
 		bot := &ss.Bots[i]
@@ -434,6 +454,14 @@ func (r *Renderer) DrawSwarmMode(screen *ebiten.Image, s *simulation.Simulation,
 		drawSwarmParticles(a, r.SwarmParticles, 0, 0)
 	}
 
+	// Dash speed lines (on top of bots)
+	drawDashSpeedLines(a, ss)
+
+	// Day/Night overlay (on top of everything in arena)
+	if ss.DayNightOn {
+		drawDayNightOverlay(a, ss)
+	}
+
 	// Selected bot visual overlays (on arena, before blit)
 	if ss.SelectedBot >= 0 && ss.SelectedBot < len(ss.Bots) {
 		drawSelectedBotOverlays(a, ss)
@@ -554,6 +582,27 @@ func (r *Renderer) DrawSwarmMode(screen *ebiten.Image, s *simulation.Simulation,
 	// Genom-Browser overlay (G key)
 	if ss.GenomeBrowserOn {
 		DrawGenomeBrowser(screen, ss)
+	}
+
+	// Speciation overlay (Shift+E)
+	if ss.ShowSpeciation && ss.Speciation != nil {
+		DrawSpeciationOverlay(screen, ss)
+	}
+
+	// Pattern detection overlay (Shift+F)
+	if ss.ShowPatterns && ss.PatternResult != nil {
+		DrawPatternOverlay(screen, ss)
+	}
+
+	// Achievement overlay (Shift+B)
+	if ss.ShowAchievements && ss.AchievementState != nil {
+		DrawAchievementOverlay(screen, ss)
+	}
+
+	// Achievement popup (always drawn when active)
+	if ss.AchievementState != nil {
+		ss.AchievementState.UpdatePopup()
+		DrawAchievementPopup(screen, ss)
 	}
 
 	// Tournament overlay (U key)

@@ -73,6 +73,11 @@ const (
 	CondGroupCarry                               // group_carry (% of neighbors carrying)
 	CondGroupSpeed                               // group_speed (avg speed of neighbors * 100)
 	CondGroupSize                                // group_size (connected cluster size)
+	CondSwarmCenterDist                          // swarm_center_dist (distance to swarm center of mass)
+	CondSwarmSpread                              // swarm_spread (overall swarm spread)
+	CondIsolationLevel                           // isolation_level (0=close, >0=isolated)
+	CondResourceGradientX                        // resource_gradient_x (direction to resources, 0-359)
+	CondResourceGradientY                        // resource_gradient_y (resource proximity, 0-100)
 )
 
 // Condition represents a single boolean check in a rule.
@@ -131,6 +136,8 @@ const (
 	ActWallFollowRight                         // WALL_FOLLOW_RIGHT (right-hand rule)
 	ActWallFollowLeft                          // WALL_FOLLOW_LEFT (left-hand rule)
 	ActFollowPheromone                         // FOLLOW_PHER (follow pheromone gradient)
+	ActDash                                    // DASH (double-speed burst for 10 ticks)
+	ActEmergencyBroadcast                      // EMERGENCY_BROADCAST N (3x range broadcast)
 )
 
 // Action represents an action to execute when a rule matches.
@@ -265,6 +272,16 @@ var conditionNames = map[string]ConditionType{
 	"group_carry": CondGroupCarry,
 	"group_speed": CondGroupSpeed,
 	"group_size":  CondGroupSize,
+	// Swarm awareness sensors
+	"swarm_center_dist":   CondSwarmCenterDist,
+	"swarm_spread":        CondSwarmSpread,
+	"isolation_level":     CondIsolationLevel,
+	"resource_gradient_x": CondResourceGradientX,
+	"resource_gradient_y": CondResourceGradientY,
+	"center_dist":         CondSwarmCenterDist,
+	"isolation":           CondIsolationLevel,
+	"res_grad_x":          CondResourceGradientX,
+	"res_grad_y":          CondResourceGradientY,
 }
 
 // actionNames maps action name strings to (ActionType, paramCount).
@@ -335,6 +352,10 @@ var actionNames = map[string]struct {
 	"FWD":        {ActMoveForward, 0},
 	"FWD_SLOW":   {ActMoveForwardSlow, 0},
 	"GOTO_MATCH": {ActTurnToMatchingDropoff, 0},
+	// Dash & emergency broadcast
+	"DASH":                {ActDash, 0},
+	"EMERGENCY_BROADCAST": {ActEmergencyBroadcast, 1},
+	"EMERGENCY":           {ActEmergencyBroadcast, 1},
 }
 
 // --- SwarmScript syntax highlighting support ---
@@ -413,6 +434,10 @@ var highlightConditions = map[string]bool{
 	"visited_here": true, "visited_ahead": true, "explored": true, "visited": true,
 	// Cooperative sensors
 	"group_carry": true, "group_speed": true, "group_size": true,
+	// Swarm awareness sensors
+	"swarm_center_dist": true, "swarm_spread": true, "isolation_level": true,
+	"resource_gradient_x": true, "resource_gradient_y": true,
+	"center_dist": true, "isolation": true, "res_grad_x": true, "res_grad_y": true,
 }
 
 var highlightActions = map[string]bool{
@@ -449,6 +474,8 @@ var highlightActions = map[string]bool{
 	"WALL_FOLLOW_RIGHT": true, "WALL_FOLLOW_LEFT": true,
 	// Pheromone
 	"FOLLOW_PHER": true, "GOTO_PHER": true,
+	// Dash & emergency
+	"DASH": true, "EMERGENCY_BROADCAST": true, "EMERGENCY": true,
 }
 
 // --- Reverse mapping functions (for block editor / serialization) ---
@@ -564,6 +591,16 @@ func ConditionTypeName(ct ConditionType) string {
 		return "group_speed"
 	case CondGroupSize:
 		return "group_size"
+	case CondSwarmCenterDist:
+		return "center_dist"
+	case CondSwarmSpread:
+		return "swarm_spread"
+	case CondIsolationLevel:
+		return "isolation"
+	case CondResourceGradientX:
+		return "res_grad_x"
+	case CondResourceGradientY:
+		return "res_grad_y"
 	}
 	return "unknown"
 }
@@ -668,6 +705,10 @@ func ActionTypeName(at ActionType) string {
 		return "WALL_FOLLOW_LEFT"
 	case ActFollowPheromone:
 		return "FOLLOW_PHER"
+	case ActDash:
+		return "DASH"
+	case ActEmergencyBroadcast:
+		return "EMERGENCY"
 	}
 	return "UNKNOWN"
 }
@@ -700,6 +741,7 @@ var SensorGrouped = [][]string{
 	{"-- LED --", "nearest_led_r", "nearest_led_g", "nearest_led_b"},
 	{"-- Intern --", "state", "counter", "value1", "value2", "timer", "tick"},
 	{"-- Truck --", "truck_here", "truck_pkg_count", "on_ramp", "nearest_truck_pkg"},
+	{"-- Schwarm --", "center_dist", "swarm_spread", "isolation", "res_grad_x", "res_grad_y"},
 }
 
 // ActionGrouped returns action names organized in groups for dropdown display.
@@ -712,6 +754,7 @@ var ActionGrouped = [][]string{
 	{"-- Intern --", "SET_STATE", "SET_COUNTER", "INC_COUNTER", "DEC_COUNTER", "SET_TIMER", "SET_VALUE1", "SET_VALUE2"},
 	{"-- Follow --", "FOLLOW_NEAREST", "UNFOLLOW"},
 	{"-- Truck --", "GOTO_RAMP", "GOTO_TRUCK_PKG"},
+	{"-- Spezial --", "DASH", "EMERGENCY"},
 }
 
 // wordPos tracks a word and its column position in a line.

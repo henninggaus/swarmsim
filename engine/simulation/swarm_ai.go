@@ -14,6 +14,14 @@ func (s *Simulation) updateSwarmMode() {
 	ss := s.SwarmState
 	ss.Tick++
 
+	// Day/Night cycle: advance phase
+	if ss.DayNightOn {
+		ss.DayNightPhase += ss.DayNightSpeed
+		if ss.DayNightPhase >= 1.0 {
+			ss.DayNightPhase -= 1.0
+		}
+	}
+
 	// Reset per-tick counters
 	ss.CollisionCount = 0
 
@@ -331,6 +339,13 @@ func (s *Simulation) updateSwarmMode() {
 			ss.EvolutionSoundPending = true
 			dm := swarm.MeasureParamDiversity(ss)
 			ss.Diversity = &dm
+			// Speciation update after evolution
+			if ss.SpeciationOn {
+				if ss.Speciation == nil {
+					swarm.InitSpeciation(ss)
+				}
+				swarm.UpdateSpeciation(ss)
+			}
 		}
 	}
 
@@ -396,6 +411,30 @@ func (s *Simulation) updateSwarmMode() {
 	// Phase 4.93: Heatmap accumulation (periodic for performance)
 	if ss.ShowHeatmap && ss.Tick%SwarmHeatmapInterval == 0 {
 		swarm.UpdateHeatmap(ss)
+	}
+
+	// Phase 4.93b: Swarm center + congestion grid (every 10 ticks)
+	if ss.Tick%10 == 0 {
+		if ss.ShowSwarmCenter || ss.ShowPrediction {
+			swarm.ComputeSwarmCenter(ss)
+		}
+		if ss.ShowZones {
+			swarm.UpdateCongestionGrid(ss)
+		}
+	}
+
+	// Phase 4.93c: Swarm awareness sensors (every tick when needed)
+	swarm.ComputeSwarmAwarenessSensors(ss)
+
+	// Phase 4.93d: Pattern detection (every 30 ticks)
+	if ss.ShowPatterns && ss.Tick%30 == 0 {
+		pr := swarm.DetectPatterns(ss)
+		ss.PatternResult = &pr
+	}
+
+	// Phase 4.93e: Achievement checking (every 60 ticks)
+	if ss.AchievementState != nil && ss.Tick%60 == 0 {
+		swarm.CheckAchievements(ss)
 	}
 
 	// Phase 4.94: Bot spatial memory update (periodic)
@@ -581,6 +620,11 @@ func buildSwarmEnvironment(ss *swarm.SwarmState, i int) {
 	sensorRange := swarm.SwarmSensorRange
 	if bot.CarryingPkg >= 0 {
 		sensorRange = swarm.SwarmDeliverySensorRange
+	}
+	// Day/Night: reduce sensor range at night
+	if ss.DayNightOn {
+		brightness := swarm.DayNightBrightness(ss)
+		sensorRange *= (0.4 + 0.6*brightness)
 	}
 	candidateIDs := ss.Hash.Query(bot.X, bot.Y, sensorRange)
 	var sumX, sumY float64
@@ -1303,6 +1347,16 @@ func evaluateSwarmCondition(cond swarmscript.Condition, bot *swarm.SwarmBot, sna
 		return compareInt(bot.GroupSpeed, cond.Op, cv)
 	case swarmscript.CondGroupSize:
 		return compareInt(bot.GroupSize, cond.Op, cv)
+	case swarmscript.CondSwarmCenterDist:
+		return compareInt(bot.SwarmCenterDist, cond.Op, cv)
+	case swarmscript.CondSwarmSpread:
+		return compareInt(bot.SwarmSpreadSensor, cond.Op, cv)
+	case swarmscript.CondIsolationLevel:
+		return compareInt(bot.IsolationLevel, cond.Op, cv)
+	case swarmscript.CondResourceGradientX:
+		return compareInt(bot.ResourceGradientX, cond.Op, cv)
+	case swarmscript.CondResourceGradientY:
+		return compareInt(bot.ResourceGradientY, cond.Op, cv)
 	}
 
 	return false
@@ -1962,6 +2016,36 @@ func executeSwarmAction(act swarmscript.Action, bot *swarm.SwarmBot, ss *swarm.S
 			}
 		}
 		bot.Speed = swarm.SwarmBotSpeed
+
+	case swarmscript.ActDash:
+		// Double-speed burst for 10 ticks (costs 15 energy, 60 tick cooldown)
+		if bot.DashCooldown <= 0 && bot.Energy >= 15 {
+			bot.DashTimer = 10
+			bot.DashCooldown = 60
+			bot.Energy -= 15
+		}
+		bot.Speed = swarm.SwarmBotSpeed
+
+	case swarmscript.ActEmergencyBroadcast:
+		// Broadcast with 3x communication range (message value from param)
+		msgVal := act.Param1
+		if msgVal == 0 {
+			msgVal = 99 // default emergency value
+		}
+		// Send 3 copies at wider offsets to simulate 3x range
+		for _, offset := range [][2]float64{{0, 0}, {swarm.SwarmCommRange, 0}, {-swarm.SwarmCommRange, 0}, {0, swarm.SwarmCommRange}, {0, -swarm.SwarmCommRange}} {
+			ss.NextMessages = append(ss.NextMessages, swarm.SwarmMessage{
+				Value: msgVal,
+				X:     bot.X + offset[0],
+				Y:     bot.Y + offset[1],
+			})
+		}
+		// Visual: brighter wave ring
+		if ss.ShowMsgWaves {
+			ss.MsgWaves = append(ss.MsgWaves, swarm.MsgWave{
+				X: bot.X, Y: bot.Y, Radius: 5, Timer: 45, Value: msgVal,
+			})
+		}
 	}
 }
 
@@ -2013,6 +2097,15 @@ func applyFollowBehavior(ss *swarm.SwarmState, i int) {
 // applySwarmPhysics moves a bot and handles boundary collisions + separation.
 func applySwarmPhysics(ss *swarm.SwarmState, i int) {
 	bot := &ss.Bots[i]
+
+	// Dash timer: double speed while active
+	if bot.DashTimer > 0 {
+		bot.DashTimer--
+		bot.Speed *= 2.0
+	}
+	if bot.DashCooldown > 0 {
+		bot.DashCooldown--
+	}
 
 	// Move
 	if bot.Speed > 0 {

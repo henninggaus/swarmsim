@@ -103,6 +103,13 @@ type SwarmBot struct {
 	GroupSpeed int // avg speed of neighbors * 100
 	GroupSize  int // connected cluster size (BFS)
 
+	// Swarm awareness sensors (computed per tick)
+	SwarmCenterDist    int // distance to swarm center of mass
+	SwarmSpreadSensor  int // overall swarm spread (same for all bots)
+	IsolationLevel     int // 0 if near others, >0 if isolated
+	ResourceGradientX  int // direction toward resources (0-359 degrees, -1=none)
+	ResourceGradientY  int // magnitude of resource gradient (0-100)
+
 	// Anti-stuck tracking
 	StuckTicks      int     // how many ticks bot barely moved
 	StuckPrevX      float64 // position last tick for stuck detection
@@ -111,6 +118,10 @@ type SwarmBot struct {
 	AntiStuckTimer  int // >0 = breakout mode active (counts down)
 	AntiStuckAngle  float64
 	CloseNeighbors  int // neighbors within 30px (rebuilt per tick)
+
+	// Dash mechanics (DASH action: double-speed burst)
+	DashTimer    int // >0 = dash active (counts down from 10)
+	DashCooldown int // >0 = cooldown after dash (counts down from 60)
 
 	// Scatter mechanics
 	ScatterTimer    int // >0 = forced scatter mode (TURN_FROM_NEAREST + FWD, counts down)
@@ -491,6 +502,19 @@ type SwarmState struct {
 	// Population diversity (updated each generation)
 	Diversity *DiversityMetrics
 
+	// Speciation (NEAT-style species formation)
+	Speciation     *SpeciationState
+	SpeciationOn   bool // Shift+E toggle
+	ShowSpeciation bool // species visualization overlay
+
+	// Emergent pattern detection (Shift+F)
+	ShowPatterns  bool
+	PatternResult *PatternResult
+
+	// Achievement system (Shift+B)
+	AchievementState  *AchievementState
+	ShowAchievements  bool
+
 	// Tournament mode
 	TournamentOn      bool
 	TournamentEntries []TournamentEntry
@@ -507,6 +531,29 @@ type SwarmState struct {
 
 	// Clipboard flash (visual feedback on copy)
 	ClipboardFlash int // >0 = flash timer (counts down)
+
+	// Aurora background effect (Shift+A)
+	AuroraOn bool
+
+	// Prediction arrows (Shift+T in swarm mode, separate from classic trails)
+	ShowPrediction bool
+
+	// Day/Night cycle (Shift+I)
+	DayNightOn    bool
+	DayNightPhase float64 // 0.0-1.0 (0=noon, 0.5=midnight)
+	DayNightSpeed float64 // phase advance per tick
+
+	// Swarm center of mass overlay (Shift+C in swarm mode)
+	ShowSwarmCenter bool
+	SwarmCenterX    float64
+	SwarmCenterY    float64
+	SwarmSpread     float64
+
+	// Congestion zone overlay (Shift+Y)
+	ShowZones     bool
+	CongestionGrid []float64
+	CongestionCols int
+	CongestionRows int
 
 	// Block editor
 	BlockEditorActive bool

@@ -585,6 +585,32 @@ func DrawSwarmHUD(screen *ebiten.Image, s *simulation.Simulation, fps float64) {
 			printColoredAt(screen, "RAUSCHEN", 1110, 35, color.RGBA{255, 120, 80, 220})
 		}
 
+		// Day/Night indicator
+		if ss.DayNightOn {
+			brightness := swarm.DayNightBrightness(ss)
+			timeLabel := "TAG"
+			timeCol := color.RGBA{255, 220, 80, 220}
+			if brightness < 0.3 {
+				timeLabel = "NACHT"
+				timeCol = color.RGBA{80, 80, 200, 220}
+			} else if brightness < 0.7 {
+				timeLabel = "DAEMMERUNG"
+				timeCol = color.RGBA{200, 150, 100, 220}
+			}
+			printColoredAt(screen, timeLabel, 1200, 35, timeCol)
+		}
+
+		// Aurora indicator
+		if ss.AuroraOn {
+			printColoredAt(screen, "AURORA", 1200, 22, color.RGBA{100, 255, 200, 220})
+		}
+
+		// Achievement counter
+		if ss.AchievementState != nil && ss.AchievementState.TotalUnlocked > 0 {
+			achLabel := fmt.Sprintf("%d/%d", ss.AchievementState.TotalUnlocked, int(swarm.AchCount))
+			printColoredAt(screen, achLabel, 1200, 48, color.RGBA{255, 215, 0, 200})
+		}
+
 		// Reset flash indicator
 		if ss.ResetFlashTimer > 0 {
 			flashAlpha := uint8(255)
@@ -632,9 +658,9 @@ func DrawSwarmHUD(screen *ebiten.Image, s *simulation.Simulation, fps float64) {
 	}
 
 	// Help text at very bottom — two lines for readability
-	printColoredAt(screen, "SPACE:Pause  L:Licht  T:Trails  D:Dashboard  M:Minimap  C:Challenge",
+	printColoredAt(screen, "SPACE:Pause  T:Trails  D:Dashboard  Shift+A:Aurora  Shift+T:Pfeile  Shift+I:Tag/Nacht",
 		360, sh-28, color.RGBA{120, 130, 150, 180})
-	printColoredAt(screen, "1-5:Speed(0.5x-10x)  V:Genom  G:Browser  S:Sound  H:Hilfe",
+	printColoredAt(screen, "Shift+C:Zentrum  Shift+Y:Stau  Shift+B:Achievements  1-5:Speed  V:Genom  G:Browser  S:Sound  H:Hilfe",
 		360, sh-14, color.RGBA{120, 130, 150, 180})
 
 	// Scenario title overlay

@@ -745,10 +745,17 @@ func (g *Game) handleSwarmInput() {
 		}
 	}
 
-	// T key: toggle trails (when editor not focused)
+	// T key: Shift+T = prediction arrows, plain T = trails
 	if inpututil.IsKeyJustPressed(ebiten.KeyT) && !ed.Focused && !ss.BotCountEdit {
-		ss.ShowTrails = !ss.ShowTrails
-		logger.Info("SWARM", "Trails: %v", ss.ShowTrails)
+		if ebiten.IsKeyPressed(ebiten.KeyShift) {
+			ss.ShowPrediction = !ss.ShowPrediction
+			swarm.RecordOverlayUsed(ss, "prediction")
+			logger.Info("SWARM", "Prediction arrows: %v", ss.ShowPrediction)
+		} else {
+			ss.ShowTrails = !ss.ShowTrails
+			swarm.RecordOverlayUsed(ss, "trails")
+			logger.Info("SWARM", "Trails: %v", ss.ShowTrails)
+		}
 	}
 
 	// F5 key: start/stop scenario chain
@@ -781,6 +788,7 @@ func (g *Game) handleSwarmInput() {
 	// F6 key: toggle formation analysis overlay
 	if inpututil.IsKeyJustPressed(ebiten.KeyF6) && !ed.Focused {
 		ss.ShowFormation = !ss.ShowFormation
+		swarm.RecordOverlayUsed(ss, "formation")
 		logger.Info("SWARM", "Formation-Analyse: %v", ss.ShowFormation)
 	}
 
@@ -810,6 +818,7 @@ func (g *Game) handleSwarmInput() {
 	// Period key: toggle live chart
 	if inpututil.IsKeyJustPressed(ebiten.KeyPeriod) && !ed.Focused && !ss.BotCountEdit {
 		ss.ShowLiveChart = !ss.ShowLiveChart
+		swarm.RecordOverlayUsed(ss, "livechart")
 		logger.Info("SWARM", "Live-Chart: %v", ss.ShowLiveChart)
 	}
 
@@ -855,6 +864,7 @@ func (g *Game) handleSwarmInput() {
 			ss.Leaderboard = swarm.LoadLeaderboard()
 		}
 		ss.ShowLeaderboard = !ss.ShowLeaderboard
+		swarm.RecordOverlayUsed(ss, "leaderboard")
 	}
 
 	// Ctrl+S: export program as .swarm file
@@ -897,9 +907,15 @@ func (g *Game) handleSwarmInput() {
 		}
 	}
 
-	// Y key: toggle heatmap overlay
-	if inpututil.IsKeyJustPressed(ebiten.KeyY) && !ed.Focused && !ss.BotCountEdit {
+	// Y key: Shift+Y = congestion zones, plain Y = heatmap
+	if inpututil.IsKeyJustPressed(ebiten.KeyY) && !ed.Focused && !ss.BotCountEdit && ebiten.IsKeyPressed(ebiten.KeyShift) {
+		ss.ShowZones = !ss.ShowZones
+		swarm.RecordOverlayUsed(ss, "zones")
+		logger.Info("SWARM", "Stau-Zonen: %v", ss.ShowZones)
+	}
+	if inpututil.IsKeyJustPressed(ebiten.KeyY) && !ed.Focused && !ss.BotCountEdit && !ebiten.IsKeyPressed(ebiten.KeyShift) {
 		ss.ShowHeatmap = !ss.ShowHeatmap
+		swarm.RecordOverlayUsed(ss, "heatmap")
 		if ss.ShowHeatmap && ss.HeatmapGrid == nil {
 			swarm.InitHeatmap(ss)
 		}
@@ -925,9 +941,13 @@ func (g *Game) handleSwarmInput() {
 		logger.Info("SWARM", "Message waves: %v", ss.ShowMsgWaves)
 	}
 
-	// C key: challenge (teams) or toggle routes (delivery)
+	// C key: Shift+C = swarm center overlay, plain C = challenge/routes
 	if inpututil.IsKeyJustPressed(ebiten.KeyC) && !ed.Focused && !ss.BotCountEdit {
-		if ss.TeamsEnabled {
+		if ebiten.IsKeyPressed(ebiten.KeyShift) {
+			ss.ShowSwarmCenter = !ss.ShowSwarmCenter
+			swarm.RecordOverlayUsed(ss, "center")
+			logger.Info("SWARM", "Schwarm-Zentrum: %v", ss.ShowSwarmCenter)
+		} else if ss.TeamsEnabled {
 			// Start challenge: 5000 ticks
 			ss.ChallengeActive = true
 			ss.ChallengeTicks = 5000
@@ -937,6 +957,7 @@ func (g *Game) handleSwarmInput() {
 			logger.Info("SWARM", "Challenge started! 5000 ticks")
 		} else {
 			ss.ShowRoutes = !ss.ShowRoutes
+			swarm.RecordOverlayUsed(ss, "routes")
 			logger.Info("SWARM", "Routes: %v", ss.ShowRoutes)
 		}
 	}
@@ -972,6 +993,7 @@ func (g *Game) handleSwarmInput() {
 	// D key: toggle dashboard (when editor not focused)
 	if inpututil.IsKeyJustPressed(ebiten.KeyD) && !ed.Focused && !ss.BotCountEdit {
 		ss.DashboardOn = !ss.DashboardOn
+		swarm.RecordOverlayUsed(ss, "dashboard")
 		if ss.DashboardOn && ss.StatsTracker == nil {
 			ss.StatsTracker = swarm.NewStatsTracker()
 		}
@@ -1021,8 +1043,18 @@ func (g *Game) handleSwarmInput() {
 		}
 	}
 
-	// I key: toggle energy system
+	// I key: Shift+I = day/night cycle, plain I = energy system
 	if inpututil.IsKeyJustPressed(ebiten.KeyI) && !ed.Focused && !ss.BotCountEdit {
+		if ebiten.IsKeyPressed(ebiten.KeyShift) {
+			ss.DayNightOn = !ss.DayNightOn
+			swarm.RecordOverlayUsed(ss, "daynight")
+			if ss.DayNightOn && ss.DayNightSpeed == 0 {
+				ss.DayNightSpeed = 0.001 // ~1000 tick full cycle
+			}
+			logger.Info("SWARM", "Tag/Nacht-Zyklus: %v (Phase=%.2f)", ss.DayNightOn, ss.DayNightPhase)
+		}
+	}
+	if inpututil.IsKeyJustPressed(ebiten.KeyI) && !ed.Focused && !ss.BotCountEdit && !ebiten.IsKeyPressed(ebiten.KeyShift) {
 		ss.EnergyEnabled = !ss.EnergyEnabled
 		if ss.EnergyEnabled {
 			// Initialize all bots with full energy
@@ -1035,9 +1067,16 @@ func (g *Game) handleSwarmInput() {
 		}
 	}
 
-	// B key: bookmark current fitness curve as baseline for comparison
+	// B key: Shift+B = achievements overlay, plain B = baseline bookmark
 	if inpututil.IsKeyJustPressed(ebiten.KeyB) && !ed.Focused && !ss.BotCountEdit {
-		if len(ss.FitnessHistory) > 1 {
+		if ebiten.IsKeyPressed(ebiten.KeyShift) {
+			ss.ShowAchievements = !ss.ShowAchievements
+			if ss.AchievementState == nil {
+				ss.AchievementState = swarm.NewAchievementState()
+			}
+			swarm.RecordOverlayUsed(ss, "achievements")
+			logger.Info("SWARM", "Achievements: %v", ss.ShowAchievements)
+		} else if len(ss.FitnessHistory) > 1 {
 			ss.BaselineFitness = make([]swarm.FitnessRecord, len(ss.FitnessHistory))
 			copy(ss.BaselineFitness, ss.FitnessHistory)
 			gen := ss.Generation
@@ -1052,15 +1091,33 @@ func (g *Game) handleSwarmInput() {
 		}
 	}
 
+	// E key in swarm mode: Shift+E = speciation toggle
+	if inpututil.IsKeyJustPressed(ebiten.KeyE) && !ed.Focused && !ss.BotCountEdit {
+		if ebiten.IsKeyPressed(ebiten.KeyShift) && ss.EvolutionOn {
+			ss.SpeciationOn = !ss.SpeciationOn
+			swarm.RecordOverlayUsed(ss, "speciation")
+			ss.ShowSpeciation = ss.SpeciationOn
+			if ss.SpeciationOn && ss.Speciation == nil {
+				swarm.InitSpeciation(ss)
+			}
+			logger.Info("SWARM", "Speciation: %v", ss.SpeciationOn)
+		}
+	}
+
 	// K key: toggle communication graph overlay
 	if inpututil.IsKeyJustPressed(ebiten.KeyK) && !ed.Focused && !ss.BotCountEdit {
 		ss.ShowCommGraph = !ss.ShowCommGraph
+		swarm.RecordOverlayUsed(ss, "commgraph")
 		logger.Info("SWARM", "Comm graph: %v", ss.ShowCommGraph)
 	}
 
-	// A key: toggle action heatmap vs motion heatmap on dashboard
+	// A key: Shift+A = aurora background, plain A = action heatmap toggle
 	if inpututil.IsKeyJustPressed(ebiten.KeyA) && !ed.Focused && !ss.BotCountEdit {
-		if ss.DashboardOn && ss.StatsTracker != nil {
+		if ebiten.IsKeyPressed(ebiten.KeyShift) {
+			ss.AuroraOn = !ss.AuroraOn
+			swarm.RecordOverlayUsed(ss, "aurora")
+			logger.Info("SWARM", "Aurora: %v", ss.AuroraOn)
+		} else if ss.DashboardOn && ss.StatsTracker != nil {
 			ss.StatsTracker.ShowActionHeat = !ss.StatsTracker.ShowActionHeat
 			logger.Info("SWARM", "Action heatmap: %v", ss.StatsTracker.ShowActionHeat)
 		}
@@ -1097,6 +1154,7 @@ func (g *Game) handleSwarmInput() {
 	if inpututil.IsKeyJustPressed(ebiten.KeyV) && !ed.Focused && !ss.BotCountEdit {
 		if ss.EvolutionOn {
 			ss.ShowGenomeViz = !ss.ShowGenomeViz
+			swarm.RecordOverlayUsed(ss, "genome")
 			logger.Info("SWARM", "Genome viz: %v", ss.ShowGenomeViz)
 		}
 	}
@@ -1156,9 +1214,13 @@ func (g *Game) handleSwarmInput() {
 		}
 	}
 
-	// F key: toggle follow-cam (when editor not focused)
+	// F key: Shift+F = pattern detection, plain F = follow-cam
 	if inpututil.IsKeyJustPressed(ebiten.KeyF) && !ed.Focused && !ss.BotCountEdit {
-		if ss.FollowCamBot >= 0 {
+		if ebiten.IsKeyPressed(ebiten.KeyShift) {
+			ss.ShowPatterns = !ss.ShowPatterns
+			swarm.RecordOverlayUsed(ss, "patterns")
+			logger.Info("SWARM", "Muster-Erkennung: %v", ss.ShowPatterns)
+		} else if ss.FollowCamBot >= 0 {
 			ss.FollowCamBot = -1
 			logger.Info("SWARM", "Follow-cam OFF")
 		} else if ss.SelectedBot >= 0 {
