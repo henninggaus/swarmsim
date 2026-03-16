@@ -218,12 +218,33 @@ func (r *Renderer) DrawSwarmMode(screen *ebiten.Image, s *simulation.Simulation,
 		by := float32(bot.Y)
 		radius := float32(swarm.SwarmBotRadius)
 
+		// Color filter: check if bot passes filter
+		botAlpha := uint8(255)
+		if ss.ColorFilter > 0 {
+			match := false
+			switch ss.ColorFilter {
+			case 1: // red dominant
+				match = bot.LEDColor[0] > bot.LEDColor[1] && bot.LEDColor[0] > bot.LEDColor[2] && bot.LEDColor[0] > 100
+			case 2: // green dominant
+				match = bot.LEDColor[1] > bot.LEDColor[0] && bot.LEDColor[1] > bot.LEDColor[2] && bot.LEDColor[1] > 100
+			case 3: // blue dominant
+				match = bot.LEDColor[2] > bot.LEDColor[0] && bot.LEDColor[2] > bot.LEDColor[1] && bot.LEDColor[2] > 100
+			case 4: // carrying package
+				match = bot.CarryingPkg >= 0
+			case 5: // idle (speed == 0)
+				match = bot.Speed < 0.1
+			}
+			if !match {
+				botAlpha = 30 // nearly invisible
+			}
+		}
+
 		// Boost minimum LED brightness so dark bots are still visible
 		r, g, b := bot.LEDColor[0], bot.LEDColor[1], bot.LEDColor[2]
 		if r < 60 && g < 60 && b < 60 {
 			r, g, b = 80, 80, 80
 		}
-		botCol := color.RGBA{r, g, b, 255}
+		botCol := color.RGBA{r, g, b, botAlpha}
 		vector.DrawFilledCircle(a, bx, by, radius, botCol, false)
 
 		// Team ring overlay

@@ -124,6 +124,7 @@ func DrawHelpOverlay(screen *ebiten.Image, isSwarmMode bool, scrollY int) {
 		{"O", "Arena-Editor: Hindernisse/Stationen platzieren (1/2/3)"},
 		{"U", "Turnier-Modus: Programme gegeneinander antreten lassen"},
 		{"Q", "Einzelschritt-Debugger (Q=1 Tick, Space=weiter)"},
+		{"W", "Farb-Filter: Rot/Gruen/Blau/Traegt/Idle (zyklisch)"},
 		{"X", "Stats als CSV in Clipboard exportieren"},
 	})
 	ly += 8

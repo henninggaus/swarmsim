@@ -727,6 +727,13 @@ func (g *Game) handleSwarmInput() {
 		logger.Info("SWARM", "Trails: %v", ss.ShowTrails)
 	}
 
+	// W key: cycle color filter (off → red → green → blue → carrying → idle → off)
+	if inpututil.IsKeyJustPressed(ebiten.KeyW) && !ed.Focused && !ss.BotCountEdit {
+		ss.ColorFilter = (ss.ColorFilter + 1) % 6
+		filterNames := []string{"OFF", "Rot", "Gruen", "Blau", "Traegt Paket", "Idle"}
+		logger.Info("SWARM", "Color filter: %s", filterNames[ss.ColorFilter])
+	}
+
 	// C key: challenge (teams) or toggle routes (delivery)
 	if inpututil.IsKeyJustPressed(ebiten.KeyC) && !ed.Focused && !ss.BotCountEdit {
 		if ss.TeamsEnabled {

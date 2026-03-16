@@ -337,6 +337,9 @@ type SwarmState struct {
 	WrapMode    bool // false=BOUNCE, true=WRAP
 	ShowTrails  bool
 
+	// Color filter (W key): 0=off, 1=red, 2=green, 3=blue, 4=carrying, 5=idle
+	ColorFilter int
+
 	// Selected bot for info overlay
 	SelectedBot int // -1 = none
 	CompareBot  int // -1 = none, Shift+click to set second bot for comparison

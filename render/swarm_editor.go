@@ -546,6 +546,16 @@ func DrawSwarmHUD(screen *ebiten.Image, s *simulation.Simulation, fps float64) {
 			printColoredAt(screen, "DYNAMISCH", 750, 35, color.RGBA{255, 150, 50, 220})
 		}
 
+		// Color filter indicator
+		if ss.ColorFilter > 0 {
+			filterNames := []string{"", "Filter:ROT", "Filter:GRUEN", "Filter:BLAU", "Filter:TRAEGT", "Filter:IDLE"}
+			filterColors := []color.RGBA{
+				{}, {255, 80, 80, 255}, {80, 255, 80, 255}, {80, 80, 255, 255},
+				{255, 200, 50, 255}, {150, 150, 150, 255},
+			}
+			printColoredAt(screen, filterNames[ss.ColorFilter], 850, 35, filterColors[ss.ColorFilter])
+		}
+
 		// Reset flash indicator
 		if ss.ResetFlashTimer > 0 {
 			flashAlpha := uint8(255)
