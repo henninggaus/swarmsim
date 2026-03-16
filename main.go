@@ -727,6 +727,23 @@ func (g *Game) handleSwarmInput() {
 		logger.Info("SWARM", "Trails: %v", ss.ShowTrails)
 	}
 
+	// F4 key: start/stop auto-optimizer
+	if inpututil.IsKeyJustPressed(ebiten.KeyF4) && !ed.Focused {
+		if ss.AutoOptimizer != nil && ss.AutoOptimizer.Active {
+			ss.AutoOptimizer.Active = false
+			logger.Info("SWARM", "Auto-Optimizer stopped")
+		} else {
+			if !ss.DeliveryOn {
+				ss.DeliveryOn = true
+				swarm.GenerateDeliveryStations(ss)
+			}
+			ss.EvolutionOn = true
+			swarm.ScanUsedParams(ss)
+			swarm.AutoOptimizerStart(ss)
+			g.sim.Speed = 10.0 // max speed during optimization
+		}
+	}
+
 	// Y key: toggle heatmap overlay
 	if inpututil.IsKeyJustPressed(ebiten.KeyY) && !ed.Focused && !ss.BotCountEdit {
 		ss.ShowHeatmap = !ss.ShowHeatmap

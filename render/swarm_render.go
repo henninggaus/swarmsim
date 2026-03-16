@@ -496,6 +496,17 @@ func (r *Renderer) DrawSwarmMode(screen *ebiten.Image, s *simulation.Simulation,
 		}
 	}
 
+	// Auto-Optimizer HUD
+	if ss.AutoOptimizer != nil && ss.AutoOptimizer.Active {
+		opt := ss.AutoOptimizer
+		optInfo := fmt.Sprintf("AUTO-OPTIMIZER: Trial %d/%d | Score:%.0f | Best:%.0f | F4=Stop",
+			opt.Trial+1, opt.MaxTrials, opt.CurrentScore, opt.BestScore)
+		// Background bar
+		vector.DrawFilledRect(screen, 360, float32(sh-60), float32(sw-365), 16,
+			color.RGBA{80, 20, 20, 200}, false)
+		printColoredAt(screen, optInfo, 365, sh-59, color.RGBA{255, 200, 80, 255})
+	}
+
 	// Genome visualization overlay (V key)
 	if ss.ShowGenomeViz && ss.EvolutionOn {
 		drawGenomeVisualization(screen, ss)

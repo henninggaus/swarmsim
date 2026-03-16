@@ -358,6 +358,11 @@ func (s *Simulation) updateSwarmMode() {
 		}
 	}
 
+	// Phase 4.92b: Auto-Optimizer tick
+	if ss.AutoOptimizer != nil && ss.AutoOptimizer.Active {
+		swarm.AutoOptimizerTick(ss)
+	}
+
 	// Phase 4.93: Heatmap accumulation (every 5 ticks for performance)
 	if ss.ShowHeatmap && ss.Tick%5 == 0 {
 		swarm.UpdateHeatmap(ss)

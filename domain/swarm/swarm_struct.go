@@ -340,6 +340,9 @@ type SwarmState struct {
 	// Color filter (W key): 0=off, 1=red, 2=green, 3=blue, 4=carrying, 5=idle
 	ColorFilter int
 
+	// Auto-Optimizer
+	AutoOptimizer *AutoOptimizerState
+
 	// Heatmap overlay (Y key)
 	ShowHeatmap bool
 	HeatmapGrid []float64 // flat grid of visit counts
