@@ -358,6 +358,11 @@ func (s *Simulation) updateSwarmMode() {
 		}
 	}
 
+	// Phase 4.92a: Scenario chain tick
+	if ss.ScenarioChain != nil && ss.ScenarioChain.Active {
+		swarm.ScenarioChainTick(ss)
+	}
+
 	// Phase 4.92b: Auto-Optimizer tick
 	if ss.AutoOptimizer != nil && ss.AutoOptimizer.Active {
 		swarm.AutoOptimizerTick(ss)

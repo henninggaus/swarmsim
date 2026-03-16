@@ -343,6 +343,9 @@ type SwarmState struct {
 	// Auto-Optimizer
 	AutoOptimizer *AutoOptimizerState
 
+	// Scenario chain
+	ScenarioChain *ScenarioChainState
+
 	// Heatmap overlay (Y key)
 	ShowHeatmap bool
 	HeatmapGrid []float64 // flat grid of visit counts

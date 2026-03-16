@@ -496,6 +496,27 @@ func (r *Renderer) DrawSwarmMode(screen *ebiten.Image, s *simulation.Simulation,
 		}
 	}
 
+	// Scenario chain HUD
+	if ss.ScenarioChain != nil {
+		chain := ss.ScenarioChain
+		if chain.Active {
+			step := &chain.Steps[chain.StepIdx]
+			chainInfo := fmt.Sprintf("SZENARIO-KETTE: %s | %d/%d Ticks | Score:%d | F5=Stop",
+				step.Name, step.TickLimit-chain.Timer, step.TickLimit, chain.TotalScore)
+			vector.DrawFilledRect(screen, 360, float32(sh-76), float32(sw-365), 16,
+				color.RGBA{20, 60, 80, 200}, false)
+			printColoredAt(screen, chainInfo, 365, sh-75, color.RGBA{80, 220, 255, 255})
+		} else if chain.Complete {
+			result := fmt.Sprintf("KETTE FERTIG! Gesamt-Score: %d", chain.TotalScore)
+			for i, s := range chain.StepScores {
+				result += fmt.Sprintf(" | S%d:%d", i+1, s)
+			}
+			vector.DrawFilledRect(screen, 360, float32(sh-76), float32(sw-365), 16,
+				color.RGBA{20, 80, 20, 200}, false)
+			printColoredAt(screen, result, 365, sh-75, color.RGBA{80, 255, 120, 255})
+		}
+	}
+
 	// Auto-Optimizer HUD
 	if ss.AutoOptimizer != nil && ss.AutoOptimizer.Active {
 		opt := ss.AutoOptimizer

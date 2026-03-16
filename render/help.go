@@ -127,6 +127,7 @@ func DrawHelpOverlay(screen *ebiten.Image, isSwarmMode bool, scrollY int) {
 		{"W", "Farb-Filter: Rot/Gruen/Blau/Traegt/Idle (zyklisch)"},
 		{"Y", "Heatmap: zeigt wo Bots sich am meisten aufhalten"},
 		{"F4", "Auto-Optimizer: testet Parameter automatisch"},
+		{"F5", "Szenario-Kette: 3 Szenarien nacheinander durchlaufen"},
 		{"X", "Stats als CSV in Clipboard exportieren"},
 	})
 	ly += 8

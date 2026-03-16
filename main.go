@@ -727,6 +727,16 @@ func (g *Game) handleSwarmInput() {
 		logger.Info("SWARM", "Trails: %v", ss.ShowTrails)
 	}
 
+	// F5 key: start/stop scenario chain
+	if inpututil.IsKeyJustPressed(ebiten.KeyF5) && !ed.Focused {
+		if ss.ScenarioChain != nil && ss.ScenarioChain.Active {
+			swarm.ScenarioChainStop(ss)
+			logger.Info("SWARM", "Scenario chain stopped")
+		} else {
+			swarm.ScenarioChainStart(ss)
+		}
+	}
+
 	// F4 key: start/stop auto-optimizer
 	if inpututil.IsKeyJustPressed(ebiten.KeyF4) && !ed.Focused {
 		if ss.AutoOptimizer != nil && ss.AutoOptimizer.Active {
