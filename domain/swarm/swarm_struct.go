@@ -409,6 +409,9 @@ type SwarmState struct {
 	StatsTracker *StatsTracker
 	DashboardOn  bool // D key toggle
 
+	// Clipboard flash (visual feedback on copy)
+	ClipboardFlash int // >0 = flash timer (counts down)
+
 	// Block editor
 	BlockEditorActive bool
 	BlockRules        []BlockRule

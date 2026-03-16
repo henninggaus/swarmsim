@@ -235,6 +235,10 @@ func (g *Game) Update() (retErr error) {
 	if g.sim.SwarmMode && g.sim.SwarmState != nil && g.sim.SwarmState.ResetFlashTimer > 0 {
 		g.sim.SwarmState.ResetFlashTimer--
 	}
+	// Clipboard flash timer
+	if g.sim.SwarmMode && g.sim.SwarmState != nil && g.sim.SwarmState.ClipboardFlash > 0 {
+		g.sim.SwarmState.ClipboardFlash--
+	}
 
 	// Follow-cam lerp update
 	if g.sim.SwarmMode && g.sim.SwarmState != nil {
@@ -826,6 +830,28 @@ func (g *Game) handleSwarmClick(mx, my int) {
 		g.renderer.Sound.PlayReset()
 		ss.DropdownOpen = false
 		ss.BotCountEdit = false
+
+	case "copy":
+		// Export program to clipboard
+		text := strings.Join(ed.Lines, "\n")
+		render.ClipboardWrite(text)
+		ss.ClipboardFlash = 30
+		logger.Info("SWARM", "Program copied to clipboard (%d lines)", len(ed.Lines))
+
+	case "paste":
+		// Import program from clipboard
+		render.ClipboardRead(func(text string) {
+			if text == "" {
+				return
+			}
+			lines := strings.Split(text, "\n")
+			ed.Lines = lines
+			ed.CursorLine = 0
+			ed.CursorCol = 0
+			ed.ScrollY = 0
+			ss.ProgramName = "Custom"
+			logger.Info("SWARM", "Program pasted from clipboard (%d lines)", len(lines))
+		})
 
 	case "botcount":
 		ss.BotCountEdit = true
