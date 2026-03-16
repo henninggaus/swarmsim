@@ -133,6 +133,11 @@ func DrawHelpOverlay(screen *ebiten.Image, isSwarmMode bool, scrollY int) {
 		{"F8", "Parameter-Preset speichern"},
 		{"F9", "Gespeichertes Preset laden (zyklisch)"},
 		{".", "Live-Chart: Lieferstatistik als Liniendiagramm"},
+		{"Z", "Replay-Modus: Zeitverlauf mit Pfeiltasten scrubben"},
+		{"I", "Energie-System: Bots verbrauchen Energie"},
+		{"K", "Kommunikations-Graph: Nachrichten-Linien anzeigen"},
+		{"B", "Fitness-Baseline: aktuelle Kurve als Vergleich speichern"},
+		{"A", "Dashboard: Aktions-Heatmap / Bewegungs-Heatmap"},
 		{"Ctrl+Klick", "Bot-Genom auf alle anderen klonen"},
 		{"X", "Stats als CSV in Clipboard exportieren"},
 	})

@@ -61,6 +61,4 @@ func DrawFormationOverlay(screen *ebiten.Image, ss *swarm.SwarmState) {
 		y += lineH + 2
 	}
 
-	// Draw centroid marker on arena
-	// (This is rendered in screen space, need to convert)
 }
