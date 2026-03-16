@@ -76,6 +76,10 @@ type Game struct {
 	// Tooltips
 	tooltip render.TooltipState
 
+	// Single-step debugger (Q key)
+	stepMode bool // true = advance one tick per Q press
+	stepOnce bool // true = execute exactly one tick this frame
+
 	// Replay / time travel
 	replayMode     bool
 	replayIdx      int // current snapshot index in replay buffer
@@ -279,6 +283,24 @@ func (g *Game) Update() (retErr error) {
 		}
 	}
 
+	// Single-step mode: force exactly one tick
+	if g.stepMode && g.stepOnce && !g.replayMode {
+		g.stepOnce = false
+		g.sim.Paused = false
+		g.sim.Update()
+		g.sim.Paused = true
+		// Record replay snapshot
+		if g.sim.SwarmMode && g.sim.SwarmState != nil {
+			ss := g.sim.SwarmState
+			if ss.ReplayBuf == nil {
+				ss.ReplayBuf = swarm.NewReplayBuffer(500)
+			}
+			if ss.Tick%10 == 0 {
+				ss.ReplayBuf.Record(ss)
+			}
+		}
+	}
+
 	// Fixed timestep for simulation (skip during replay)
 	if !g.replayMode {
 		dt := 1.0 / 60.0 * g.sim.Speed
@@ -308,6 +330,21 @@ func (g *Game) handleGlobalInput() {
 	// Space: pause/resume
 	if inpututil.IsKeyJustPressed(ebiten.KeySpace) {
 		g.sim.Paused = !g.sim.Paused
+		if !g.sim.Paused {
+			g.stepMode = false // resume clears step mode
+		}
+	}
+
+	// Q: single-step mode (toggle) / advance one tick
+	skipQ := g.sim.SwarmMode && g.sim.SwarmState != nil && g.sim.SwarmState.Editor != nil && g.sim.SwarmState.Editor.Focused
+	if inpututil.IsKeyJustPressed(ebiten.KeyQ) && !skipQ {
+		if !g.stepMode {
+			g.stepMode = true
+			g.sim.Paused = true
+			g.stepOnce = true // execute the first tick immediately
+		} else {
+			g.stepOnce = true // advance one tick
+		}
 	}
 
 	// +/-: speed
@@ -2255,6 +2292,11 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	g.renderer.Draw(screen, g.sim)
 	render.DrawHUD(screen, g.sim, ebiten.ActualFPS(), g.renderer)
+
+	// Step mode indicator
+	if g.stepMode {
+		render.DrawStepModeIndicator(screen)
+	}
 
 	// Replay overlay
 	if g.replayMode && g.sim.SwarmState != nil && g.sim.SwarmState.ReplayBuf != nil {

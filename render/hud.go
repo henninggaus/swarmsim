@@ -77,7 +77,9 @@ func DrawHUD(screen *ebiten.Image, s *simulation.Simulation, fps float64, r *Ren
 	pherModes := []string{"Pher:OFF", "Pher:FOUND", "Pher:ALL"}
 	ebitenutil.DebugPrintAt(screen, pherModes[s.PheromoneVizMode], 10, sh-30)
 
-	ebitenutil.DebugPrintAt(screen, "SPACE:Pause 1-5:Bot R:Res O:Obs N:Next D:Debug P:Pher E:Evolve V:Genome S:Sound +/-:Speed H:Hilfe", 10, sh-15)
+	// Bottom help: two lines for readability
+	printColoredAt(screen, "SPACE:Pause  1-5:Bot spawnen  R:Ressource  O:Hindernis  N:Szenario  D:Debug", 10, sh-28, color.RGBA{140, 150, 170, 200})
+	printColoredAt(screen, "P:Pheromone  E:Evolution  V:Genom  S:Sound  +/-:Speed  H:Hilfe (alle Tasten)", 10, sh-14, color.RGBA{140, 150, 170, 200})
 
 	// Selected bot info panel
 	if s.SelectedBotID >= 0 {
@@ -311,4 +313,13 @@ func drawScenarioTitle(screen *ebiten.Image, title string, sw, sh, timer int) {
 	op.GeoM.Translate(float64(sw)/2-totalW/2, float64(sh)/2-totalH/2)
 	op.ColorScale.ScaleAlpha(float32(alpha) / 255.0)
 	screen.DrawImage(textImg, op)
+}
+
+// DrawStepModeIndicator draws the step-mode indicator on screen.
+func DrawStepModeIndicator(screen *ebiten.Image) {
+	sw := screen.Bounds().Dx()
+	vector.DrawFilledRect(screen, float32(sw/2-80), 2, 160, 16,
+		color.RGBA{180, 50, 50, 200}, false)
+	printColoredAt(screen, "EINZELSCHRITT (Q=Tick, Space=weiter)", sw/2-78, 3,
+		color.RGBA{255, 255, 255, 255})
 }
