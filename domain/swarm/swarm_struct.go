@@ -199,6 +199,14 @@ type SwarmMessage struct {
 	X, Y  float64
 }
 
+// MsgWave is a visual expanding ring from a broadcast message.
+type MsgWave struct {
+	X, Y   float64
+	Radius float64 // current radius (expands each tick)
+	Timer  int     // counts down from 30
+	Value  int     // message value (for color)
+}
+
 // EditorState tracks the text editor's internal state.
 type EditorState struct {
 	Lines      []string
@@ -355,6 +363,7 @@ type SwarmState struct {
 	// Selected bot for info overlay
 	SelectedBot int // -1 = none
 	CompareBot  int // -1 = none, Shift+click to set second bot for comparison
+	HoveredBot  int // -1 = none, set by mouse hover detection
 
 	// Follow-cam
 	FollowCamBot int     // bot index being followed (-1 = off)
@@ -416,6 +425,10 @@ type SwarmState struct {
 	ChallengeActive  bool
 	ChallengeTicks   int
 	ChallengeResult  string
+
+	// Message wave visualization
+	ShowMsgWaves bool
+	MsgWaves     []MsgWave // active expanding wave rings
 
 	// Ramp semaphore (truck mode)
 	RampBotCount int // non-carrying bots currently on ramp (rebuilt per tick)

@@ -699,6 +699,22 @@ func (g *Game) handleSwarmInput() {
 		ss.DropdownHover = render.SwarmDropdownHitTest(mx, my, len(ss.PresetNames))
 	}
 
+	// Bot hover detection for tooltip
+	ss.HoveredBot = -1
+	awx, awy, inside := render.SwarmScreenToArena(mx, my, ss)
+	if inside && !ss.DropdownOpen && !ss.ArenaEditMode {
+		bestDist := 12.0
+		for i := range ss.Bots {
+			dx := ss.Bots[i].X - awx
+			dy := ss.Bots[i].Y - awy
+			dist := math.Sqrt(dx*dx + dy*dy)
+			if dist < bestDist {
+				bestDist = dist
+				ss.HoveredBot = i
+			}
+		}
+	}
+
 	// Left click handling
 	if inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) {
 		if ss.DropdownOpen {
@@ -2469,6 +2485,12 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	// Tooltips (below tutorial overlay)
 	if g.sim.SwarmMode && g.tooltip.Visible {
 		render.DrawTooltip(screen, &g.tooltip)
+	}
+
+	// Bot hover tooltip
+	if g.sim.SwarmMode && g.sim.SwarmState != nil && g.sim.SwarmState.HoveredBot >= 0 {
+		bmx, bmy := ebiten.CursorPosition()
+		render.DrawBotTooltip(screen, g.sim.SwarmState, bmx, bmy)
 	}
 
 	// Tutorial overlay (on top of everything)
