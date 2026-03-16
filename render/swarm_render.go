@@ -580,6 +580,11 @@ func (r *Renderer) DrawSwarmMode(screen *ebiten.Image, s *simulation.Simulation,
 		DrawParetoOverlay(screen, ss)
 	}
 
+	// Leaderboard overlay (Ctrl+L)
+	if ss.ShowLeaderboard && ss.Leaderboard != nil {
+		DrawLeaderboardOverlay(screen, ss.Leaderboard)
+	}
+
 	// Arena editor mode indicator
 	if ss.ArenaEditMode {
 		toolNames := []string{"Hindernis", "Station", "Loeschen"}

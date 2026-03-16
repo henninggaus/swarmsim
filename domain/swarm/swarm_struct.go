@@ -474,6 +474,10 @@ type SwarmState struct {
 	SensorNoiseOn  bool              // toggle sensor noise system
 	SensorNoiseCfg SensorNoiseConfig // noise parameters
 
+	// Leaderboard / Highscore
+	Leaderboard     *LeaderboardState // loaded on startup
+	ShowLeaderboard bool              // toggle overlay
+
 	CollisionCount  int // obstacle collisions this tick (reset per tick)
 	ResetFlashTimer int // counts down from 30 for "RESET" flash
 

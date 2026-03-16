@@ -849,6 +849,14 @@ func (g *Game) handleSwarmInput() {
 			ss.SensorNoiseOn, ss.SensorNoiseCfg.NoiseLevel*100, ss.SensorNoiseCfg.FailureRate*100)
 	}
 
+	// Ctrl+L: toggle leaderboard overlay
+	if inpututil.IsKeyJustPressed(ebiten.KeyL) && ebiten.IsKeyPressed(ebiten.KeyControl) && !ed.Focused {
+		if ss.Leaderboard == nil {
+			ss.Leaderboard = swarm.LoadLeaderboard()
+		}
+		ss.ShowLeaderboard = !ss.ShowLeaderboard
+	}
+
 	// Ctrl+S: export program as .swarm file
 	if inpututil.IsKeyJustPressed(ebiten.KeyS) && ebiten.IsKeyPressed(ebiten.KeyControl) && !ed.Focused {
 		filename := fmt.Sprintf("%s_%d.swarm", ss.ProgramName, ss.Tick)
@@ -1983,6 +1991,34 @@ func (g *Game) deploySwarmProgram() {
 		ss.ErrorLine = 0
 		logger.Warn("SWARM", "Parse error: %s", err.Error())
 		return
+	}
+
+	// Submit leaderboard score before resetting (if there were deliveries)
+	if ss.DeliveryOn && ss.DeliveryStats.TotalDelivered > 0 {
+		if ss.Leaderboard == nil {
+			ss.Leaderboard = swarm.LoadLeaderboard()
+		}
+		mode := "Script"
+		gen := ss.Generation
+		if ss.GPEnabled {
+			mode = "GP"
+			gen = ss.GPGeneration
+		} else if ss.NeuroEnabled {
+			mode = "Neuro"
+			gen = ss.NeuroGeneration
+		} else if ss.EvolutionOn {
+			mode = "Evolution"
+		}
+		swarm.SubmitScore(ss.Leaderboard, swarm.LeaderboardEntry{
+			Name:       ss.ProgramName,
+			Deliveries: ss.DeliveryStats.TotalDelivered,
+			Correct:    ss.DeliveryStats.CorrectDelivered,
+			Wrong:      ss.DeliveryStats.WrongDelivered,
+			BotCount:   ss.BotCount,
+			Ticks:      ss.Tick,
+			Generation: gen,
+			Mode:       mode,
+		})
 	}
 
 	ss.Program = prog
