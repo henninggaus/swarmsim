@@ -17,6 +17,9 @@ cpu.prof
 # User data
 swarmsim_presets.json
 
+# Logs
+*.log
+
 # IDE / tools
 .claude/
 .vscode/
