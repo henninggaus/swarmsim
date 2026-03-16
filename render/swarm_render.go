@@ -122,23 +122,38 @@ func (r *Renderer) DrawSwarmMode(screen *ebiten.Image, s *simulation.Simulation,
 		}
 	}
 
-	// Trails
+	// Trails — connected fading lines with color gradient
 	if ss.ShowTrails {
+		trailLen := len(ss.Bots[0].Trail)
 		for i := range ss.Bots {
 			bot := &ss.Bots[i]
-			for t := 0; t < len(bot.Trail); t++ {
-				tx := bot.Trail[t][0]
-				ty := bot.Trail[t][1]
-				if tx == 0 && ty == 0 {
+			// Build ordered trail: newest first
+			for t := 1; t < trailLen; t++ {
+				currIdx := (bot.TrailIdx - t + trailLen) % trailLen
+				prevIdx := (bot.TrailIdx - t - 1 + trailLen) % trailLen
+				cx, cy := bot.Trail[currIdx][0], bot.Trail[currIdx][1]
+				px, py := bot.Trail[prevIdx][0], bot.Trail[prevIdx][1]
+				if (cx == 0 && cy == 0) || (px == 0 && py == 0) {
 					continue
 				}
-				age := (bot.TrailIdx - t - 1 + len(bot.Trail)) % len(bot.Trail)
-				alpha := uint8(60 - age*5)
-				if alpha < 10 {
-					alpha = 10
+				// Skip if distance too large (teleport/respawn)
+				dx := cx - px
+				dy := cy - py
+				if dx*dx+dy*dy > 2500 {
+					continue // >50px gap = teleport
+				}
+				// Fade alpha and width with age
+				frac := float32(t) / float32(trailLen)
+				alpha := uint8(float32(120) * (1.0 - frac))
+				if alpha < 8 {
+					alpha = 8
+				}
+				width := 2.5 * (1.0 - frac*0.7)
+				if width < 0.5 {
+					width = 0.5
 				}
 				trailCol := color.RGBA{bot.LEDColor[0], bot.LEDColor[1], bot.LEDColor[2], alpha}
-				vector.DrawFilledCircle(a, float32(tx), float32(ty), 2, trailCol, false)
+				vector.StrokeLine(a, float32(cx), float32(cy), float32(px), float32(py), float32(width), trailCol, false)
 			}
 		}
 	}

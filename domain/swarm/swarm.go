@@ -144,7 +144,7 @@ func (ss *SwarmState) ResetBots() {
 		ss.Bots[i].StuckPrevX = ss.Bots[i].X
 		ss.Bots[i].StuckPrevY = ss.Bots[i].Y
 		ss.Bots[i].StuckCooldown = 0
-		ss.Bots[i].Trail = [10][2]float64{}
+		ss.Bots[i].Trail = [30][2]float64{}
 		ss.Bots[i].TrailIdx = 0
 		ss.Bots[i].CarryingPkg = -1
 		ss.Bots[i].NearestPickupDist = 999

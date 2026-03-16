@@ -106,7 +106,7 @@ type SwarmBot struct {
 	IdleMoveTimer int // >0 = forced random exploration (counts down)
 
 	// Trail history (ring buffer)
-	Trail    [10][2]float64
+	Trail    [30][2]float64
 	TrailIdx int
 
 	// Delivery system
