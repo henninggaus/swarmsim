@@ -690,6 +690,10 @@ type SwarmState struct {
 	MetaEvo   *MetaEvoState
 	MetaEvoOn bool
 
+	// Co-evolutionary ecosystem
+	Ecosystem   *EcosystemState
+	EcosystemOn bool
+
 	// Block editor
 	BlockEditorActive bool
 	BlockRules        []BlockRule
