@@ -185,8 +185,9 @@ type SwarmBot struct {
 	RampCooldown        int // >0 = ticks until bot can try GOTO_RAMP again
 
 	// Evolution parameters (per-bot, used when $A-$Z syntax and EvolutionOn)
-	ParamValues [26]float64
-	Fitness     float64
+	ParamValues    [26]float64
+	Fitness        float64
+	DiploidGenome  *DiploidGenome // nil when sexual reproduction OFF
 
 	// Genetic Programming (per-bot program, used when GPEnabled)
 	OwnProgram       *swarmscript.SwarmProgram // nil when GP OFF
