@@ -670,6 +670,10 @@ type SwarmState struct {
 	EpisodicMemory   *EpisodicMemoryState
 	EpisodicMemoryOn bool
 
+	// Benchmarks
+	Benchmark   *BenchmarkState
+	BenchmarkOn bool
+
 	// Block editor
 	BlockEditorActive bool
 	BlockRules        []BlockRule
