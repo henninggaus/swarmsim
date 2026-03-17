@@ -662,6 +662,10 @@ type SwarmState struct {
 	EnergyEconomy   *EnergyEconomyState
 	EnergyEconomyOn bool
 
+	// Hierarchical swarm (multi-scale)
+	Hierarchy   *HierarchyState
+	HierarchyOn bool
+
 	// Block editor
 	BlockEditorActive bool
 	BlockRules        []BlockRule
