@@ -714,6 +714,10 @@ type SwarmState struct {
 	Language   *LanguageState
 	LanguageOn bool
 
+	// Morphogenesis (Turing patterns)
+	Morphogenesis   *MorphogenesisState
+	MorphogenesisOn bool
+
 	// Block editor
 	BlockEditorActive bool
 	BlockRules        []BlockRule
