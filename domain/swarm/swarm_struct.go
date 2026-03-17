@@ -746,6 +746,10 @@ type SwarmState struct {
 	CollectiveDream   *CollectiveDreamState
 	CollectiveDreamOn bool
 
+	// Gene Cascade (regulatory cascades)
+	GeneCascade   *GeneCascadeState
+	GeneCascadeOn bool
+
 	// Block editor
 	BlockEditorActive bool
 	BlockRules        []BlockRule
