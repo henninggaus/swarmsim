@@ -623,6 +623,10 @@ type SwarmState struct {
 	Curriculum   *CurriculumState
 	CurriculumOn bool
 
+	// Predator-prey co-evolution
+	PredatorPrey   *PredatorPreyState
+	PredatorPreyOn bool
+
 	// Block editor
 	BlockEditorActive bool
 	BlockRules        []BlockRule
