@@ -468,6 +468,11 @@ func (s *Simulation) updateSwarmMode() {
 		swarm.UpdateBotMemory(ss)
 	}
 
+	// Phase 4.94a: Memory decay (exponential forgetting, every 50 ticks)
+	if ss.MemoryEnabled && ss.Tick%50 == 0 && ss.Tick > 0 {
+		swarm.DecayBotMemory(ss, 0.92) // ~8% decay per 50 ticks
+	}
+
 	// Phase 4.94b: Update moving obstacles (patrol + rotation)
 	if swarm.HasMovingObstacles(ss) {
 		swarm.UpdateMovingObstacles(ss)

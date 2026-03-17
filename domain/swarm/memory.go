@@ -45,6 +45,26 @@ func UpdateBotMemory(ss *SwarmState) {
 	}
 }
 
+// DecayBotMemory applies exponential forgetting to all bots' memory grids.
+// Each cell value is multiplied by decayFactor (e.g. 0.95).
+// Call periodically (e.g. every 50 ticks) to simulate memory fading.
+func DecayBotMemory(ss *SwarmState, decayFactor float64) {
+	for i := range ss.Bots {
+		bot := &ss.Bots[i]
+		if bot.MemoryGrid == nil {
+			continue
+		}
+		for j := range bot.MemoryGrid {
+			newVal := float64(bot.MemoryGrid[j]) * decayFactor
+			if newVal < 0.5 {
+				bot.MemoryGrid[j] = 0
+			} else {
+				bot.MemoryGrid[j] = uint8(newVal)
+			}
+		}
+	}
+}
+
 // BotVisitedHere returns how many times the bot visited its current cell.
 func BotVisitedHere(bot *SwarmBot) int {
 	if bot.MemoryGrid == nil {

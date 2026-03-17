@@ -292,3 +292,73 @@ func TestMemoryPerBotIndependence(t *testing.T) {
 		t.Errorf("bot 1 should see its own visit, got %d", visits1)
 	}
 }
+
+// === DecayBotMemory tests ===
+
+func newMemSS(n int) *SwarmState {
+	rng := rand.New(rand.NewSource(42))
+	return NewSwarmState(rng, n)
+}
+
+func TestDecayBotMemoryReducesValues(t *testing.T) {
+	ss := newMemSS(1)
+	InitBotMemory(ss)
+	ss.Bots[0].X = 100
+	ss.Bots[0].Y = 100
+
+	// Visit cell 10 times
+	for i := 0; i < 10; i++ {
+		UpdateBotMemory(ss)
+	}
+	before := BotVisitedHere(&ss.Bots[0])
+	if before != 10 {
+		t.Fatalf("expected 10 visits before decay, got %d", before)
+	}
+
+	DecayBotMemory(ss, 0.5)
+	after := BotVisitedHere(&ss.Bots[0])
+	if after != 5 {
+		t.Errorf("after 50%% decay of 10, expected 5, got %d", after)
+	}
+}
+
+func TestDecayBotMemoryZerosOutSmallValues(t *testing.T) {
+	ss := newMemSS(1)
+	InitBotMemory(ss)
+	ss.Bots[0].X = 100
+	ss.Bots[0].Y = 100
+	UpdateBotMemory(ss) // visit = 1
+
+	DecayBotMemory(ss, 0.3) // 1 * 0.3 = 0.3 → rounds to 0
+	after := BotVisitedHere(&ss.Bots[0])
+	if after != 0 {
+		t.Errorf("value should decay to 0, got %d", after)
+	}
+}
+
+func TestDecayBotMemoryNilGridSafe(t *testing.T) {
+	ss := newMemSS(1)
+	// No InitBotMemory → grid is nil
+	DecayBotMemory(ss, 0.9) // should not panic
+}
+
+func TestDecayBotMemoryRepeatedDecay(t *testing.T) {
+	ss := newMemSS(1)
+	InitBotMemory(ss)
+	ss.Bots[0].X = 200
+	ss.Bots[0].Y = 200
+
+	// Visit 100 times
+	for i := 0; i < 100; i++ {
+		UpdateBotMemory(ss)
+	}
+
+	// Decay repeatedly
+	for d := 0; d < 50; d++ {
+		DecayBotMemory(ss, 0.9)
+	}
+	after := BotVisitedHere(&ss.Bots[0])
+	if after > 2 {
+		t.Errorf("after many decays, value should be near 0, got %d", after)
+	}
+}
