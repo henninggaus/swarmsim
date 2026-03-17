@@ -726,6 +726,10 @@ type SwarmState struct {
 	SpatialMemory   *SpatialMemoryState
 	SpatialMemoryOn bool
 
+	// Body Evolution (morphological traits)
+	BodyEvo   *BodyEvoState
+	BodyEvoOn bool
+
 	// Block editor
 	BlockEditorActive bool
 	BlockRules        []BlockRule
