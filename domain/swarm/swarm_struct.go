@@ -658,6 +658,10 @@ type SwarmState struct {
 	ReactionDiffusion   *ReactionDiffusionState
 	ReactionDiffusionOn bool
 
+	// Energy economy / trading
+	EnergyEconomy   *EnergyEconomyState
+	EnergyEconomyOn bool
+
 	// Block editor
 	BlockEditorActive bool
 	BlockRules        []BlockRule
