@@ -738,6 +738,10 @@ type SwarmState struct {
 	Classifier   *ClassifierState
 	ClassifierOn bool
 
+	// Homeostasis (internal drives)
+	Homeostasis   *HomeostasisState
+	HomeostasisOn bool
+
 	// Block editor
 	BlockEditorActive bool
 	BlockRules        []BlockRule
