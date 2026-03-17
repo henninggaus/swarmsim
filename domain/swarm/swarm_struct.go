@@ -638,6 +638,10 @@ type SwarmState struct {
 	// Transfer learning between scenarios
 	Transfer *TransferState
 
+	// Interactive evolution (user-guided selection)
+	InteractiveEvo   *InteractiveEvoState
+	InteractiveEvoOn bool
+
 	// Block editor
 	BlockEditorActive bool
 	BlockRules        []BlockRule
