@@ -117,3 +117,79 @@ func (c *Channel) PendingMessages() []PendingMsg {
 func PendingMsgOrigin(p PendingMsg) (float64, float64, float64, Message) {
 	return p.OriginX, p.OriginY, p.CommRange, p.Msg
 }
+
+// --- Named Signal Protocol ---
+
+// NewSignalChannel creates a new signal channel.
+func NewSignalChannel() *SignalChannel {
+	return &SignalChannel{}
+}
+
+// SendSignal queues a named signal from a position.
+func (sc *SignalChannel) SendSignal(sig Signal, originX, originY, commRange float64) {
+	sc.pending = append(sc.pending, PendingSignal{
+		Sig: sig, OriginX: originX, OriginY: originY, CommRange: commRange,
+	})
+}
+
+// DeliverSignals returns all signals receivable at position (rx, ry).
+// Optionally filter by signal name (empty = all).
+func (sc *SignalChannel) DeliverSignals(rx, ry float64, filterName string) []Signal {
+	var result []Signal
+	for _, p := range sc.pending {
+		if filterName != "" && p.Sig.Name != filterName {
+			continue
+		}
+		dx := p.OriginX - rx
+		dy := p.OriginY - ry
+		dist := math.Sqrt(dx*dx + dy*dy)
+		if dist <= p.CommRange {
+			result = append(result, p.Sig)
+		}
+	}
+	return result
+}
+
+// TickSignals ages all signals and removes expired ones.
+func (sc *SignalChannel) TickSignals() int {
+	alive := sc.pending[:0]
+	for _, p := range sc.pending {
+		p.Sig.TTL--
+		if p.Sig.TTL > 0 {
+			alive = append(alive, p)
+		}
+	}
+	sc.pending = alive
+	return len(sc.pending)
+}
+
+// ClearSignals removes all pending signals.
+func (sc *SignalChannel) ClearSignals() {
+	sc.pending = sc.pending[:0]
+}
+
+// SignalCount returns the number of active signals.
+func (sc *SignalChannel) SignalCount() int {
+	return len(sc.pending)
+}
+
+// SignalCountByName returns the number of active signals with a specific name.
+func (sc *SignalChannel) SignalCountByName(name string) int {
+	count := 0
+	for _, p := range sc.pending {
+		if p.Sig.Name == name {
+			count++
+		}
+	}
+	return count
+}
+
+// NewSignal creates a Signal with given name, position, and payload.
+func NewSignal(name string, senderID int, x, y float64, payload [4]float64) Signal {
+	return Signal{
+		Name: name, SenderID: senderID,
+		X: x, Y: y,
+		Payload: payload,
+		TTL:     5,
+	}
+}
