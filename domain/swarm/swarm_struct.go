@@ -722,6 +722,10 @@ type SwarmState struct {
 	Stigmergy2   *Stigmergy2State
 	Stigmergy2On bool
 
+	// Spatial Memory (shared knowledge map)
+	SpatialMemory   *SpatialMemoryState
+	SpatialMemoryOn bool
+
 	// Block editor
 	BlockEditorActive bool
 	BlockRules        []BlockRule
