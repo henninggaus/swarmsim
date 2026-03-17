@@ -730,6 +730,10 @@ type SwarmState struct {
 	BodyEvo   *BodyEvoState
 	BodyEvoOn bool
 
+	// Kuramoto Oscillators
+	Oscillator   *OscillatorState
+	OscillatorOn bool
+
 	// Block editor
 	BlockEditorActive bool
 	BlockRules        []BlockRule
