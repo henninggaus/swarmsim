@@ -702,6 +702,10 @@ type SwarmState struct {
 	Specialization   *SpecializationState
 	SpecializationOn bool
 
+	// NAS Evolution
+	NASEvo   *NASEvoState
+	NASEvoOn bool
+
 	// Block editor
 	BlockEditorActive bool
 	BlockRules        []BlockRule
