@@ -770,6 +770,10 @@ type SwarmState struct {
 	StockMarket   *StockMarketState
 	StockMarketOn bool
 
+	// Epigenetics (heritable marks)
+	Epigenetics   *EpigeneticsState
+	EpigeneticsOn bool
+
 	// Block editor
 	BlockEditorActive bool
 	BlockRules        []BlockRule
