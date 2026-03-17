@@ -754,6 +754,10 @@ type SwarmState struct {
 	Democracy   *DemocracyState
 	DemocracyOn bool
 
+	// Temporal Memory (pattern recognition)
+	TemporalMemory   *TemporalMemoryState
+	TemporalMemoryOn bool
+
 	// Block editor
 	BlockEditorActive bool
 	BlockRules        []BlockRule
