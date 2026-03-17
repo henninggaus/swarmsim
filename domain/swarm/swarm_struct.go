@@ -619,6 +619,10 @@ type SwarmState struct {
 	MorphEnabled bool
 	MorphConfig  *MorphologyConfig
 
+	// Curriculum learning (auto-difficulty)
+	Curriculum   *CurriculumState
+	CurriculumOn bool
+
 	// Block editor
 	BlockEditorActive bool
 	BlockRules        []BlockRule
