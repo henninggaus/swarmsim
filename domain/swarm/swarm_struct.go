@@ -654,6 +654,10 @@ type SwarmState struct {
 	Quorum   *QuorumState
 	QuorumOn bool
 
+	// Reaction-diffusion (Turing patterns)
+	ReactionDiffusion   *ReactionDiffusionState
+	ReactionDiffusionOn bool
+
 	// Block editor
 	BlockEditorActive bool
 	BlockRules        []BlockRule
