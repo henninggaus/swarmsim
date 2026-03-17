@@ -110,6 +110,16 @@ type SwarmBot struct {
 	ResourceGradientX  int // direction toward resources (0-359 degrees, -1=none)
 	ResourceGradientY  int // magnitude of resource gradient (0-100)
 
+	// Extended sensor cache (advanced)
+	NeighborMinDist   int // distance to closest neighbor (9999 if none)
+	BotCarryingCount  int // count of neighbors currently carrying
+	TimeSinceDelivery int // ticks since last successful delivery
+	RecentCollision   int // 1 if collided with obstacle in last 10 ticks, 0 otherwise
+	CollisionTimer    int // countdown from 10 when collision detected
+
+	// Brake mechanics
+	BrakeTimer int // >0 = braking (speed ramps down over 3 ticks)
+
 	// Anti-stuck tracking
 	StuckTicks      int     // how many ticks bot barely moved
 	StuckPrevX      float64 // position last tick for stuck detection
@@ -183,7 +193,16 @@ type SwarmBot struct {
 	LastMatchedRules []int                     // indices of rules that matched last tick
 
 	// Neuroevolution (per-bot neural network, used when NeuroEnabled)
-	Brain *NeuroBrain // nil when NEURO OFF
+	Brain     *NeuroBrain // nil when NEURO OFF
+	LSTMBrain *LSTMBrain  // nil when LSTM OFF
+
+	// Genealogy (lineage tracking)
+	BotID   int // unique genealogy identifier
+	ParentA int // parent A BotID (-1 = none)
+	ParentB int // parent B BotID (-1 = none)
+
+	// Novelty Search (behavior characterization)
+	Behavior BehaviorDescriptor
 
 	// Teams (multiplayer mode)
 	Team int // 0=no team, 1=A (blue), 2=B (red)
@@ -203,9 +222,10 @@ type BotLifetimeStats struct {
 	MessagesSent      int
 	MessagesReceived  int
 	AntiStuckCount    int
-	TicksAlive        int // incremented every tick
-	TicksCarrying     int // ticks while CarryingPkg >= 0
-	TicksIdle         int // ticks while Speed == 0
+	TicksAlive        int     // incremented every tick
+	TicksCarrying     int     // ticks while CarryingPkg >= 0
+	TicksIdle         int     // ticks while Speed == 0
+	SumNeighborCount  float64 // sum of neighbor count per tick (for novelty behavior)
 }
 
 // LightSource represents an optional light source in the arena.
@@ -446,6 +466,11 @@ type SwarmState struct {
 	NeuroGeneration int  // current neuro generation
 	NeuroTimer      int  // ticks since last neuro evolution
 
+	// LSTM neuroevolution (alternative brain with temporal memory)
+	LSTMEnabled    bool // LSTM toggle (mutually exclusive with NeuroEnabled)
+	LSTMGeneration int
+	LSTMTimer      int
+
 	// Sound events (consumed by renderer each frame)
 	EvolutionSoundPending bool // set true when a generation completes
 	BroadcastCount        int  // messages sent this tick (for sound throttling)
@@ -501,6 +526,13 @@ type SwarmState struct {
 
 	// Population diversity (updated each generation)
 	Diversity *DiversityMetrics
+
+	// Genealogy tracking (lineage across generations)
+	Genealogy *GenealogyTracker
+
+	// Novelty Search (behavioral diversity fitness)
+	NoveltyArchive *NoveltyArchive
+	NoveltyEnabled bool
 
 	// Speciation (NEAT-style species formation)
 	Speciation     *SpeciationState

@@ -41,6 +41,11 @@ var gpSensorPool = []gpSensorEntry{
 	{CondSwarmSpread, 10, 300},
 	{CondIsolationLevel, 0, 200},
 	{CondResourceGradientY, 0, 100},
+	{CondEnergy, 0, 100},
+	{CondBotCarrying, 0, 10},
+	{CondTimeSinceDelivery, 0, 500},
+	{CondRecentCollision, 0, 1},
+	{CondNeighborMinDist, 0, 200},
 }
 
 // gpActionEntry defines an action template for random generation.
@@ -78,6 +83,9 @@ var gpActionPool = []gpActionEntry{
 	{ActSendDropoff, 1, 0, 0},
 	{ActDash, 0, 0, 0},
 	{ActEmergencyBroadcast, 99, 0, 0},
+	{ActReverse, 0, 0, 0},
+	{ActBrake, 0, 0, 0},
+	{ActScatterRandom, 0, 0, 0},
 }
 
 // GenerateRandomProgram creates a random SwarmScript program with numRules rules.

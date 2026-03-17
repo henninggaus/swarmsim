@@ -78,6 +78,11 @@ const (
 	CondIsolationLevel                           // isolation_level (0=close, >0=isolated)
 	CondResourceGradientX                        // resource_gradient_x (direction to resources, 0-359)
 	CondResourceGradientY                        // resource_gradient_y (resource proximity, 0-100)
+	CondEnergy                                   // energy (0-100)
+	CondBotCarrying                              // bot_carrying (count of neighbors carrying)
+	CondTimeSinceDelivery                        // time_since_delivery (ticks since last delivery)
+	CondRecentCollision                          // recent_collision (1 if collided recently)
+	CondNeighborMinDist                          // neighbor_min_dist (distance to closest neighbor)
 )
 
 // Condition represents a single boolean check in a rule.
@@ -138,6 +143,9 @@ const (
 	ActFollowPheromone                         // FOLLOW_PHER (follow pheromone gradient)
 	ActDash                                    // DASH (double-speed burst for 10 ticks)
 	ActEmergencyBroadcast                      // EMERGENCY_BROADCAST N (3x range broadcast)
+	ActReverse                                 // REVERSE (turn 180° and move forward)
+	ActBrake                                   // BRAKE (reduce speed to 0 over 3 ticks)
+	ActScatterRandom                           // SCATTER_RANDOM (scatter away from neighbors)
 )
 
 // Action represents an action to execute when a rule matches.
@@ -282,6 +290,15 @@ var conditionNames = map[string]ConditionType{
 	"isolation":           CondIsolationLevel,
 	"res_grad_x":          CondResourceGradientX,
 	"res_grad_y":          CondResourceGradientY,
+	// Energy & advanced sensors
+	"energy":              CondEnergy,
+	"bot_carrying":        CondBotCarrying,
+	"time_since_delivery": CondTimeSinceDelivery,
+	"since_delivery":      CondTimeSinceDelivery,
+	"recent_collision":    CondRecentCollision,
+	"collision":           CondRecentCollision,
+	"neighbor_min_dist":   CondNeighborMinDist,
+	"nbr_min_dist":        CondNeighborMinDist,
 }
 
 // actionNames maps action name strings to (ActionType, paramCount).
@@ -356,6 +373,11 @@ var actionNames = map[string]struct {
 	"DASH":                {ActDash, 0},
 	"EMERGENCY_BROADCAST": {ActEmergencyBroadcast, 1},
 	"EMERGENCY":           {ActEmergencyBroadcast, 1},
+	// Movement extensions
+	"REVERSE":             {ActReverse, 0},
+	"BRAKE":               {ActBrake, 0},
+	"SCATTER_RANDOM":      {ActScatterRandom, 0},
+	"SCATTER":             {ActScatterRandom, 0},
 }
 
 // --- SwarmScript syntax highlighting support ---
@@ -438,6 +460,9 @@ var highlightConditions = map[string]bool{
 	"swarm_center_dist": true, "swarm_spread": true, "isolation_level": true,
 	"resource_gradient_x": true, "resource_gradient_y": true,
 	"center_dist": true, "isolation": true, "res_grad_x": true, "res_grad_y": true,
+	// Energy & advanced sensors
+	"energy": true, "bot_carrying": true, "time_since_delivery": true, "since_delivery": true,
+	"recent_collision": true, "collision": true, "neighbor_min_dist": true, "nbr_min_dist": true,
 }
 
 var highlightActions = map[string]bool{
@@ -476,6 +501,8 @@ var highlightActions = map[string]bool{
 	"FOLLOW_PHER": true, "GOTO_PHER": true,
 	// Dash & emergency
 	"DASH": true, "EMERGENCY_BROADCAST": true, "EMERGENCY": true,
+	// Movement extensions
+	"REVERSE": true, "BRAKE": true, "SCATTER_RANDOM": true, "SCATTER": true,
 }
 
 // --- Reverse mapping functions (for block editor / serialization) ---
@@ -601,6 +628,16 @@ func ConditionTypeName(ct ConditionType) string {
 		return "res_grad_x"
 	case CondResourceGradientY:
 		return "res_grad_y"
+	case CondEnergy:
+		return "energy"
+	case CondBotCarrying:
+		return "bot_carrying"
+	case CondTimeSinceDelivery:
+		return "since_delivery"
+	case CondRecentCollision:
+		return "collision"
+	case CondNeighborMinDist:
+		return "nbr_min_dist"
 	}
 	return "unknown"
 }
@@ -709,6 +746,12 @@ func ActionTypeName(at ActionType) string {
 		return "DASH"
 	case ActEmergencyBroadcast:
 		return "EMERGENCY"
+	case ActReverse:
+		return "REVERSE"
+	case ActBrake:
+		return "BRAKE"
+	case ActScatterRandom:
+		return "SCATTER"
 	}
 	return "UNKNOWN"
 }
@@ -742,6 +785,7 @@ var SensorGrouped = [][]string{
 	{"-- Intern --", "state", "counter", "value1", "value2", "timer", "tick"},
 	{"-- Truck --", "truck_here", "truck_pkg_count", "on_ramp", "nearest_truck_pkg"},
 	{"-- Schwarm --", "center_dist", "swarm_spread", "isolation", "res_grad_x", "res_grad_y"},
+	{"-- Erweitert --", "energy", "bot_carrying", "since_delivery", "collision", "nbr_min_dist"},
 }
 
 // ActionGrouped returns action names organized in groups for dropdown display.
@@ -754,7 +798,7 @@ var ActionGrouped = [][]string{
 	{"-- Intern --", "SET_STATE", "SET_COUNTER", "INC_COUNTER", "DEC_COUNTER", "SET_TIMER", "SET_VALUE1", "SET_VALUE2"},
 	{"-- Follow --", "FOLLOW_NEAREST", "UNFOLLOW"},
 	{"-- Truck --", "GOTO_RAMP", "GOTO_TRUCK_PKG"},
-	{"-- Spezial --", "DASH", "EMERGENCY"},
+	{"-- Spezial --", "DASH", "EMERGENCY", "REVERSE", "BRAKE", "SCATTER"},
 }
 
 // wordPos tracks a word and its column position in a line.

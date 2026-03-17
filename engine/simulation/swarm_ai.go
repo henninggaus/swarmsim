@@ -105,6 +105,21 @@ func (s *Simulation) updateSwarmMode() {
 			}
 			continue
 		}
+		// LSTM: use LSTM neural network if LSTM is ON
+		if ss.LSTMEnabled && bot.LSTMBrain != nil {
+			inputs := swarm.BuildNeuroInputs(bot, ss)
+			actionIdx := swarm.LSTMForward(bot.LSTMBrain, inputs)
+			swarm.ExecuteNeuroAction(actionIdx, bot, ss, i)
+			if ss.DeliveryOn {
+				if bot.CarryingPkg < 0 && bot.NearestPickupDist < 20 && bot.NearestPickupHasPkg {
+					executeSwarmAction(swarmscript.Action{Type: swarmscript.ActPickup}, bot, ss, i)
+				}
+				if bot.CarryingPkg >= 0 && bot.DropoffMatch && bot.NearestDropoffDist < 30 {
+					executeSwarmAction(swarmscript.Action{Type: swarmscript.ActDrop}, bot, ss, i)
+				}
+			}
+			continue
+		}
 		if ss.Program != nil {
 			executeSwarmProgram(ss, i)
 		}
@@ -372,6 +387,17 @@ func (s *Simulation) updateSwarmMode() {
 		}
 	}
 
+	// Phase 4.88: LSTM neuroevolution
+	if ss.LSTMEnabled {
+		ss.LSTMTimer++
+		if ss.LSTMTimer >= NeuroEvolutionInterval {
+			swarm.RunLSTMEvolution(ss)
+			ss.EvolutionSoundPending = true
+			dm := swarm.MeasureLSTMDiversity(ss)
+			ss.Diversity = &dm
+		}
+	}
+
 	// Count broadcasts for sound
 	ss.BroadcastCount = len(ss.NextMessages)
 
@@ -460,6 +486,8 @@ func (s *Simulation) updateSwarmMode() {
 		if bot.CarryingPkg >= 0 {
 			bot.Stats.TicksCarrying++
 		}
+		// Novelty Search: accumulate neighbor count for behavior descriptor
+		bot.Stats.SumNeighborCount += float64(bot.NeighborCount)
 	}
 
 	// Phase 4.97: Energy system
@@ -1000,6 +1028,27 @@ func buildSwarmEnvironment(ss *swarm.SwarmState, i int) {
 		py := bot.Y + math.Sin(bot.Angle)*20
 		bot.PherAhead = ss.PherGrid.Get(px, py)
 	}
+
+	// Advanced sensors: neighbor_min_dist (integer form of NearestDist)
+	if bot.NearestDist < 1e8 {
+		bot.NeighborMinDist = int(bot.NearestDist)
+	} else {
+		bot.NeighborMinDist = 9999
+	}
+
+	// bot_carrying: count of neighbors that are carrying packages
+	bot.BotCarryingCount = carryCount
+
+	// time_since_delivery: ticks since last successful delivery (tracked in stats)
+	bot.TimeSinceDelivery++
+
+	// recent_collision: update collision timer
+	if bot.CollisionTimer > 0 {
+		bot.CollisionTimer--
+		bot.RecentCollision = 1
+	} else {
+		bot.RecentCollision = 0
+	}
 }
 
 // pointInRect checks if a point is inside an obstacle rect.
@@ -1357,6 +1406,17 @@ func evaluateSwarmCondition(cond swarmscript.Condition, bot *swarm.SwarmBot, sna
 		return compareInt(bot.ResourceGradientX, cond.Op, cv)
 	case swarmscript.CondResourceGradientY:
 		return compareInt(bot.ResourceGradientY, cond.Op, cv)
+
+	case swarmscript.CondEnergy:
+		return compareInt(int(bot.Energy), cond.Op, cv)
+	case swarmscript.CondBotCarrying:
+		return compareInt(bot.BotCarryingCount, cond.Op, cv)
+	case swarmscript.CondTimeSinceDelivery:
+		return compareInt(bot.TimeSinceDelivery, cond.Op, cv)
+	case swarmscript.CondRecentCollision:
+		return compareInt(bot.RecentCollision, cond.Op, cv)
+	case swarmscript.CondNeighborMinDist:
+		return compareInt(bot.NeighborMinDist, cond.Op, cv)
 	}
 
 	return false
@@ -1744,6 +1804,7 @@ func executeSwarmAction(act swarmscript.Action, bot *swarm.SwarmBot, ss *swarm.S
 					ss.DeliveryStats.DeliveryTimes = append(ss.DeliveryStats.DeliveryTimes, deliveryTime)
 				}
 				bot.Stats.TotalDeliveries++
+				bot.TimeSinceDelivery = 0 // reset time-since-delivery sensor
 				if correct {
 					bot.Stats.CorrectDeliveries++
 				} else {
@@ -2046,6 +2107,27 @@ func executeSwarmAction(act swarmscript.Action, bot *swarm.SwarmBot, ss *swarm.S
 				X: bot.X, Y: bot.Y, Radius: 5, Timer: 45, Value: msgVal,
 			})
 		}
+
+	case swarmscript.ActReverse:
+		// Turn 180° and move forward
+		bot.Angle += math.Pi
+		bot.Speed = swarm.SwarmBotSpeed
+
+	case swarmscript.ActBrake:
+		// Initiate braking: speed ramps down over 3 ticks
+		bot.BrakeTimer = 3
+
+	case swarmscript.ActScatterRandom:
+		// Scatter away from neighbors with random perturbation
+		if bot.NeighborCount > 0 {
+			// Turn away from center of neighbors + random offset
+			awayAngle := math.Atan2(-bot.AvgNeighborY, -bot.AvgNeighborX)
+			awayAngle += (ss.Rng.Float64() - 0.5) * math.Pi / 2 // ±45° random
+			bot.Angle = awayAngle
+		} else {
+			bot.Angle = ss.Rng.Float64() * 2 * math.Pi
+		}
+		bot.Speed = swarm.SwarmBotSpeed
 	}
 }
 
@@ -2107,6 +2189,12 @@ func applySwarmPhysics(ss *swarm.SwarmState, i int) {
 		bot.DashCooldown--
 	}
 
+	// Brake timer: reduce speed over 3 ticks
+	if bot.BrakeTimer > 0 {
+		bot.Speed *= float64(bot.BrakeTimer-1) / 3.0
+		bot.BrakeTimer--
+	}
+
 	// Move
 	if bot.Speed > 0 {
 		bot.X += math.Cos(bot.Angle) * bot.Speed
@@ -2119,6 +2207,7 @@ func applySwarmPhysics(ss *swarm.SwarmState, i int) {
 		hit, _, _ := physics.CircleRectCollision(bot.X, bot.Y, swarm.SwarmBotRadius, obs.X, obs.Y, obs.W, obs.H)
 		if hit {
 			ss.CollisionCount++
+			bot.CollisionTimer = 10 // trigger recent_collision sensor for 10 ticks
 			newX, newY := physics.ResolveCircleRectOverlap(bot.X, bot.Y, swarm.SwarmBotRadius, obs.X, obs.Y, obs.W, obs.H)
 			pushDx := newX - bot.X
 			pushDy := newY - bot.Y
