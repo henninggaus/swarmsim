@@ -678,6 +678,10 @@ type SwarmState struct {
 	GRN   *GRNState
 	GRNOn bool
 
+	// Hebbian plasticity (lifetime learning)
+	Hebbian   *HebbianState
+	HebbianOn bool
+
 	// Block editor
 	BlockEditorActive bool
 	BlockRules        []BlockRule
