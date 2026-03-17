@@ -523,7 +523,9 @@ type SwarmState struct {
 	DashboardOn  bool // D key toggle
 
 	// Replay system
-	ReplayBuf *ReplayBuffer // ring buffer of state snapshots
+	ReplayBuf    *ReplayBuffer // ring buffer of state snapshots
+	ReplayPlayer *ReplayPlayer // playback controller (seek/rewind/step)
+	ReplayMode   bool          // true = replay active, simulation paused
 
 	// Population diversity (updated each generation)
 	Diversity *DiversityMetrics
