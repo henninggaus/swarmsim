@@ -666,6 +666,10 @@ type SwarmState struct {
 	Hierarchy   *HierarchyState
 	HierarchyOn bool
 
+	// Episodic memory
+	EpisodicMemory   *EpisodicMemoryState
+	EpisodicMemoryOn bool
+
 	// Block editor
 	BlockEditorActive bool
 	BlockRules        []BlockRule
