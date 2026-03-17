@@ -674,6 +674,10 @@ type SwarmState struct {
 	Benchmark   *BenchmarkState
 	BenchmarkOn bool
 
+	// Genetic Regulatory Networks
+	GRN   *GRNState
+	GRNOn bool
+
 	// Block editor
 	BlockEditorActive bool
 	BlockRules        []BlockRule
