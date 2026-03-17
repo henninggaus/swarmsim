@@ -734,6 +734,10 @@ type SwarmState struct {
 	Oscillator   *OscillatorState
 	OscillatorOn bool
 
+	// Learning Classifier System
+	Classifier   *ClassifierState
+	ClassifierOn bool
+
 	// Block editor
 	BlockEditorActive bool
 	BlockRules        []BlockRule
