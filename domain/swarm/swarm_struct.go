@@ -686,6 +686,10 @@ type SwarmState struct {
 	Immune   *ImmuneState
 	ImmuneOn bool
 
+	// Meta-evolution
+	MetaEvo   *MetaEvoState
+	MetaEvoOn bool
+
 	// Block editor
 	BlockEditorActive bool
 	BlockRules        []BlockRule
