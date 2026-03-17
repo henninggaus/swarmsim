@@ -642,6 +642,10 @@ type SwarmState struct {
 	InteractiveEvo   *InteractiveEvoState
 	InteractiveEvoOn bool
 
+	// Emergent language evolution
+	LanguageEvo   *LanguageEvo
+	LanguageEvoOn bool
+
 	// Block editor
 	BlockEditorActive bool
 	BlockRules        []BlockRule
