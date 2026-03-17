@@ -627,6 +627,10 @@ type SwarmState struct {
 	PredatorPrey   *PredatorPreyState
 	PredatorPreyOn bool
 
+	// Stigmergy / collective building
+	Stigmergy   *StigmergyState
+	StigmergyOn bool
+
 	// Block editor
 	BlockEditorActive bool
 	BlockRules        []BlockRule
