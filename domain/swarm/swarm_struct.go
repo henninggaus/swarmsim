@@ -758,6 +758,10 @@ type SwarmState struct {
 	TemporalMemory   *TemporalMemoryState
 	TemporalMemoryOn bool
 
+	// Adaptive Immune System
+	AdaptiveImmune   *AdaptiveImmuneState
+	AdaptiveImmuneOn bool
+
 	// Block editor
 	BlockEditorActive bool
 	BlockRules        []BlockRule
