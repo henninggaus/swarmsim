@@ -646,6 +646,10 @@ type SwarmState struct {
 	LanguageEvo   *LanguageEvo
 	LanguageEvoOn bool
 
+	// Shape formation system
+	ShapeFormation   *ShapeFormationState
+	ShapeFormationOn bool
+
 	// Block editor
 	BlockEditorActive bool
 	BlockRules        []BlockRule
