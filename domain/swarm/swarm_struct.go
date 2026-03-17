@@ -742,6 +742,10 @@ type SwarmState struct {
 	Homeostasis   *HomeostasisState
 	HomeostasisOn bool
 
+	// Collective Dream (offline strategy replay)
+	CollectiveDream   *CollectiveDreamState
+	CollectiveDreamOn bool
+
 	// Block editor
 	BlockEditorActive bool
 	BlockRules        []BlockRule
