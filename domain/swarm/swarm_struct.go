@@ -650,6 +650,10 @@ type SwarmState struct {
 	ShapeFormation   *ShapeFormationState
 	ShapeFormationOn bool
 
+	// Quorum sensing
+	Quorum   *QuorumState
+	QuorumOn bool
+
 	// Block editor
 	BlockEditorActive bool
 	BlockRules        []BlockRule
