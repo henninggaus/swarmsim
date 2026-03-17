@@ -635,6 +635,9 @@ type SwarmState struct {
 	SwarmAlgo   *SwarmAlgorithmState
 	SwarmAlgoOn bool
 
+	// Transfer learning between scenarios
+	Transfer *TransferState
+
 	// Block editor
 	BlockEditorActive bool
 	BlockRules        []BlockRule
