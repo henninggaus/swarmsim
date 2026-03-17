@@ -750,6 +750,10 @@ type SwarmState struct {
 	GeneCascade   *GeneCascadeState
 	GeneCascadeOn bool
 
+	// Democracy (ranked choice voting)
+	Democracy   *DemocracyState
+	DemocracyOn bool
+
 	// Block editor
 	BlockEditorActive bool
 	BlockRules        []BlockRule
