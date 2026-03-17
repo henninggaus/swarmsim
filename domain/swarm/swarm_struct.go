@@ -682,6 +682,10 @@ type SwarmState struct {
 	Hebbian   *HebbianState
 	HebbianOn bool
 
+	// Swarm immune system
+	Immune   *ImmuneState
+	ImmuneOn bool
+
 	// Block editor
 	BlockEditorActive bool
 	BlockRules        []BlockRule
