@@ -108,3 +108,126 @@ func countClusters(ss *SwarmState) int {
 	}
 	return clusters
 }
+
+// --- Formation Morphing ---
+
+// FormationType identifies a target formation shape.
+type FormationType int
+
+const (
+	FormCircle    FormationType = iota // bots arranged in a circle
+	FormLine                          // bots in a horizontal line
+	FormGrid                          // bots in a grid
+	FormV                             // V-formation (like geese)
+	FormSpiral                        // Archimedean spiral
+	FormTypeCount                     // sentinel
+)
+
+// FormationTarget holds per-bot target positions for morphing.
+type FormationTarget struct {
+	Targets [][2]float64 // (x,y) per bot
+	Type    FormationType
+}
+
+// ComputeFormationTargets computes target positions for n bots in the given formation.
+func ComputeFormationTargets(fType FormationType, n int, centerX, centerY, radius float64) FormationTarget {
+	if n == 0 {
+		return FormationTarget{Type: fType}
+	}
+	targets := make([][2]float64, n)
+
+	switch fType {
+	case FormCircle:
+		for i := 0; i < n; i++ {
+			angle := 2 * math.Pi * float64(i) / float64(n)
+			targets[i] = [2]float64{
+				centerX + radius*math.Cos(angle),
+				centerY + radius*math.Sin(angle),
+			}
+		}
+
+	case FormLine:
+		spacing := 2 * radius / math.Max(float64(n-1), 1)
+		startX := centerX - radius
+		for i := 0; i < n; i++ {
+			targets[i] = [2]float64{startX + float64(i)*spacing, centerY}
+		}
+
+	case FormGrid:
+		cols := int(math.Ceil(math.Sqrt(float64(n))))
+		spacing := 2 * radius / math.Max(float64(cols-1), 1)
+		startX := centerX - radius
+		startY := centerY - radius
+		for i := 0; i < n; i++ {
+			c := i % cols
+			r := i / cols
+			targets[i] = [2]float64{startX + float64(c)*spacing, startY + float64(r)*spacing}
+		}
+
+	case FormV:
+		halfN := n / 2
+		spacing := radius / math.Max(float64(halfN), 1)
+		// Left wing
+		for i := 0; i <= halfN; i++ {
+			targets[i] = [2]float64{
+				centerX - float64(i)*spacing,
+				centerY + float64(i)*spacing*0.6,
+			}
+		}
+		// Right wing
+		for i := halfN + 1; i < n; i++ {
+			j := i - halfN
+			targets[i] = [2]float64{
+				centerX + float64(j)*spacing,
+				centerY + float64(j)*spacing*0.6,
+			}
+		}
+
+	case FormSpiral:
+		for i := 0; i < n; i++ {
+			t := float64(i) / float64(n) * 4 * math.Pi // 2 full turns
+			r := radius * float64(i) / float64(n)
+			targets[i] = [2]float64{
+				centerX + r*math.Cos(t),
+				centerY + r*math.Sin(t),
+			}
+		}
+	}
+
+	return FormationTarget{Targets: targets, Type: fType}
+}
+
+// MorphToFormation smoothly moves bots toward their formation target positions.
+// lerpFactor controls speed (0.01=slow, 0.1=fast).
+// Returns average remaining distance to targets.
+func MorphToFormation(ss *SwarmState, ft FormationTarget, lerpFactor float64) float64 {
+	n := len(ss.Bots)
+	if len(ft.Targets) == 0 || n == 0 {
+		return 0
+	}
+
+	totalDist := 0.0
+	count := 0
+	for i := 0; i < n && i < len(ft.Targets); i++ {
+		tx, ty := ft.Targets[i][0], ft.Targets[i][1]
+		dx := tx - ss.Bots[i].X
+		dy := ty - ss.Bots[i].Y
+		dist := math.Sqrt(dx*dx + dy*dy)
+		totalDist += dist
+		count++
+
+		if dist > 1.0 {
+			ss.Bots[i].X += dx * lerpFactor
+			ss.Bots[i].Y += dy * lerpFactor
+			ss.Bots[i].Angle = math.Atan2(dy, dx)
+			ss.Bots[i].Speed = SwarmBotSpeed
+		} else {
+			ss.Bots[i].Speed = 0
+		}
+	}
+
+	if count == 0 {
+		return 0
+	}
+	return totalDist / float64(count)
+}
