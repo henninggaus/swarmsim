@@ -762,6 +762,10 @@ type SwarmState struct {
 	AdaptiveImmune   *AdaptiveImmuneState
 	AdaptiveImmuneOn bool
 
+	// Neural Pruning (synaptic Darwinism)
+	NeuralPruning   *NeuralPruningState
+	NeuralPruningOn bool
+
 	// Block editor
 	BlockEditorActive bool
 	BlockRules        []BlockRule
