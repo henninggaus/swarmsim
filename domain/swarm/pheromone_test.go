@@ -158,3 +158,121 @@ func TestGradientNormalized(t *testing.T) {
 		t.Errorf("gradient magnitude too large: %.4f", mag)
 	}
 }
+
+// === Multi-channel pheromone tests ===
+
+func TestNewMultiPheromoneGrid(t *testing.T) {
+	g := NewMultiPheromoneGrid(800, 800)
+	if g.Cols != 40 || g.Rows != 40 {
+		t.Errorf("expected 40x40, got %dx%d", g.Cols, g.Rows)
+	}
+	for ch := 0; ch < PherChannels; ch++ {
+		if len(g.Channels[ch]) != 1600 {
+			t.Errorf("channel %d: expected 1600 cells, got %d", ch, len(g.Channels[ch]))
+		}
+	}
+}
+
+func TestMultiDepositDirectional(t *testing.T) {
+	g := NewMultiPheromoneGrid(800, 800)
+	heading := math.Pi / 4 // 45 degrees
+	g.DepositDirectional(200, 200, heading, 0.5, PherCarry)
+
+	val := g.GetChannel(200, 200, PherCarry)
+	if val < 0.49 || val > 0.51 {
+		t.Errorf("expected ~0.5, got %f", val)
+	}
+
+	// Other channels should be 0
+	if g.GetChannel(200, 200, PherHome) != 0 {
+		t.Error("PherHome should be 0")
+	}
+	if g.GetChannel(200, 200, PherDanger) != 0 {
+		t.Error("PherDanger should be 0")
+	}
+}
+
+func TestMultiGetDirection(t *testing.T) {
+	g := NewMultiPheromoneGrid(800, 800)
+	// Deposit multiple times with same heading
+	for i := 0; i < 5; i++ {
+		g.DepositDirectional(300, 300, 0, 0.1, PherCarry) // heading = 0 (east)
+	}
+	dx, dy := g.GetDirection(300, 300)
+	if dx <= 0 {
+		t.Errorf("direction X should be positive (eastward), got %f", dx)
+	}
+	if math.Abs(dy) > 0.01 {
+		t.Errorf("direction Y should be near 0, got %f", dy)
+	}
+}
+
+func TestMultiGetDirectionEmpty(t *testing.T) {
+	g := NewMultiPheromoneGrid(800, 800)
+	dx, dy := g.GetDirection(400, 400)
+	if dx != 0 || dy != 0 {
+		t.Errorf("empty cell should return (0,0), got (%f,%f)", dx, dy)
+	}
+}
+
+func TestMultiVariableDecay(t *testing.T) {
+	g := NewMultiPheromoneGrid(800, 800)
+	g.DepositDirectional(100, 100, 0, 0.5, PherCarry)
+	g.DepositDirectional(100, 100, 0, 0.5, PherDanger)
+
+	for i := 0; i < 100; i++ {
+		g.UpdateMulti()
+	}
+
+	carry := g.GetChannel(100, 100, PherCarry)
+	danger := g.GetChannel(100, 100, PherDanger)
+
+	// Danger decays faster (0.980) than carry (0.995)
+	if danger >= carry {
+		t.Errorf("danger should decay faster than carry: danger=%f carry=%f", danger, carry)
+	}
+}
+
+func TestMultiGradientChannel(t *testing.T) {
+	g := NewMultiPheromoneGrid(800, 800)
+	g.DepositDirectional(100, 200, 0, 0.2, PherHome)
+	g.DepositDirectional(120, 200, 0, 0.6, PherHome)
+	g.DepositDirectional(140, 200, 0, 0.9, PherHome)
+
+	gx, _ := g.GradientChannel(120, 200, PherHome)
+	if gx <= 0 {
+		t.Errorf("gradient should point right, got gx=%f", gx)
+	}
+}
+
+func TestMultiClear(t *testing.T) {
+	g := NewMultiPheromoneGrid(800, 800)
+	g.DepositDirectional(200, 200, 1.0, 0.5, PherCarry)
+	g.DepositDirectional(300, 300, 2.0, 0.8, PherDanger)
+	g.ClearMulti()
+
+	for ch := 0; ch < PherChannels; ch++ {
+		for _, v := range g.Channels[ch] {
+			if v != 0 {
+				t.Errorf("channel %d not cleared", ch)
+				break
+			}
+		}
+	}
+	for _, d := range g.DirCount {
+		if d != 0 {
+			t.Error("direction counts not cleared")
+			break
+		}
+	}
+}
+
+func TestMultiDepositClampsTo1(t *testing.T) {
+	g := NewMultiPheromoneGrid(800, 800)
+	g.DepositDirectional(100, 100, 0, 0.7, PherCarry)
+	g.DepositDirectional(100, 100, 0, 0.7, PherCarry)
+	val := g.GetChannel(100, 100, PherCarry)
+	if val > 1.0 {
+		t.Errorf("value should be clamped to 1.0, got %f", val)
+	}
+}
