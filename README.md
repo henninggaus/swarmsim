@@ -1,15 +1,25 @@
-# SwarmSim — Swarm Robotics Simulator
+# SwarmSim — Swarm Robotics & Artificial Life Simulator
 
 **[Live Demo (WebAssembly)](https://henning-heisenberg.github.io/swarmsim/)**
 
-> A 2D swarm robotics simulator with its own scripting language (SwarmScript),
+> A 2D swarm robotics simulator with 80+ scientific subsystems — from neural
+> networks and genetic algorithms to immune systems, stock markets, and
+> emergent language. Features its own scripting language (SwarmScript),
 > genetic programming, multiplayer arenas, and real-time analytics.
 > Built in Go with [Ebiten](https://ebitengine.org/).
+>
+> **~60.000 lines of Go** | **820+ tests** | **156 source files**
 
 ## Highlights
 
 - **Programmable Bots** — Write behavior rules in SwarmScript, a domain-specific language with 30+ sensors and 25+ actions
 - **Genetic Programming** — Programs evolve themselves through crossover and mutation
+- **Neural Brains** — NeuroBrain, LSTM, Hebbian Learning, Neural Pruning, Neural Architecture Search
+- **Evolution Lab** — Genetic algorithms, sexual reproduction, diploid genetics, speciation, epigenetics
+- **Biological Systems** — Morphogenesis, gene regulatory networks, immune systems, ecosystems, homeostasis
+- **Social Intelligence** — Hierarchy, quorum sensing, democracy (ranked choice), emergent language
+- **Economy** — Energy trading, stock market with strategy shares, Gini coefficient
+- **Swarm Cognition** — Episodic memory, temporal pattern recognition, spatial memory, collective dreaming
 - **Multiplayer** — Blue vs Red team competitions with shared arena
 - **Real-time Analytics** — Heatmaps, fitness graphs, delivery rates, bot rankings
 - **Logistics Simulation** — Truck unloading, package delivery, color-coded stations
@@ -259,13 +269,143 @@ Real-time dashboard with five panels:
 bot selection, follow-cam, block editor, and feature toggles.
 Starts automatically on first launch, skippable with ESC.
 
+## Advanced Subsystems (80+)
+
+SwarmSim contains a rich library of scientific subsystems, each following the `Init*/Tick*/Clear*` pattern and stored in `domain/swarm/`. All subsystems are independent, toggleable, and fully tested.
+
+### Neural & Learning Systems
+
+| Module | File | Description |
+|--------|------|-------------|
+| **NeuroBrain** | `neuro.go` | Feedforward neural network with configurable hidden layer |
+| **LSTM** | `lstm.go` | Long Short-Term Memory networks for sequential decision-making |
+| **Hebbian Learning** | `hebbian.go` | Reward-modulated Hebbian plasticity with eligibility traces |
+| **Neural Pruning** | `neural_pruning.go` | Neuronaler Darwinismus — oversize brains get pruned to efficient circuits |
+| **Neural Architecture Search** | `nas.go`, `nas_evolution.go` | NEAT-style topology evolution, bots evolve their own network structure |
+| **Reinforcement Learning** | `rl.go` | Q-Learning with epsilon-greedy exploration |
+| **Behavior Trees** | `behavior_tree.go` | Sequence/Selector/Inverter/Repeater nodes as brain type |
+| **Learning Classifier System** | `classifier.go` | IF-THEN rule populations per bot, rules compete by strength |
+
+### Evolution & Genetics
+
+| Module | File | Description |
+|--------|------|-------------|
+| **Genetic Programming** | (engine/swarmscript) | SwarmScript programs evolve via crossover and mutation |
+| **Sexual Reproduction** | `sexual_reproduction.go` | Diploid genetics with mate selection |
+| **Advanced Diploid Genetics** | `diploid.go` | Dominance, co-dominance, heterozygote advantage |
+| **Speciation** | `speciation.go` | Genetic distance-based species formation |
+| **Meta-Evolution** | `meta_evolution.go` | Mutation rate, crossover rate, selection pressure evolve themselves |
+| **Epigenetics** | `epigenetics.go` | Heritable methylation/acetylation marks from environmental experience |
+| **GP Evolution** | `gp_evolution.go` | Genetic programming operators for tree-based programs |
+| **Pareto (NSGA-II)** | `pareto.go` | Multi-objective optimization with Pareto fronts |
+| **Novelty Search** | `novelty.go` | Reward behavioral novelty instead of just fitness |
+| **Body Evolution** | `body_evolution.go` | Evolvable size, speed, sensor range, carry capacity with trade-offs |
+| **Morphological Evolution** | `morphology.go` | Evolvable body parameters per bot |
+| **Interactive Evolution** | `interactive_evo.go` | User-guided selection (Karl Sims style) |
+
+### Biological Systems
+
+| Module | File | Description |
+|--------|------|-------------|
+| **Gene Regulatory Networks** | `grn.go` | Regulation matrix, gene expression, sigmoid activation |
+| **Gene Cascades** | `gene_cascade.go` | Regulatory chains: Gene A activates B activates C |
+| **Morphogenesis** | `morphogenesis.go` | Turing patterns via activator-inhibitor reaction-diffusion on bots |
+| **Reaction-Diffusion** | `reaction_diffusion.go` | Gray-Scott model with bot chemotaxis |
+| **Immune System** | `immune.go` | Detector cells, anomaly scoring, threat memory |
+| **Adaptive Immunity** | `adaptive_immune.go` | B/T-cells, memory cells, clonal selection, 10x faster secondary response |
+| **Ecosystem** | `ecosystem.go` | Plants, herbivores, predators with metabolic cost and respawn |
+| **Predator-Prey** | `predator_prey.go` | Co-evolutionary arms race |
+| **Homeostasis** | `homeostasis.go` | 4 internal drives (energy, stress, curiosity, safety) regulate behavior |
+
+### Communication & Social
+
+| Module | File | Description |
+|--------|------|-------------|
+| **Emergent Language** | `language.go` | 8-symbol vocabulary, encode/decode tables, shared meaning metric |
+| **Language Evolution** | `language_evo.go` | Continuous signal vectors with evolved encoding/decoding networks |
+| **Quorum Sensing** | `quorum.go` | Local voting with 4 proposals, social influence, quorum detection |
+| **Democracy** | `democracy.go` | Ranked choice voting with instant-runoff, emergent parties |
+| **Hierarchy** | `hierarchy.go` | Squads, platoons, companies with leader election |
+| **Specialization** | `specialization.go` | Division of labor with experience-based role assignment |
+| **Cooperative Learning** | `cooperative.go` | Knowledge transfer between bots |
+
+### Memory & Cognition
+
+| Module | File | Description |
+|--------|------|-------------|
+| **Episodic Memory** | `episodic_memory.go` | Per-bot memories with decay, replay, spatial triggers |
+| **Spatial Memory** | `spatial_memory.go` | Shared knowledge grid with resource/traffic/delivery scores |
+| **Temporal Memory** | `temporal_memory.go` | Temporal pattern recognition — bots anticipate periodic events |
+| **Collective Dreaming** | `collective_dream.go` | Offline strategy replay and recombination during low activity |
+| **Swarm Dreams** | `dreams.go` | Experience replay with consolidation |
+| **Bot Memory** | `memory.go` | Spatial memory with exponential decay |
+
+### Navigation & Stigmergy
+
+| Module | File | Description |
+|--------|------|-------------|
+| **Pheromone Trails** | `swarm_pheromone.go` | Multi-channel pheromone grid with directional data |
+| **Stigmergy** | `stigmergy.go` | Collective building like termites |
+| **Stigmergy 2.0** | `stigmergy2.go` | Compound pheromone messages (type + direction + age) |
+| **Shape Formation** | `shape_formation.go` | 8 shapes, greedy nearest-neighbor assignment, rotation |
+| **Formations** | `formation.go` | 5 formation types with smooth morphing |
+| **Oscillators** | `oscillator.go` | Kuramoto model — firefly synchronization, order parameter |
+
+### Economy & Competition
+
+| Module | File | Description |
+|--------|------|-------------|
+| **Energy Economy** | `energy_economy.go` | Wallets, trading, 4 roles (Worker/Trader/Hoarder/Altruist), Gini coefficient |
+| **Stock Market** | `stock_market.go` | Strategy shares traded by bots, emergent bubbles and crashes |
+| **Multi-Swarm Arena** | `multi_swarm.go` | Competing teams with territory control |
+| **Tournament** | `tournament.go` | Competitive evaluation system |
+
+### Analytics & Tools
+
+| Module | File | Description |
+|--------|------|-------------|
+| **Benchmarks** | `benchmark.go` | 6 standardized scenarios (Foraging, Exploration, Clustering, ...) |
+| **Diversity Metrics** | `diversity.go` | Population diversity tracking |
+| **Statistics** | `stats.go` | Runtime statistics and aggregation |
+| **Timelapse** | `timelapse.go` | Window-based metric aggregation and trends |
+| **Replay** | `replay.go` | Seek/rewind/step-through for recorded simulations |
+| **Checkpoints** | `checkpoint.go` | Save/restore full simulation state as JSON |
+| **Genealogy** | `genealogy.go` | Family tree tracking across generations |
+| **Heatmap** | `heatmap.go` | Spatial activity density visualization |
+| **Sensitivity Analysis** | `sensitivity.go` | Automated parameter variation framework |
+| **Auto-Optimizer** | `auto_optimizer.go` | Convergence detection + config save/restore |
+| **AST Visualizer** | `ast_visualizer.go` | SwarmScript program tree layout |
+
+### Environment & Effects
+
+| Module | File | Description |
+|--------|------|-------------|
+| **Weather** | `weather.go` | Wind, rain, fog, storms with visibility and force effects |
+| **Terrain** | `terrain.go` | Heightmap + biomes with speed modifiers |
+| **Sensor Noise** | `sensor_noise.go` | Realistic sensor failures and noise pattern learning |
+| **Moving Obstacles** | `moving_obstacles.go` | Patrol and rotation obstacles |
+| **Dynamic Environment** | `dynamic_env.go` | Changing environment conditions |
+
+### Infrastructure
+
+| Module | File | Description |
+|--------|------|-------------|
+| **Plugin System** | `plugin.go` | Mod/extension system for SwarmState |
+| **Curriculum Learning** | `curriculum.go` | Automatic difficulty progression |
+| **Transfer Learning** | `transfer.go` | Genome export/import between scenarios |
+| **Scenario Chains** | `scenario_chain.go` | Branching scenario templates |
+| **Presets** | `presets.go` | 20 built-in SwarmScript programs |
+| **Shader Config** | `shader_config.go` | 6 Kage GPU shader effects |
+| **Leaderboard** | `leaderboard.go` | Persistent high-score system |
+| **Achievements** | `achievements.go` | Progress tracking and unlockables |
+
 ## Architecture
 
 ```
 swarmsim/
 ├── domain/              Core logic (no rendering dependencies)
 │   ├── bot/             Bot types and behavior interfaces
-│   ├── swarm/           SwarmBot, delivery, GP evolution, teams, stats
+│   ├── swarm/           SwarmBot + 80 subsystems (156 files, see above)
 │   ├── physics/         Collision detection, spatial hash, arena
 │   ├── comm/            Decentralized message passing (TTL, range)
 │   ├── genetics/        Genome, crossover, mutation, fitness
@@ -343,11 +483,16 @@ go build -o swarmsim .
 
 ## Tech Stack
 
-- **Go 1.21+** (no CGO)
+- **Go 1.25** (no CGO)
 - **Ebiten v2** (2D game library)
 - Cross-compile: Windows, Linux, WebAssembly
 - No external dependencies beyond Ebiten
+- **~60.000 lines of Go**, **820+ unit tests**, **186 commits**
+
+## Contributing
+
+See [ARCHITECTURE.md](ARCHITECTURE.md) for the subsystem pattern and how to add new features.
 
 ## License
 
-MIT
+MIT — see [LICENSE](LICENSE)
