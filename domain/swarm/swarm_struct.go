@@ -694,6 +694,14 @@ type SwarmState struct {
 	Ecosystem   *EcosystemState
 	EcosystemOn bool
 
+	// Diploid genetics
+	Diploid   *DiploidState
+	DiploidOn bool
+
+	// Emergent Specialization
+	Specialization   *SpecializationState
+	SpecializationOn bool
+
 	// Block editor
 	BlockEditorActive bool
 	BlockRules        []BlockRule
