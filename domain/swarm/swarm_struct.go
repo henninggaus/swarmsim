@@ -710,6 +710,10 @@ type SwarmState struct {
 	Dreams   *DreamState
 	DreamsOn bool
 
+	// Emergent Language
+	Language   *LanguageState
+	LanguageOn bool
+
 	// Block editor
 	BlockEditorActive bool
 	BlockRules        []BlockRule
