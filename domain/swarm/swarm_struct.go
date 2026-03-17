@@ -718,6 +718,10 @@ type SwarmState struct {
 	Morphogenesis   *MorphogenesisState
 	MorphogenesisOn bool
 
+	// Stigmergy 2.0 (compound pheromones)
+	Stigmergy2   *Stigmergy2State
+	Stigmergy2On bool
+
 	// Block editor
 	BlockEditorActive bool
 	BlockRules        []BlockRule
