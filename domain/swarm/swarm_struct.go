@@ -205,6 +205,9 @@ type SwarmBot struct {
 	// Novelty Search (behavior characterization)
 	Behavior BehaviorDescriptor
 
+	// Morphological evolution (evolvable body parameters)
+	Morph Morphology
+
 	// Teams (multiplayer mode)
 	Team int // 0=no team, 1=A (blue), 2=B (red)
 
@@ -611,6 +614,10 @@ type SwarmState struct {
 	RLState     *RLState
 	RLEnabled   bool
 	RLBotStates []RLBotState
+
+	// Morphological evolution
+	MorphEnabled bool
+	MorphConfig  *MorphologyConfig
 
 	// Block editor
 	BlockEditorActive bool
