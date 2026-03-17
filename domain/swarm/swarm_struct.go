@@ -508,8 +508,10 @@ type SwarmState struct {
 	ParetoFront   *ParetoFront // latest Pareto front (computed each generation)
 
 	// Sensor noise & failures
-	SensorNoiseOn  bool              // toggle sensor noise system
-	SensorNoiseCfg SensorNoiseConfig // noise parameters
+	SensorNoiseOn      bool                // toggle sensor noise system
+	SensorNoiseCfg     SensorNoiseConfig   // noise parameters
+	SensorFailures     []SensorFailureState // per-bot failure state
+	NoisePatternLearn  *NoisePatternLearner // adapts to noise over time
 
 	// Leaderboard / Highscore
 	Leaderboard     *LeaderboardState // loaded on startup
