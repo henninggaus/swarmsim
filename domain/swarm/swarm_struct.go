@@ -706,6 +706,10 @@ type SwarmState struct {
 	NASEvo   *NASEvoState
 	NASEvoOn bool
 
+	// Schwarm-Traeume (Offline Replay)
+	Dreams   *DreamState
+	DreamsOn bool
+
 	// Block editor
 	BlockEditorActive bool
 	BlockRules        []BlockRule
