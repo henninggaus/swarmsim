@@ -592,6 +592,26 @@ type SwarmState struct {
 	CongestionCols int
 	CongestionRows int
 
+	// Cooperative learning (knowledge transfer between bots)
+	CoopState *CooperativeState
+	CoopOn    bool
+
+	// Terrain system (heightmap + biomes)
+	Terrain   *TerrainGrid
+	TerrainOn bool
+
+	// Weather system
+	Weather   *WeatherState
+	WeatherOn bool
+
+	// Multi-swarm arena
+	MultiSwarm *MultiSwarmState
+
+	// Reinforcement learning
+	RLState     *RLState
+	RLEnabled   bool
+	RLBotStates []RLBotState
+
 	// Block editor
 	BlockEditorActive bool
 	BlockRules        []BlockRule
