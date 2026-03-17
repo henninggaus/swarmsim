@@ -631,6 +631,10 @@ type SwarmState struct {
 	Stigmergy   *StigmergyState
 	StigmergyOn bool
 
+	// Classic swarm algorithms (Boids, PSO, ACO, Firefly)
+	SwarmAlgo   *SwarmAlgorithmState
+	SwarmAlgoOn bool
+
 	// Block editor
 	BlockEditorActive bool
 	BlockRules        []BlockRule
