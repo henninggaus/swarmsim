@@ -27,7 +27,8 @@ import (
 // Evolution:
 //   - Alle 2000 Ticks: Fitness bewerten, Top 20% sind Eltern
 //   - Crossover: Gewichte von zwei Eltern mischen
-//   - Mutation: 15% Chance pro Gewicht, Gauss-Rauschen
+//   - Mutation: ADAPTIVE Rate (5-40%) und Staerke (0.1-0.8)
+//     → steigt bei Stagnation, sinkt bei Fortschritt
 //   - 10% jeder Generation sind komplett neue Zufalls-Netze
 //   - Fitness = Deliveries×30 + Pickups×15 + Distance×0.01
 //               - AntiStuck×10 - Idle×0.05
@@ -291,6 +292,25 @@ func RunNeuroEvolution(ss *SwarmState) {
 		fitnesses[i] = EvaluateGPFitness(&ss.Bots[i])
 	}
 
+	// 1b. Novelty Search blending (if enabled)
+	if ss.NoveltyEnabled && ss.NoveltyArchive != nil {
+		for i := range ss.Bots {
+			ss.Bots[i].Behavior = ComputeBehavior(&ss.Bots[i], ss)
+		}
+		noveltyScores := ComputeNoveltyScores(ss)
+		if noveltyScores != nil {
+			alpha := ss.NoveltyArchive.Alpha
+			for i := range fitnesses {
+				fitnesses[i] = BlendFitness(fitnesses[i], noveltyScores[i], alpha)
+			}
+			behaviors := make([]BehaviorDescriptor, n)
+			for i := range ss.Bots {
+				behaviors[i] = ss.Bots[i].Behavior
+			}
+			UpdateNoveltyArchive(ss, behaviors, noveltyScores)
+		}
+	}
+
 	// 2. Sort by fitness (descending)
 	indices := make([]int, n)
 	for i := range indices {
@@ -342,12 +362,21 @@ func RunNeuroEvolution(ss *SwarmState) {
 		}
 	}
 
-	// 7. Generate new population
+	// 7. Adaptive mutation: increase exploration when stagnating
+	mutRate, mutStrength := neuroAdaptiveMutation(ss)
+
+	// 8. Generate new population
 	freshCount := n * 10 / 100 // 10% fresh random
 	if freshCount < 1 {
 		freshCount = 1
 	}
 	crossoverCount := n - eliteCount - freshCount
+
+	// Genealogy: save old BotIDs for parent tracking
+	oldBotIDs := make([]int, n)
+	for i := range ss.Bots {
+		oldBotIDs[i] = ss.Bots[i].BotID
+	}
 
 	assigned := 0
 	// Elite: copy unchanged
@@ -357,6 +386,12 @@ func RunNeuroEvolution(ss *SwarmState) {
 			ss.Bots[idx].Brain = &NeuroBrain{}
 		}
 		ss.Bots[idx].Brain.Weights = eliteWeights[i].weights
+		// Genealogy
+		if ss.Genealogy != nil {
+			ss.Bots[idx].ParentA = oldBotIDs[indices[i]]
+			ss.Bots[idx].ParentB = -1
+			ss.Bots[idx].BotID = AssignBotID(ss.Genealogy)
+		}
 		assigned++
 	}
 
@@ -375,10 +410,16 @@ func RunNeuroEvolution(ss *SwarmState) {
 			} else {
 				ss.Bots[idx].Brain.Weights[w] = parentWeights[p2].weights[w]
 			}
-			// Mutation: 15% chance, Gaussian noise
-			if ss.Rng.Float64() < 0.15 {
-				ss.Bots[idx].Brain.Weights[w] += ss.Rng.NormFloat64() * 0.3
+			// Adaptive mutation
+			if ss.Rng.Float64() < mutRate {
+				ss.Bots[idx].Brain.Weights[w] += ss.Rng.NormFloat64() * mutStrength
 			}
+		}
+		// Genealogy
+		if ss.Genealogy != nil {
+			ss.Bots[idx].ParentA = oldBotIDs[indices[p1]]
+			ss.Bots[idx].ParentB = oldBotIDs[indices[p2]]
+			ss.Bots[idx].BotID = AssignBotID(ss.Genealogy)
 		}
 		assigned++
 	}
@@ -392,10 +433,21 @@ func RunNeuroEvolution(ss *SwarmState) {
 		for w := 0; w < NeuroWeights; w++ {
 			ss.Bots[idx].Brain.Weights[w] = (ss.Rng.Float64() - 0.5) * 2.0 / math.Sqrt(float64(NeuroInputs))
 		}
+		// Genealogy
+		if ss.Genealogy != nil {
+			ss.Bots[idx].ParentA = -1
+			ss.Bots[idx].ParentB = -1
+			ss.Bots[idx].BotID = AssignBotID(ss.Genealogy)
+		}
 		assigned++
 	}
 
-	// 8. Reset lifetime stats for next generation
+	// Record genealogy
+	if ss.Genealogy != nil {
+		RecordGeneration(ss.Genealogy, ss.Bots, ss.NeuroGeneration)
+	}
+
+	// 9. Reset lifetime stats for next generation
 	for i := range ss.Bots {
 		ss.Bots[i].Fitness = 0
 		ss.Bots[i].Stats = BotLifetimeStats{}
@@ -405,7 +457,50 @@ func RunNeuroEvolution(ss *SwarmState) {
 	ss.NeuroTimer = 0
 
 	// Log generation milestone
-	logger.Info("NEURO", "Gen %d — Best: %.0f, Avg: %.0f (%d Elite + %d Crossover + %d Neue)",
+	logger.Info("NEURO", "Gen %d — Best: %.0f, Avg: %.0f (Mut: %.0f%%/%.2f, %d Elite + %d Crossover + %d Neue)",
 		ss.NeuroGeneration, ss.BestFitness, ss.AvgFitness,
-		eliteCount, crossoverCount, freshCount)
+		mutRate*100, mutStrength, eliteCount, crossoverCount, freshCount)
+}
+
+// neuroAdaptiveMutation computes mutation rate and strength based on stagnation.
+// When fitness improves → low mutation (exploit). When stagnating → high mutation (explore).
+func neuroAdaptiveMutation(ss *SwarmState) (rate, strength float64) {
+	const (
+		minRate     = 0.05 // 5% minimum mutation rate
+		maxRate     = 0.40 // 40% maximum when stagnating
+		minStrength = 0.10 // gentle mutations when improving
+		maxStrength = 0.80 // aggressive mutations when stuck
+	)
+
+	stagnant := neuroStagnantGenerations(ss)
+
+	// Linear ramp from min to max over 5 stagnant generations
+	t := float64(stagnant) / 5.0
+	if t > 1.0 {
+		t = 1.0
+	}
+	rate = minRate + t*(maxRate-minRate)
+	strength = minStrength + t*(maxStrength-minStrength)
+	return rate, strength
+}
+
+// neuroStagnantGenerations counts how many recent generations had no best-fitness improvement.
+func neuroStagnantGenerations(ss *SwarmState) int {
+	h := ss.FitnessHistory
+	n := len(h)
+	if n < 2 {
+		return 0
+	}
+
+	stagnant := 0
+	bestSeen := h[n-1].Best
+	for i := n - 2; i >= 0 && i >= n-10; i-- {
+		if h[i].Best >= bestSeen {
+			stagnant++
+			bestSeen = h[i].Best
+		} else {
+			break
+		}
+	}
+	return stagnant
 }

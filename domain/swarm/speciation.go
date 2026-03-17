@@ -155,6 +155,10 @@ func UpdateSpeciation(ss *SwarmState) {
 		sp.PrevBestFit = sp.BestFitness
 	}
 
+	// Fitness sharing (NEAT-style): divide fitness by species size
+	// This protects small innovative species from being overwhelmed
+	ApplyFitnessSharing(ss)
+
 	// Auto-adjust threshold to target species count
 	if len(spec.Species) < spec.TargetSpecies-1 {
 		spec.Threshold *= 0.95 // lower threshold → more species
@@ -213,6 +217,26 @@ func genomeDistance(a, b [26]float64, used [26]bool) float64 {
 		return 0
 	}
 	return math.Sqrt(dist/float64(count)) / 100.0
+}
+
+// ApplyFitnessSharing adjusts bot fitness by dividing by species size (NEAT-style).
+// This prevents large species from dominating evolution and gives small, novel
+// species a fair chance to survive. Without this, a single dominant species
+// can crowd out innovative solutions before they have time to develop.
+func ApplyFitnessSharing(ss *SwarmState) {
+	spec := ss.Speciation
+	if spec == nil {
+		return
+	}
+	for _, sp := range spec.Species {
+		size := float64(len(sp.Members))
+		if size <= 1 {
+			continue
+		}
+		for _, bi := range sp.Members {
+			ss.Bots[bi].Fitness /= size
+		}
+	}
 }
 
 // SpeciesCount returns the number of active species.

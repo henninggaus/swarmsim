@@ -320,3 +320,94 @@ func TestUpdateSpeciationNilSpeciation(t *testing.T) {
 	// Should not panic when speciation is nil
 	UpdateSpeciation(ss)
 }
+
+// === Fitness Sharing tests ===
+
+func TestApplyFitnessSharingReducesFitness(t *testing.T) {
+	rng := rand.New(rand.NewSource(42))
+	ss := NewSwarmState(rng, 10)
+	InitSpeciation(ss)
+
+	// All bots identical → 1 big species
+	ss.UsedParams[0] = true
+	for i := range ss.Bots {
+		ss.Bots[i].ParamValues[0] = 50
+		ss.Bots[i].Fitness = 100
+	}
+
+	// Assign to species first
+	UpdateSpeciation(ss)
+
+	// After fitness sharing, fitness should be 100/10 = 10
+	for i, bot := range ss.Bots {
+		if bot.Fitness > 15 {
+			t.Errorf("bot %d: fitness should be shared (reduced), got %.1f", i, bot.Fitness)
+		}
+	}
+}
+
+func TestApplyFitnessSharingProtectsSmallSpecies(t *testing.T) {
+	rng := rand.New(rand.NewSource(42))
+	ss := NewSwarmState(rng, 10)
+	InitSpeciation(ss)
+
+	// Create 2 groups: 8 bots in cluster A, 2 bots far away in cluster B
+	ss.UsedParams[0] = true
+	for i := 0; i < 8; i++ {
+		ss.Bots[i].ParamValues[0] = 50
+		ss.Bots[i].Fitness = 100
+	}
+	for i := 8; i < 10; i++ {
+		ss.Bots[i].ParamValues[0] = 5000 // far away
+		ss.Bots[i].Fitness = 100
+	}
+
+	UpdateSpeciation(ss)
+
+	// Large species (8 members): fitness ≈ 100/8 = 12.5
+	// Small species (2 members): fitness ≈ 100/2 = 50
+	// Small species should have HIGHER shared fitness → protected!
+	var largeFitness, smallFitness float64
+	for i := 0; i < 8; i++ {
+		largeFitness += ss.Bots[i].Fitness
+	}
+	largeFitness /= 8
+	for i := 8; i < 10; i++ {
+		smallFitness += ss.Bots[i].Fitness
+	}
+	smallFitness /= 2
+
+	if smallFitness <= largeFitness {
+		t.Errorf("small species should have higher shared fitness: small=%.1f, large=%.1f",
+			smallFitness, largeFitness)
+	}
+}
+
+func TestApplyFitnessSharingNilSpeciation(t *testing.T) {
+	rng := rand.New(rand.NewSource(42))
+	ss := NewSwarmState(rng, 10)
+	// Should not panic
+	ApplyFitnessSharing(ss)
+}
+
+func TestApplyFitnessSharingSingleMemberSpecies(t *testing.T) {
+	rng := rand.New(rand.NewSource(42))
+	ss := NewSwarmState(rng, 3)
+	InitSpeciation(ss)
+
+	// Each bot very far apart → each in own species
+	ss.UsedParams[0] = true
+	for i := range ss.Bots {
+		ss.Bots[i].ParamValues[0] = float64(i) * 10000
+		ss.Bots[i].Fitness = 100
+	}
+
+	UpdateSpeciation(ss)
+
+	// Single-member species: fitness should NOT be divided (stays 100)
+	for i, bot := range ss.Bots {
+		if bot.Fitness < 90 {
+			t.Errorf("bot %d in solo species: fitness should stay ~100, got %.1f", i, bot.Fitness)
+		}
+	}
+}

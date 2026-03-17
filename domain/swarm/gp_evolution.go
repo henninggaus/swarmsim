@@ -39,6 +39,25 @@ func RunGPEvolution(ss *SwarmState) {
 		}
 	}
 
+	// 1b. Novelty Search blending (if enabled)
+	if ss.NoveltyEnabled && ss.NoveltyArchive != nil {
+		for i := range ss.Bots {
+			ss.Bots[i].Behavior = ComputeBehavior(&ss.Bots[i], ss)
+		}
+		noveltyScores := ComputeNoveltyScores(ss)
+		if noveltyScores != nil {
+			alpha := ss.NoveltyArchive.Alpha
+			for i := range fitnesses {
+				fitnesses[i] = BlendFitness(fitnesses[i], noveltyScores[i], alpha)
+			}
+			behaviors := make([]BehaviorDescriptor, n)
+			for i := range ss.Bots {
+				behaviors[i] = ss.Bots[i].Behavior
+			}
+			UpdateNoveltyArchive(ss, behaviors, noveltyScores)
+		}
+	}
+
 	// 2. Sort indices by fitness (descending)
 	indices := make([]int, n)
 	for i := range indices {
@@ -89,21 +108,42 @@ func RunGPEvolution(ss *SwarmState) {
 		freshCount = 1
 	}
 
+	// Genealogy: save old BotIDs for parent tracking
+	oldBotIDs := make([]int, n)
+	for i := range ss.Bots {
+		oldBotIDs[i] = ss.Bots[i].BotID
+	}
+
 	for rank, botIdx := range indices {
 		if rank < eliteCount {
 			// Elite: keep as-is (already copied above)
 			ss.Bots[botIdx].OwnProgram = elitePrograms[rank]
+			if ss.Genealogy != nil {
+				ss.Bots[botIdx].ParentA = oldBotIDs[indices[rank]]
+				ss.Bots[botIdx].ParentB = -1
+				ss.Bots[botIdx].BotID = AssignBotID(ss.Genealogy)
+			}
 		} else if rank >= n-freshCount {
 			// Fresh random programs
 			numRules := 8 + ss.Rng.Intn(8) // 8-15 rules
 			ss.Bots[botIdx].OwnProgram = swarmscript.GenerateRandomProgram(ss.Rng, numRules)
+			if ss.Genealogy != nil {
+				ss.Bots[botIdx].ParentA = -1
+				ss.Bots[botIdx].ParentB = -1
+				ss.Bots[botIdx].BotID = AssignBotID(ss.Genealogy)
+			}
 		} else {
 			// Crossover + mutation
-			p1 := parentPrograms[ss.Rng.Intn(parentCount)]
-			p2 := parentPrograms[ss.Rng.Intn(parentCount)]
-			child := swarmscript.CrossoverPrograms(ss.Rng, p1, p2)
+			p1Idx := ss.Rng.Intn(parentCount)
+			p2Idx := ss.Rng.Intn(parentCount)
+			child := swarmscript.CrossoverPrograms(ss.Rng, parentPrograms[p1Idx], parentPrograms[p2Idx])
 			swarmscript.MutateProgram(ss.Rng, child)
 			ss.Bots[botIdx].OwnProgram = child
+			if ss.Genealogy != nil {
+				ss.Bots[botIdx].ParentA = oldBotIDs[indices[p1Idx]]
+				ss.Bots[botIdx].ParentB = oldBotIDs[indices[p2Idx]]
+				ss.Bots[botIdx].BotID = AssignBotID(ss.Genealogy)
+			}
 		}
 
 		// Reset fitness-relevant stats for next generation
@@ -113,7 +153,13 @@ func RunGPEvolution(ss *SwarmState) {
 		ss.Bots[botIdx].Stats.AntiStuckCount = 0
 		ss.Bots[botIdx].Stats.TicksIdle = 0
 		ss.Bots[botIdx].Stats.TicksAlive = 0
+		ss.Bots[botIdx].Stats.SumNeighborCount = 0
 		ss.Bots[botIdx].Fitness = 0
+	}
+
+	// Record genealogy
+	if ss.Genealogy != nil {
+		RecordGeneration(ss.Genealogy, ss.Bots, ss.GPGeneration)
 	}
 
 	ss.GPGeneration++

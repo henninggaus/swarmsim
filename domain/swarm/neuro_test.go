@@ -362,6 +362,111 @@ func TestNeuroForwardSpecificPathway(t *testing.T) {
 	}
 }
 
+// === Adaptive Mutation tests ===
+
+func TestNeuroAdaptiveMutationNoHistory(t *testing.T) {
+	rng := rand.New(rand.NewSource(42))
+	ss := NewSwarmState(rng, 10)
+	rate, strength := neuroAdaptiveMutation(ss)
+
+	// No history → no stagnation → minimum values
+	if rate < 0.04 || rate > 0.06 {
+		t.Errorf("expected rate ~0.05 with no history, got %.4f", rate)
+	}
+	if strength < 0.09 || strength > 0.11 {
+		t.Errorf("expected strength ~0.10 with no history, got %.4f", strength)
+	}
+}
+
+func TestNeuroAdaptiveMutationIncreasesDuringStagnation(t *testing.T) {
+	rng := rand.New(rand.NewSource(42))
+	ss := NewSwarmState(rng, 10)
+
+	// Simulate stagnation: 6 generations with same best fitness
+	for i := 0; i < 6; i++ {
+		ss.FitnessHistory = append(ss.FitnessHistory, FitnessRecord{Best: 100, Avg: 50})
+	}
+
+	rate, strength := neuroAdaptiveMutation(ss)
+
+	// After 5+ stagnant gens → should be at max
+	if rate < 0.35 {
+		t.Errorf("expected high mutation rate during stagnation, got %.4f", rate)
+	}
+	if strength < 0.70 {
+		t.Errorf("expected high mutation strength during stagnation, got %.4f", strength)
+	}
+}
+
+func TestNeuroAdaptiveMutationLowWhenImproving(t *testing.T) {
+	rng := rand.New(rand.NewSource(42))
+	ss := NewSwarmState(rng, 10)
+
+	// Simulate consistent improvement
+	for i := 0; i < 5; i++ {
+		ss.FitnessHistory = append(ss.FitnessHistory, FitnessRecord{Best: float64(i * 100), Avg: float64(i * 50)})
+	}
+
+	rate, strength := neuroAdaptiveMutation(ss)
+
+	// Improving → should stay at minimum
+	if rate > 0.10 {
+		t.Errorf("expected low mutation rate when improving, got %.4f", rate)
+	}
+	if strength > 0.20 {
+		t.Errorf("expected low mutation strength when improving, got %.4f", strength)
+	}
+}
+
+func TestNeuroStagnantGenerations(t *testing.T) {
+	ss := &SwarmState{}
+
+	// No history
+	if neuroStagnantGenerations(ss) != 0 {
+		t.Error("no history → 0 stagnant")
+	}
+
+	// Improving sequence
+	ss.FitnessHistory = []FitnessRecord{
+		{Best: 10}, {Best: 20}, {Best: 30}, {Best: 40},
+	}
+	if neuroStagnantGenerations(ss) != 0 {
+		t.Errorf("improving → 0 stagnant, got %d", neuroStagnantGenerations(ss))
+	}
+
+	// Stagnating sequence
+	ss.FitnessHistory = []FitnessRecord{
+		{Best: 100}, {Best: 100}, {Best: 100}, {Best: 100},
+	}
+	stag := neuroStagnantGenerations(ss)
+	if stag < 2 {
+		t.Errorf("flat fitness → should be stagnant, got %d", stag)
+	}
+}
+
+func TestNeuroEvolutionAdaptiveMutationIntegration(t *testing.T) {
+	rng := rand.New(rand.NewSource(42))
+	ss := NewSwarmState(rng, 20)
+	InitNeuro(ss)
+
+	// Run 10 generations with identical fitness → stagnation
+	for gen := 0; gen < 10; gen++ {
+		for i := range ss.Bots {
+			ss.Bots[i].Stats.TotalDeliveries = 5 // same for all
+			ss.Bots[i].Stats.TotalDistance = 100
+		}
+		RunNeuroEvolution(ss)
+	}
+
+	// The adaptive mutation should have kicked in:
+	// check that weights have more diversity than with fixed 0.3 noise
+	// (we can't test exact values, but we can verify it doesn't crash
+	// and that generations progress)
+	if ss.NeuroGeneration != 10 {
+		t.Errorf("expected 10 generations, got %d", ss.NeuroGeneration)
+	}
+}
+
 func TestClearNeuro(t *testing.T) {
 	rng := rand.New(rand.NewSource(42))
 	ss := NewSwarmState(rng, 10)

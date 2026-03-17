@@ -215,6 +215,74 @@ func MeasureGPDiversity(ss *SwarmState) DiversityMetrics {
 	}
 }
 
+// MeasureLSTMDiversity measures diversity for LSTM mode (brain weights).
+func MeasureLSTMDiversity(ss *SwarmState) DiversityMetrics {
+	n := len(ss.Bots)
+	if n < 2 {
+		return DiversityMetrics{AvgDistance: 1.0, MinDistance: 1.0, UniqueCount: n}
+	}
+
+	sampleSize := n
+	if sampleSize > 30 {
+		sampleSize = 30
+	}
+
+	totalDist := 0.0
+	minDist := math.MaxFloat64
+	pairs := 0
+	threshold := 0.02
+
+	uniqueCount := 0
+	for i := 0; i < sampleSize; i++ {
+		if ss.Bots[i].LSTMBrain == nil {
+			continue
+		}
+		isUnique := true
+		for j := i + 1; j < sampleSize; j++ {
+			if ss.Bots[j].LSTMBrain == nil {
+				continue
+			}
+			d := lstmDistance(ss.Bots[i].LSTMBrain, ss.Bots[j].LSTMBrain)
+			totalDist += d
+			pairs++
+			if d < minDist {
+				minDist = d
+			}
+			if d < threshold {
+				isUnique = false
+			}
+		}
+		if isUnique {
+			uniqueCount++
+		}
+	}
+
+	avgDist := 0.0
+	if pairs > 0 {
+		avgDist = totalDist / float64(pairs)
+	}
+	if minDist == math.MaxFloat64 {
+		minDist = 0
+	}
+
+	return DiversityMetrics{
+		AvgDistance:  avgDist,
+		MinDistance:  minDist,
+		UniqueCount: uniqueCount,
+		Stagnant:    avgDist < 0.03,
+	}
+}
+
+// lstmDistance computes normalized Euclidean distance between two LSTM brains' weights.
+func lstmDistance(a, b *LSTMBrain) float64 {
+	dist := 0.0
+	for k := 0; k < LSTMWeights; k++ {
+		d := a.Weights[k] - b.Weights[k]
+		dist += d * d
+	}
+	return math.Sqrt(dist / float64(LSTMWeights))
+}
+
 // gpDistance computes a simple structural distance between two GP programs.
 func gpDistance(ss *SwarmState, i, j int) float64 {
 	pa := ss.Bots[i].OwnProgram

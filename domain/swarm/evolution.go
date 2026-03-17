@@ -68,6 +68,36 @@ func RunEvolution(ss *SwarmState) {
 		Avg:  ss.AvgFitness,
 	})
 
+	// 3b. Novelty Search blending (if enabled)
+	if ss.NoveltyEnabled && ss.NoveltyArchive != nil {
+		for i := range ss.Bots {
+			ss.Bots[i].Behavior = ComputeBehavior(&ss.Bots[i], ss)
+		}
+		noveltyScores := ComputeNoveltyScores(ss)
+		if noveltyScores != nil {
+			alpha := ss.NoveltyArchive.Alpha
+			for i := range ss.Bots {
+				ss.Bots[i].Fitness = BlendFitness(ss.Bots[i].Fitness, noveltyScores[i], alpha)
+			}
+			behaviors := make([]BehaviorDescriptor, n)
+			for i := range ss.Bots {
+				behaviors[i] = ss.Bots[i].Behavior
+			}
+			UpdateNoveltyArchive(ss, behaviors, noveltyScores)
+		}
+		// Re-sort after blending
+		sort.Slice(indices, func(a, b int) bool {
+			return ss.Bots[indices[a]].Fitness > ss.Bots[indices[b]].Fitness
+		})
+		parents = indices[:parentCount]
+	}
+
+	// Genealogy: save old BotIDs
+	oldBotIDs := make([]int, n)
+	for i := range ss.Bots {
+		oldBotIDs[i] = ss.Bots[i].BotID
+	}
+
 	// 4. Bottom 70% get crossover + mutation from parents
 	for _, childIdx := range indices[parentCount:] {
 		p1 := parents[ss.Rng.Intn(parentCount)]
@@ -91,6 +121,22 @@ func RunEvolution(ss *SwarmState) {
 				ss.Bots[childIdx].ParamValues[p] += ss.Rng.NormFloat64() * sigma
 			}
 		}
+		// Genealogy
+		if ss.Genealogy != nil {
+			ss.Bots[childIdx].ParentA = oldBotIDs[p1]
+			ss.Bots[childIdx].ParentB = oldBotIDs[p2]
+			ss.Bots[childIdx].BotID = AssignBotID(ss.Genealogy)
+		}
+	}
+
+	// Parents keep their ID (elite) but get new BotIDs
+	if ss.Genealogy != nil {
+		for _, parentIdx := range parents {
+			ss.Bots[parentIdx].ParentA = oldBotIDs[parentIdx]
+			ss.Bots[parentIdx].ParentB = -1
+			ss.Bots[parentIdx].BotID = AssignBotID(ss.Genealogy)
+		}
+		RecordGeneration(ss.Genealogy, ss.Bots, ss.Generation)
 	}
 
 	// 5. Reset all fitness for next generation
