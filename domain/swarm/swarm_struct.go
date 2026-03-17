@@ -766,6 +766,10 @@ type SwarmState struct {
 	NeuralPruning   *NeuralPruningState
 	NeuralPruningOn bool
 
+	// Stock Market (strategy trading)
+	StockMarket   *StockMarketState
+	StockMarketOn bool
+
 	// Block editor
 	BlockEditorActive bool
 	BlockRules        []BlockRule
