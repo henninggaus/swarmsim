@@ -142,7 +142,7 @@ Write-OK "Prompt-Laenge: $($finalPrompt.Length) Zeichen"
 
 # --- Prompt als Datei speichern (vermeidet Shell-Escaping-Probleme) ---
 $promptFile = Join-Path (Split-Path -Parent $MyInvocation.MyCommand.Path) "_prompt.tmp.md"
-$finalPrompt | Out-File -FilePath $promptFile -Encoding utf8NoBOM
+[System.IO.File]::WriteAllText($promptFile, $finalPrompt)
 Write-OK "Prompt geschrieben: $promptFile"
 
 # --- Alten Container entfernen falls vorhanden ---
