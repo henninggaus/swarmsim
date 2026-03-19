@@ -249,6 +249,26 @@ func (s *Simulation) updateSwarmMode() {
 		swarm.TickImmuneSwarm(ss)
 	}
 
+	// Phase 1.30: Gravitational N-Body
+	if ss.GravityOn {
+		swarm.TickGravity(ss)
+	}
+
+	// Phase 1.31: Crystallization
+	if ss.CrystalOn {
+		swarm.TickCrystal(ss)
+	}
+
+	// Phase 1.32: Amoeba Locomotion
+	if ss.AmoebaOn {
+		swarm.TickAmoeba(ss)
+	}
+
+	// Phase 1.33: Ant Colony Optimization
+	if ss.ACOOn {
+		swarm.TickACO(ss)
+	}
+
 	// Phase 2: Execute program on each bot (skip if anti-stuck breakout active)
 	for i := range ss.Bots {
 		bot := &ss.Bots[i]
@@ -1761,6 +1781,32 @@ func evaluateSwarmCondition(cond swarmscript.Condition, bot *swarm.SwarmBot, sna
 		return compareInt(bot.ImmuneAlert, cond.Op, cv)
 	case swarmscript.CondImmunePathDist:
 		return compareInt(bot.ImmunePathDist, cond.Op, cv)
+	// Gravitational N-Body conditions
+	case swarmscript.CondGravMass:
+		return compareInt(bot.GravMass, cond.Op, cv)
+	case swarmscript.CondGravForce:
+		return compareInt(bot.GravForce, cond.Op, cv)
+	case swarmscript.CondGravNearHeavy:
+		return compareInt(bot.GravNearHeavy, cond.Op, cv)
+	// Crystallization conditions
+	case swarmscript.CondCrystalNeigh:
+		return compareInt(bot.CrystalNeigh, cond.Op, cv)
+	case swarmscript.CondCrystalDefect:
+		return compareInt(bot.CrystalDefect, cond.Op, cv)
+	case swarmscript.CondCrystalSettled:
+		return compareInt(bot.CrystalSettled, cond.Op, cv)
+	// Amoeba conditions
+	case swarmscript.CondAmoebaDistCenter:
+		return compareInt(bot.AmoebaDistCenter, cond.Op, cv)
+	case swarmscript.CondAmoebaSkin:
+		return compareInt(bot.AmoebaSkin, cond.Op, cv)
+	case swarmscript.CondAmoebaPseudo:
+		return compareInt(bot.AmoebaPseudo, cond.Op, cv)
+	// ACO conditions
+	case swarmscript.CondACOTrail:
+		return compareInt(bot.ACOTrail, cond.Op, cv)
+	case swarmscript.CondACOGrad:
+		return compareInt(bot.ACOGrad, cond.Op, cv)
 	}
 
 	return false
@@ -2554,6 +2600,18 @@ func executeSwarmAction(act swarmscript.Action, bot *swarm.SwarmBot, ss *swarm.S
 
 	case swarmscript.ActImmune:
 		swarm.ApplyImmuneSwarm(bot, ss, botIdx)
+
+	case swarmscript.ActGravity:
+		swarm.ApplyGravity(bot, ss, botIdx)
+
+	case swarmscript.ActCrystal:
+		swarm.ApplyCrystal(bot, ss, botIdx)
+
+	case swarmscript.ActAmoeba:
+		swarm.ApplyAmoeba(bot, ss, botIdx)
+
+	case swarmscript.ActACO:
+		swarm.ApplyACO(bot, ss, botIdx)
 
 	case swarmscript.ActDash:
 		// Double-speed burst for 10 ticks (costs 15 energy, 60 tick cooldown)

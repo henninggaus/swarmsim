@@ -238,6 +238,25 @@ type SwarmBot struct {
 	ImmuneAlert    int // antibody alert level (0-100)
 	ImmunePathDist int // distance to nearest pathogen
 
+	// Gravitational N-Body sensor cache
+	GravMass      int // bot mass * 100
+	GravForce     int // gravitational force magnitude (0-100)
+	GravNearHeavy int // distance to nearest heavy body
+
+	// Crystallization sensor cache
+	CrystalNeigh   int // neighbor count in lattice
+	CrystalDefect  int // 1 if defect site (wrong neighbor count)
+	CrystalSettled int // 1 if settled in lattice position
+
+	// Amoeba Locomotion sensor cache
+	AmoebaDistCenter int // distance to blob center
+	AmoebaSkin       int // 1 if on membrane
+	AmoebaPseudo     int // 1 if in pseudopod zone
+
+	// Ant Colony Optimization sensor cache
+	ACOTrail int // pheromone trail intensity at position (0-100)
+	ACOGrad  int // angle to strongest trail gradient (-180..180)
+
 	// Brake mechanics
 	BrakeTimer int // >0 = braking (speed ramps down over 3 ticks)
 
@@ -991,6 +1010,26 @@ type SwarmState struct {
 	Jellyfish   *JellyfishState
 	JellyfishOn bool
 	ShowJellyfish bool
+
+	// Gravitational N-Body
+	Gravity   *GravityState
+	GravityOn bool
+	ShowGravity bool
+
+	// Crystallization
+	Crystal   *CrystalState
+	CrystalOn bool
+	ShowCrystal bool
+
+	// Amoeba Locomotion
+	Amoeba   *AmoebaState
+	AmoebaOn bool
+	ShowAmoeba bool
+
+	// Ant Colony Optimization
+	ACO   *ACOState
+	ACOOn bool
+	ShowACO bool
 
 	// Block editor
 	BlockEditorActive bool

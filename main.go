@@ -1104,6 +1104,42 @@ func (g *Game) handleSwarmInput() {
 		logger.Info("SWARM", "Immune-Overlay: %v", ss.ShowImmune)
 	}
 
+	// Shift+N key: Gravitational N-Body overlay
+	if inpututil.IsKeyJustPressed(ebiten.KeyN) && ebiten.IsKeyPressed(ebiten.KeyShift) && !ed.Focused && !ss.BotCountEdit {
+		if !ss.GravityOn {
+			swarm.InitGravity(ss)
+		}
+		ss.ShowGravity = !ss.ShowGravity
+		logger.Info("SWARM", "Gravity-Overlay: %v", ss.ShowGravity)
+	}
+
+	// Shift+K key: Crystallization overlay
+	if inpututil.IsKeyJustPressed(ebiten.KeyK) && ebiten.IsKeyPressed(ebiten.KeyShift) && !ed.Focused && !ss.BotCountEdit {
+		if !ss.CrystalOn {
+			swarm.InitCrystal(ss)
+		}
+		ss.ShowCrystal = !ss.ShowCrystal
+		logger.Info("SWARM", "Crystal-Overlay: %v", ss.ShowCrystal)
+	}
+
+	// Shift+L key: Amoeba Locomotion overlay
+	if inpututil.IsKeyJustPressed(ebiten.KeyL) && ebiten.IsKeyPressed(ebiten.KeyShift) && !ed.Focused && !ss.BotCountEdit {
+		if !ss.AmoebaOn {
+			swarm.InitAmoeba(ss)
+		}
+		ss.ShowAmoeba = !ss.ShowAmoeba
+		logger.Info("SWARM", "Amoeba-Overlay: %v", ss.ShowAmoeba)
+	}
+
+	// Shift+Q key: ACO overlay
+	if inpututil.IsKeyJustPressed(ebiten.KeyQ) && ebiten.IsKeyPressed(ebiten.KeyShift) && !ed.Focused && !ss.BotCountEdit {
+		if !ss.ACOOn {
+			swarm.InitACO(ss)
+		}
+		ss.ShowACO = !ss.ShowACO
+		logger.Info("SWARM", "ACO-Overlay: %v", ss.ShowACO)
+	}
+
 	// C key: Shift+C = swarm center overlay, plain C = challenge/routes
 	if inpututil.IsKeyJustPressed(ebiten.KeyC) && !ed.Focused && !ss.BotCountEdit {
 		if ebiten.IsKeyPressed(ebiten.KeyShift) {
@@ -1126,7 +1162,7 @@ func (g *Game) handleSwarmInput() {
 	}
 
 	// N key: new round (teams) or new truck round
-	if inpututil.IsKeyJustPressed(ebiten.KeyN) && !ed.Focused && !ss.BotCountEdit {
+	if inpututil.IsKeyJustPressed(ebiten.KeyN) && !ed.Focused && !ss.BotCountEdit && !ebiten.IsKeyPressed(ebiten.KeyShift) {
 		if ss.TeamsEnabled {
 			swarm.ResetTeamScores(ss)
 			if ss.DeliveryOn {
@@ -1268,7 +1304,7 @@ func (g *Game) handleSwarmInput() {
 	}
 
 	// K key: toggle communication graph overlay
-	if inpututil.IsKeyJustPressed(ebiten.KeyK) && !ed.Focused && !ss.BotCountEdit {
+	if inpututil.IsKeyJustPressed(ebiten.KeyK) && !ed.Focused && !ss.BotCountEdit && !ebiten.IsKeyPressed(ebiten.KeyShift) {
 		ss.ShowCommGraph = !ss.ShowCommGraph
 		swarm.RecordOverlayUsed(ss, "commgraph")
 		logger.Info("SWARM", "Comm graph: %v", ss.ShowCommGraph)

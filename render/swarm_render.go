@@ -351,6 +351,26 @@ func (r *Renderer) DrawSwarmMode(screen *ebiten.Image, s *simulation.Simulation,
 		drawImmuneOverlay(a, ss)
 	}
 
+	// Draw gravity overlay (Shift+Y toggle — was genome, now also gravity w/ Ctrl)
+	if ss.ShowGravity && ss.GravityOn && ss.Gravity != nil {
+		drawGravityOverlay(a, ss)
+	}
+
+	// Draw crystal overlay (Shift+K toggle)
+	if ss.ShowCrystal && ss.CrystalOn && ss.Crystal != nil {
+		drawCrystalOverlay(a, ss)
+	}
+
+	// Draw amoeba overlay (Shift+A toggle)
+	if ss.ShowAmoeba && ss.AmoebaOn && ss.Amoeba != nil {
+		drawAmoebaOverlay(a, ss)
+	}
+
+	// Draw ACO overlay (Shift+Q toggle)
+	if ss.ShowACO && ss.ACOOn && ss.ACO != nil {
+		drawACOOverlay(a, ss)
+	}
+
 	// Draw message wave rings
 	if ss.ShowMsgWaves {
 		for _, w := range ss.MsgWaves {
@@ -2487,6 +2507,106 @@ func drawImmuneOverlay(a *ebiten.Image, ss *swarm.SwarmState) {
 			vector.StrokeLine(a, float32(bot.X), float32(bot.Y),
 				float32(st.SignalX[i]), float32(st.SignalY[i]),
 				1, color.RGBA{255, 80, 80, uint8(st.AlertLevel[i] * 80)}, false)
+		}
+	}
+}
+
+// drawGravityOverlay draws gravitational force vectors and heavy body markers.
+func drawGravityOverlay(a *ebiten.Image, ss *swarm.SwarmState) {
+	st := ss.Gravity
+	for i := range ss.Bots {
+		if i >= len(st.Mass) {
+			break
+		}
+		bot := &ss.Bots[i]
+		// Heavy bodies: yellow ring
+		if st.Mass[i] >= 3.0*0.8 {
+			vector.StrokeCircle(a, float32(bot.X), float32(bot.Y), 10,
+				2, color.RGBA{255, 255, 100, 150}, false)
+		}
+		// Force vector line
+		fx, fy := st.ForceX[i], st.ForceY[i]
+		mag := math.Sqrt(fx*fx + fy*fy)
+		if mag > 0.02 {
+			scale := float32(math.Min(30, mag*100))
+			ex := float32(bot.X) + scale*float32(fx/mag)
+			ey := float32(bot.Y) + scale*float32(fy/mag)
+			vector.StrokeLine(a, float32(bot.X), float32(bot.Y), ex, ey,
+				1, color.RGBA{200, 200, 100, 60}, false)
+		}
+	}
+}
+
+// drawCrystalOverlay draws lattice bonds between neighboring bots.
+func drawCrystalOverlay(a *ebiten.Image, ss *swarm.SwarmState) {
+	st := ss.Crystal
+	// Draw bonds between settled neighbors
+	for i := range ss.Bots {
+		if i >= len(st.Settled) || !st.Settled[i] {
+			continue
+		}
+		if ss.Hash == nil {
+			continue
+		}
+		nearIDs := ss.Hash.Query(ss.Bots[i].X, ss.Bots[i].Y, 35)
+		for _, j := range nearIDs {
+			if j <= i || j >= len(ss.Bots) || j >= len(st.Settled) || !st.Settled[j] {
+				continue
+			}
+			vector.StrokeLine(a,
+				float32(ss.Bots[i].X), float32(ss.Bots[i].Y),
+				float32(ss.Bots[j].X), float32(ss.Bots[j].Y),
+				1, color.RGBA{50, 220, 80, 40}, false)
+		}
+	}
+	// Defect markers
+	for i := range ss.Bots {
+		if i >= len(st.Defect) || !st.Defect[i] {
+			continue
+		}
+		vector.StrokeCircle(a, float32(ss.Bots[i].X), float32(ss.Bots[i].Y), 6,
+			1, color.RGBA{220, 60, 60, 100}, false)
+	}
+}
+
+// drawAmoebaOverlay draws the amoeba blob outline, center, and direction.
+func drawAmoebaOverlay(a *ebiten.Image, ss *swarm.SwarmState) {
+	st := ss.Amoeba
+	cx, cy := float32(st.CenterX), float32(st.CenterY)
+
+	// Center marker
+	vector.DrawFilledCircle(a, cx, cy, 5, color.RGBA{100, 255, 80, 120}, false)
+
+	// Direction arrow
+	arrLen := float32(40)
+	ax := cx + arrLen*float32(math.Cos(st.Direction))
+	ay := cy + arrLen*float32(math.Sin(st.Direction))
+	vector.StrokeLine(a, cx, cy, ax, ay, 2, color.RGBA{150, 255, 100, 150}, false)
+
+	// Pseudopod zone outline (arc)
+	for _, bot := range ss.Bots {
+		if bot.AmoebaPseudo == 1 {
+			vector.DrawFilledCircle(a, float32(bot.X), float32(bot.Y), 3,
+				color.RGBA{150, 255, 100, 60}, false)
+		}
+	}
+}
+
+// drawACOOverlay draws the pheromone trail heatmap.
+func drawACOOverlay(a *ebiten.Image, ss *swarm.SwarmState) {
+	st := ss.ACO
+	cellSize := float32(10)
+	for row := 0; row < st.GridRows; row++ {
+		for col := 0; col < st.GridCols; col++ {
+			val := st.Trail[row*st.GridCols+col]
+			if val < 1 {
+				continue
+			}
+			intensity := uint8(math.Min(255, val*3))
+			x := float32(col) * cellSize
+			y := float32(row) * cellSize
+			vector.DrawFilledRect(a, x, y, cellSize, cellSize,
+				color.RGBA{intensity, uint8(float64(intensity) * 0.5), 0, uint8(math.Min(80, val*2))}, false)
 		}
 	}
 }

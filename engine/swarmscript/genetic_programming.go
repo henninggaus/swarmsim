@@ -131,6 +131,21 @@ var gpSensorPool = []gpSensorEntry{
 	{CondImmuneRole, 0, 2},
 	{CondImmuneAlert, 0, 100},
 	{CondImmunePathDist, 0, 500},
+	// Gravitational N-Body sensors
+	{CondGravMass, 50, 300},
+	{CondGravForce, 0, 100},
+	{CondGravNearHeavy, 0, 500},
+	// Crystallization sensors
+	{CondCrystalNeigh, 0, 8},
+	{CondCrystalDefect, 0, 1},
+	{CondCrystalSettled, 0, 1},
+	// Amoeba sensors
+	{CondAmoebaDistCenter, 0, 500},
+	{CondAmoebaSkin, 0, 1},
+	{CondAmoebaPseudo, 0, 1},
+	// ACO sensors
+	{CondACOTrail, 0, 100},
+	{CondACOGrad, -180, 180},
 }
 
 // gpActionEntry defines an action template for random generation.
@@ -228,6 +243,14 @@ var gpActionPool = []gpActionEntry{
 	{ActJellyfishPulse, 0, 0, 0},
 	// Immune System
 	{ActImmune, 0, 0, 0},
+	// Gravitational N-Body
+	{ActGravity, 0, 0, 0},
+	// Crystallization
+	{ActCrystal, 0, 0, 0},
+	// Amoeba
+	{ActAmoeba, 0, 0, 0},
+	// ACO
+	{ActACO, 0, 0, 0},
 }
 
 // GenerateRandomProgram creates a random SwarmScript program with numRules rules.

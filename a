@@ -1,0 +1,188 @@
+[33mcommit 18cf47ccab8070430605cbad1709e2119dd69f67[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m
+Author: henninggaus <39703558+henninggaus@users.noreply.github.com>
+Date:   Tue Mar 17 20:35:44 2026 +0100
+
+    Dokumentation: README mit 80+ Features, CHANGELOG, LICENSE, ARCHITECTURE Guide
+    
+    README komplett ueberarbeitet mit Feature-Katalog aller Subsysteme.
+    CHANGELOG mit allen 5 Batches. ARCHITECTURE.md erklaert Init/Tick/Clear Pattern.
+    
+    Co-Authored-By: [1;31mClaude[m Opus 4.6 <noreply@anthropic.com>
+
+[33mcommit 4f43998e089755f0bfd3f2eaeba495d0c5c9a655[m
+Author: henninggaus <39703558+henninggaus@users.noreply.github.com>
+Date:   Tue Mar 17 19:54:19 2026 +0100
+
+    Epigenetik: Vererbbare Umwelt-Markierungen durch Methylierung/Acetylierung
+    
+    8 Gene mit Methylierung (Silencing) und Acetylierung (Boost) basierend auf
+    Erfahrung. 70% Vererbung an Nachkommen — Lamarcksche Evolution im Schwarm.
+    
+    Co-Authored-By: [1;31mClaude[m Opus 4.6 <noreply@anthropic.com>
+
+[33mcommit 81b68326d93a3e6f14fd4fbc985e62e44390f917[m
+Author: henninggaus <39703558+henninggaus@users.noreply.github.com>
+Date:   Tue Mar 17 19:51:42 2026 +0100
+
+    Schwarm-Boerse: Strategie-Aktienhandel mit emergenten Blasen und Crashes
+    
+    5 handelbare Strategien, Kauf/Verkauf per Orderbuch, Performance-basierte
+    Preisbildung, Portfolio-Tracking, Vermoegens-Visualisierung.
+    
+    Co-Authored-By: [1;31mClaude[m Opus 4.6 <noreply@anthropic.com>
+
+[33mcommit e5a84599b04e7b8b5f50b2eef3487e3000d49e62[m
+Author: henninggaus <39703558+henninggaus@users.noreply.github.com>
+Date:   Tue Mar 17 19:49:45 2026 +0100
+
+    Neuronaler Darwinismus: Synaptisches Pruning von uebergrossen Gehirnen
+    
+    Bots starten mit 50 zufaelligen Verbindungen. Aktive Synapsen werden
+    gestaerkt, ungenutzte abgebaut. Neurogenese bei Evolution. Von Chaos zu Effizienz.
+    
+    Co-Authored-By: [1;31mClaude[m Opus 4.6 <noreply@anthropic.com>
+
+[33mcommit a8e80d09e9ebf5df327aa58bd977d7228da3784a[m
+Author: henninggaus <39703558+henninggaus@users.noreply.github.com>
+Date:   Tue Mar 17 19:47:42 2026 +0100
+
+    Adaptives Immunsystem: B/T-Zellen, Gedaechtniszellen, 10x schnelle Re-Antwort
+    
+    Bedrohungs-Erkennung, Signatur-Abgleich, Memory-Zell-Promotion. Bekannte
+    Bedrohungen loesen 10x schnellere Immunantwort aus als neue.
+    
+    Co-Authored-By: [1;31mClaude[m Opus 4.6 <noreply@anthropic.com>
+
+[33mcommit 50cf7e87f9bccd6abae7999cac3af45848695e26[m
+Author: henninggaus <39703558+henninggaus@users.noreply.github.com>
+Date:   Tue Mar 17 19:45:43 2026 +0100
+
+    Zeitgedaechtnis: Temporale Mustererkennung mit Antizipation
+    
+    Event-Log, Perioden-Detektion per Histogramm, Bot-Antizipation fuer
+    vorhersehbare Ereignisse. Bots positionieren sich vorab optimal.
+    
+    Co-Authored-By: [1;31mClaude[m Opus 4.6 <noreply@anthropic.com>
+
+[33mcommit 56354dda4c9fb574b8b00693e0cfd471a1984cbc[m
+Author: henninggaus <39703558+henninggaus@users.noreply.github.com>
+Date:   Tue Mar 17 19:43:48 2026 +0100
+
+    Schwarm-Demokratie: Ranked Choice Voting mit Instant-Runoff
+    
+    5 Strategie-Vorschlaege (Blitz/Schildkroete/Schwarm/Kundschafter/Festung),
+    Sozialer Einfluss, Eliminationsrunden, Partei-Zugehoerigkeiten, Konsens-Metrik.
+    
+    Co-Authored-By: [1;31mClaude[m Opus 4.6 <noreply@anthropic.com>
+
+[33mcommit e19a44d91f5924745525c1f20058090ee6f8cf0c[m
+Author: henninggaus <39703558+henninggaus@users.noreply.github.com>
+Date:   Tue Mar 17 19:41:53 2026 +0100
+
+    Genetische Kaskaden: Regulatorische Gen-Ketten mit Umwelt-Triggern
+    
+    6-Gen Kaskaden mit Regulationsmatrix, Umwelt-Sensitivitaet und
+    Phenotyp-Mapping. Gene aktivieren/unterdruecken Downstream-Gene.
+    
+    Co-Authored-By: [1;31mClaude[m Opus 4.6 <noreply@anthropic.com>
+
+[33mcommit 698106e8c96db9e23fe6112b8a1fbf5ef90481cd[m
+Author: henninggaus <39703558+henninggaus@users.noreply.github.com>
+Date:   Tue Mar 17 19:40:09 2026 +0100
+
+    Kollektives Unterbewusstsein: Offline-Strategie-Replay und Rekombination
+    
+    Schwarm sammelt Erfolgs-Erinnerungen, traeumt bei niedriger Aktivitaet,
+    rekombiniert Strategien zu kreativen Insights. REM-Schlaf fuer den Schwarm.
+    
+    Co-Authored-By: [1;31mClaude[m Opus 4.6 <noreply@anthropic.com>
+
+[33mcommit 075f4924dfd88348d606739aece268b4db5ec7cb[m
+Author: henninggaus <39703558+henninggaus@users.noreply.github.com>
+Date:   Tue Mar 17 18:50:40 2026 +0100
+
+    Schwarm-Homeostase: Interne Antriebe mit allostatischer Regulation
+    
+    Vier Antriebe (Energie, Stress, Neugier, Sicherheit) treiben adaptives
+    Verhalten. Niedrige Energie → Ruhe, hoher Stress → Flucht, Neugier → Erkundung.
+    
+    Co-Authored-By: [1;31mClaude[m Opus 4.6 <noreply@anthropic.com>
+
+[33mcommit 735ffb441aafc0dbb872aa1950c1e58d61a16806[m
+Author: henninggaus <39703558+henninggaus@users.noreply.github.com>
+Date:   Tue Mar 17 18:48:01 2026 +0100
+
+    Learning Classifier System: Evolvierbare IF-THEN Verhaltensregeln
+    
+    Jeder Bot traegt 16 Regeln mit Condition-Ranges und Aktionen. Regeln
+    konkurrieren per Staerke, werden besteuert und belohnt. Schwache werden ersetzt.
+    
+    Co-Authored-By: [1;31mClaude[m Opus 4.6 <noreply@anthropic.com>
+
+[33mcommit 6d4e1f06b6662ea12bed21afa125b3dd5a462754[m
+Author: henninggaus <39703558+henninggaus@users.noreply.github.com>
+Date:   Tue Mar 17 18:44:43 2026 +0100
+
+    Schwarm-Oszillatoren: Kuramoto-Modell fuer Phasen-Synchronisation
+    
+    Gekoppelte Oszillatoren mit natuerlicher Frequenz und Nachbar-Kopplung.
+    Gluehwuermchen-Effekt, Order-Parameter, Sync-Gruppen-Erkennung.
+    
+    Co-Authored-By: [1;31mClaude[m Opus 4.6 <noreply@anthropic.com>
+
+[33mcommit f6dfca35876579f03429434ae79ec22029a72c73[m
+Author: henninggaus <39703558+henninggaus@users.noreply.github.com>
+Date:   Tue Mar 17 18:43:03 2026 +0100
+
+    Koerper-Evolution: Morphologische Traits mit Groesse-Geschwindigkeit Trade-offs
+    
+    Evolvierbare Koerper-Gene steuern Groesse, Geschwindigkeit, Sensorreichweite,
+    Tragkapazitaet und Panzerung. Grosse langsame Traeger vs schnelle Scouts.
+    
+    Co-Authored-By: [1;31mClaude[m Opus 4.6 <noreply@anthropic.com>
+
+[33mcommit 33eebc57bbfe85c9d454f754c8318d206d3120c5[m
+Author: henninggaus <39703558+henninggaus@users.noreply.github.com>
+Date:   Tue Mar 17 18:41:19 2026 +0100
+
+    Schwarm-Gedaechtnis-Palast: Geteilte raeumliche Wissenskarte
+    
+    Grid-basierte Kollektiv-Karte mit Ressourcen-, Verkehrs- und Liefer-Scores.
+    Bots schreiben Beobachtungen und navigieren anhand der Karte mit Decay.
+    
+    Co-Authored-By: [1;31mClaude[m Opus 4.6 <noreply@anthropic.com>
+
+[33mcommit a4d5c9a326e9e582094d4a4e3e65ce34f018bdac[m
+Author: henninggaus <39703558+henninggaus@users.noreply.github.com>
+Date:   Tue Mar 17 18:39:36 2026 +0100
+
+    Stigmergie 2.0: Zusammengesetzte Pheromon-Nachrichten mit Typ+Richtung+Alter
+    
+    Strukturierte Trails (Nahrung/Gefahr/Pfad/Heimat) mit Richtungsvektor,
+    kontextabhaengige Interpretation, Grid-basierte Speicherung mit Decay.
+    
+    Co-Authored-By: [1;31mClaude[m Opus 4.6 <noreply@anthropic.com>
+
+[33mcommit 48934eebdf8b6b6c4fc271ba8e36fce8ee726bc6[m
+Author: henninggaus <39703558+henninggaus@users.noreply.github.com>
+Date:   Tue Mar 17 18:37:07 2026 +0100
+
+    Morphogenese: Turing-Muster durch Aktivator-Inhibitor Dynamik auf Bots
+    
+    Reaktions-Diffusion mit kurzreichweitigem Aktivator und langreichweitigem
+    Inhibitor. Emergente Streifen/Punkte bestimmen Worker vs Scout Verhalten.
+    
+    Co-Authored-By: [1;31mClaude[m Opus 4.6 <noreply@anthropic.com>
+
+[33mcommit ec8d3d7fc67130408fb98b11e2920fce7eea146b[m
+Author: henninggaus <39703558+henninggaus@users.noreply.github.com>
+Date:   Tue Mar 17 18:34:31 2026 +0100
+
+    Schwarm-Sprache: Emergente Kommunikation mit 8-Symbol Vokabular
+    
+    Bots evolvieren Encode/Decode-Tabellen fuer 8 Symbole ueber 8 Kontexte.
+    Softmax-Symbolwahl, Nachbar-Empfang, SharedMeaning-Metrik fuer Konsens.
+    
+    Co-Authored-By: [1;31mClaude[m Opus 4.6 <noreply@anthropic.com>
+
+[33mcommit afad7c57ae34fcb0df9fa58ab58ebeea38048fb

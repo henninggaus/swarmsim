@@ -145,6 +145,17 @@ const (
 	CondImmuneRole                               // immune_role (0=normal, 1=antibody, 2=pathogen)
 	CondImmuneAlert                              // immune_alert (antibody alert 0-100)
 	CondImmunePathDist                           // immune_path_dist (distance to nearest pathogen)
+	CondGravMass                                 // grav_mass (bot mass * 100)
+	CondGravForce                                // grav_force (gravitational force 0-100)
+	CondGravNearHeavy                            // grav_near_heavy (distance to nearest heavy body)
+	CondCrystalNeigh                             // crystal_neigh (lattice neighbor count)
+	CondCrystalDefect                            // crystal_defect (1 if defect site)
+	CondCrystalSettled                           // crystal_settled (1 if settled in lattice)
+	CondAmoebaDistCenter                         // amoeba_dist (distance to blob center)
+	CondAmoebaSkin                               // amoeba_skin (1 if on membrane)
+	CondAmoebaPseudo                             // amoeba_pseudo (1 if in pseudopod)
+	CondACOTrail                                 // aco_trail (pheromone trail intensity 0-100)
+	CondACOGrad                                  // aco_grad (angle to strongest trail -180..180)
 )
 
 // Condition represents a single boolean check in a rule.
@@ -239,6 +250,10 @@ const (
 	ActBroodSort                               // BROOD_SORT (pick up or drop items by density)
 	ActJellyfishPulse                          // JELLYFISH_PULSE (expand/contract with swarm)
 	ActImmune                                  // IMMUNE (antibody chase / pathogen flee)
+	ActGravity                                 // GRAVITY (apply gravitational forces)
+	ActCrystal                                 // CRYSTAL (form hexagonal lattice)
+	ActAmoeba                                  // AMOEBA (amoeba-like collective locomotion)
+	ActACO                                     // ACO (follow ant colony pheromone trail)
 )
 
 // Action represents an action to execute when a rule matches.
@@ -512,6 +527,25 @@ var conditionNames = map[string]ConditionType{
 	"immune_alert":        CondImmuneAlert,
 	"immune_path_dist":    CondImmunePathDist,
 	"immune":              CondImmuneRole,
+	// Gravitational N-Body sensors
+	"grav_mass":           CondGravMass,
+	"grav_force":          CondGravForce,
+	"grav_near_heavy":     CondGravNearHeavy,
+	"gravity":             CondGravForce,
+	// Crystallization sensors
+	"crystal_neigh":       CondCrystalNeigh,
+	"crystal_defect":      CondCrystalDefect,
+	"crystal_settled":     CondCrystalSettled,
+	"crystal":             CondCrystalNeigh,
+	// Amoeba Locomotion sensors
+	"amoeba_dist":         CondAmoebaDistCenter,
+	"amoeba_skin":         CondAmoebaSkin,
+	"amoeba_pseudo":       CondAmoebaPseudo,
+	"amoeba":              CondAmoebaSkin,
+	// ACO sensors
+	"aco_trail":           CondACOTrail,
+	"aco_grad":            CondACOGrad,
+	"aco":                 CondACOTrail,
 }
 
 // actionNames maps action name strings to (ActionType, paramCount).
@@ -670,6 +704,18 @@ var actionNames = map[string]struct {
 	// Immune System actions
 	"IMMUNE":              {ActImmune, 0},
 	"ANTIBODY":            {ActImmune, 0},
+	// Gravitational N-Body actions
+	"GRAVITY":             {ActGravity, 0},
+	"GRAV":                {ActGravity, 0},
+	// Crystallization actions
+	"CRYSTAL":             {ActCrystal, 0},
+	"CRYSTALLIZE":         {ActCrystal, 0},
+	// Amoeba actions
+	"AMOEBA":              {ActAmoeba, 0},
+	"BLOB":                {ActAmoeba, 0},
+	// ACO actions
+	"ACO":                 {ActACO, 0},
+	"ANT_COLONY":          {ActACO, 0},
 }
 
 // --- SwarmScript syntax highlighting support ---
@@ -806,6 +852,14 @@ var highlightConditions = map[string]bool{
 	"jelly_phase": true, "jelly_expanding": true, "jelly_radius": true, "jellyfish": true,
 	// Immune System sensors
 	"immune_role": true, "immune_alert": true, "immune_path_dist": true, "immune": true,
+	// Gravitational N-Body sensors
+	"grav_mass": true, "grav_force": true, "grav_near_heavy": true, "gravity": true,
+	// Crystallization sensors
+	"crystal_neigh": true, "crystal_defect": true, "crystal_settled": true, "crystal": true,
+	// Amoeba sensors
+	"amoeba_dist": true, "amoeba_skin": true, "amoeba_pseudo": true, "amoeba": true,
+	// ACO sensors
+	"aco_trail": true, "aco_grad": true, "aco": true,
 }
 
 var highlightActions = map[string]bool{
@@ -897,6 +951,14 @@ var highlightActions = map[string]bool{
 	"JELLYFISH_PULSE": true, "JELLYFISH": true,
 	// Immune System
 	"IMMUNE": true, "ANTIBODY": true,
+	// Gravitational N-Body
+	"GRAVITY": true, "GRAV": true,
+	// Crystallization
+	"CRYSTAL": true, "CRYSTALLIZE": true,
+	// Amoeba
+	"AMOEBA": true, "BLOB": true,
+	// ACO
+	"ACO": true, "ANT_COLONY": true,
 }
 
 // --- Reverse mapping functions (for block editor / serialization) ---
@@ -1156,6 +1218,28 @@ func ConditionTypeName(ct ConditionType) string {
 		return "immune_alert"
 	case CondImmunePathDist:
 		return "immune_path_dist"
+	case CondGravMass:
+		return "grav_mass"
+	case CondGravForce:
+		return "grav_force"
+	case CondGravNearHeavy:
+		return "grav_near_heavy"
+	case CondCrystalNeigh:
+		return "crystal_neigh"
+	case CondCrystalDefect:
+		return "crystal_defect"
+	case CondCrystalSettled:
+		return "crystal_settled"
+	case CondAmoebaDistCenter:
+		return "amoeba_dist"
+	case CondAmoebaSkin:
+		return "amoeba_skin"
+	case CondAmoebaPseudo:
+		return "amoeba_pseudo"
+	case CondACOTrail:
+		return "aco_trail"
+	case CondACOGrad:
+		return "aco_grad"
 	}
 	return "unknown"
 }
@@ -1332,6 +1416,14 @@ func ActionTypeName(at ActionType) string {
 		return "JELLYFISH_PULSE"
 	case ActImmune:
 		return "IMMUNE"
+	case ActGravity:
+		return "GRAVITY"
+	case ActCrystal:
+		return "CRYSTAL"
+	case ActAmoeba:
+		return "AMOEBA"
+	case ActACO:
+		return "ACO"
 	}
 	return "UNKNOWN"
 }
@@ -1372,6 +1464,7 @@ var SensorGrouped = [][]string{
 	{"-- Emergent --", "bridge_active", "bridge_nearby", "shape_dist", "shape_angle", "shape_progress", "wave_flash", "wave_phase", "shepherd_role", "shepherd_dist", "flock_to_target"},
 	{"-- Advanced --", "pso_fitness", "pso_best", "pso_global_dist", "pred_role", "prey_dist", "pred_catches", "mag_chain_len", "mag_linked", "mag_align", "div_group", "div_phase", "div_dist"},
 	{"-- Batch 5 --", "vform_pos", "vform_draft", "vform_leader", "brood_carrying", "brood_item_color", "brood_density", "brood_same_color", "jelly_phase", "jelly_expanding", "jelly_radius", "immune_role", "immune_alert", "immune_path_dist"},
+	{"-- Batch 6 --", "grav_mass", "grav_force", "grav_near_heavy", "crystal_neigh", "crystal_defect", "crystal_settled", "amoeba_dist", "amoeba_skin", "amoeba_pseudo", "aco_trail", "aco_grad"},
 }
 
 // ActionGrouped returns action names organized in groups for dropdown display.
@@ -1391,6 +1484,7 @@ var ActionGrouped = [][]string{
 	{"-- Emergent --", "FORM_BRIDGE", "CROSS_BRIDGE", "FORM_SHAPE", "WAVE_FLASH", "SHEPHERD"},
 	{"-- Advanced --", "PSO_MOVE", "PREDATOR", "MAGNETIC", "DIVIDE"},
 	{"-- Batch 5 --", "V_FORMATION", "BROOD_SORT", "JELLYFISH_PULSE", "IMMUNE"},
+	{"-- Batch 6 --", "GRAVITY", "CRYSTAL", "AMOEBA", "ACO"},
 }
 
 // wordPos tracks a word and its column position in a line.
