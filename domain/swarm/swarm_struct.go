@@ -125,6 +125,43 @@ type SwarmBot struct {
 	RecentCollision   int // 1 if collided with obstacle in last 10 ticks, 0 otherwise
 	CollisionTimer    int // countdown from 10 when collision detected
 
+	// A* pathfinding sensor cache
+	PathDist  int // remaining path distance (0 = no path)
+	PathAngle int // angle to next waypoint relative to heading (-180..180)
+
+	// Flocking (Boids) sensor cache
+	FlockAlign     int // alignment angle diff to neighbor avg heading (-180..180)
+	FlockCohesion  int // distance to neighbor center of mass (0-500)
+	FlockSeparation int // separation urgency (0-100, 100=critical)
+
+	// Dynamic Role sensor cache
+	Role       int // current role: 0=none, 1=scout, 2=worker, 3=guard
+	RoleDemand int // most needed role locally (1-3)
+
+	// Quorum Sensing sensor cache
+	Vote          int // current vote value (0 = no vote)
+	QuorumCount   int // nearby bots with same vote
+	QuorumReached int // 1 if quorum threshold met
+
+	// Rogue Detection sensor cache
+	Reputation    int // 0-100, high = trusted
+	SuspectNearby int // 1 if anomalous neighbor detected
+
+	// Lévy-Flight sensor cache
+	LevyPhase int // 0=idle, 1=short walk, 2=long jump
+	LevyStep  int // remaining step distance
+
+	// Firefly Synchronization sensor cache
+	FlashPhase int // oscillator phase (0-255)
+	FlashSync  int // 1 if currently flashing
+
+	// Collective Transport sensor cache
+	TransportNearby int // count of heavy objects in range
+	TransportCount  int // bots assisting nearest task
+
+	// Vortex Swarming sensor cache
+	VortexStrength int // local vortex rotation strength (0-100)
+
 	// Brake mechanics
 	BrakeTimer int // >0 = braking (speed ramps down over 3 ticks)
 
@@ -787,6 +824,28 @@ type SwarmState struct {
 	// Epigenetics (heritable marks)
 	Epigenetics   *EpigeneticsState
 	EpigeneticsOn bool
+
+	// A* Pathfinding
+	AStar       *AStarState
+	AStarOn     bool
+	ShowPaths   bool
+	ShowNavGrid bool // Shift+G: debug overlay showing blocked/free cells
+	ShowFlock   bool // Shift+F: flocking velocity lines overlay
+	ShowRoles   bool // Shift+R: role color overlay
+	ShowFirefly bool // 9 key: firefly flash overlay
+	ShowVortex  bool // 0 key: vortex rotation overlay
+
+	// Lévy-Flight Foraging
+	Levy   *LevyState
+	LevyOn bool
+
+	// Firefly Synchronization
+	Firefly   *FireflyState
+	FireflyOn bool
+
+	// Collective Transport
+	Transport   *TransportState
+	TransportOn bool
 
 	// Block editor
 	BlockEditorActive bool

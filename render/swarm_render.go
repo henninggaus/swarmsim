@@ -256,6 +256,36 @@ func (r *Renderer) DrawSwarmMode(screen *ebiten.Image, s *simulation.Simulation,
 		}
 	}
 
+	// Draw A* nav grid debug overlay (Shift+G toggle)
+	if ss.ShowNavGrid && ss.AStarOn && ss.AStar != nil {
+		drawNavGridOverlay(a, ss)
+	}
+
+	// Draw A* path overlay (Shift+P toggle)
+	if ss.ShowPaths && ss.AStarOn && ss.AStar != nil {
+		drawPathOverlay(a, ss)
+	}
+
+	// Draw flocking velocity overlay (Shift+F toggle)
+	if ss.ShowFlock {
+		drawFlockOverlay(a, ss)
+	}
+
+	// Draw role color overlay (Shift+R toggle)
+	if ss.ShowRoles {
+		drawRoleOverlay(a, ss)
+	}
+
+	// Draw firefly flash overlay (9 key toggle)
+	if ss.ShowFirefly && ss.FireflyOn && ss.Firefly != nil {
+		drawFireflyOverlay(a, ss)
+	}
+
+	// Draw vortex rotation overlay (0 key toggle)
+	if ss.ShowVortex {
+		drawVortexOverlay(a, ss)
+	}
+
 	// Draw message wave rings
 	if ss.ShowMsgWaves {
 		for _, w := range ss.MsgWaves {
@@ -1750,6 +1780,318 @@ func drawTeamsScoreboard(screen *ebiten.Image, ss *swarm.SwarmState, sw int) {
 			chalText := fmt.Sprintf("Challenge: %d ticks left", ss.ChallengeTicks)
 			printColoredAt(screen, chalText, cx-len(chalText)*3, y+h+5, color.RGBA{200, 200, 100, 220})
 		}
+	}
+}
+
+// drawPathOverlay renders computed A* paths with animated particles and color coding.
+// Cyan = searching for pickup, Gold = carrying to dropoff.
+func drawPathOverlay(a *ebiten.Image, ss *swarm.SwarmState) {
+	st := ss.AStar
+	if st == nil {
+		return
+	}
+
+	// Animation phase based on tick (flowing particles)
+	phase := float64(ss.Tick%60) / 60.0
+
+	for i := range ss.Bots {
+		if i >= len(st.Paths) || st.Paths[i] == nil {
+			continue
+		}
+		path := st.Paths[i]
+		pidx := st.PathIdx[i]
+		if pidx >= len(path) {
+			continue
+		}
+
+		bot := &ss.Bots[i]
+
+		// Color coding: cyan = searching, gold = carrying
+		var baseR, baseG, baseB uint8
+		if bot.CarryingPkg >= 0 {
+			baseR, baseG, baseB = 255, 200, 50 // gold
+		} else {
+			baseR, baseG, baseB = 0, 220, 220 // cyan
+		}
+
+		// Draw line from bot to first waypoint (bright lead segment)
+		wp := path[pidx]
+		vector.StrokeLine(a,
+			float32(bot.X), float32(bot.Y),
+			float32(wp.X), float32(wp.Y),
+			2.0, color.RGBA{baseR, baseG, baseB, 120}, false)
+
+		// Draw path segments with distance-based fade
+		for j := pidx; j < len(path)-1; j++ {
+			dist := j - pidx
+			alpha := uint8(90)
+			width := float32(1.5)
+			if dist > 3 {
+				alpha = 55
+				width = 1.0
+			}
+			if dist > 10 {
+				alpha = 30
+				width = 0.8
+			}
+			vector.StrokeLine(a,
+				float32(path[j].X), float32(path[j].Y),
+				float32(path[j+1].X), float32(path[j+1].Y),
+				width, color.RGBA{baseR, baseG, baseB, alpha}, false)
+		}
+
+		// Draw waypoint dots
+		for j := pidx; j < len(path); j++ {
+			r := float32(1.5)
+			alpha := uint8(50)
+			if j == pidx {
+				r = 3.0
+				alpha = 180
+			} else if j == len(path)-1 {
+				r = 4.0
+				alpha = 200 // bright goal marker
+			}
+			vector.DrawFilledCircle(a, float32(path[j].X), float32(path[j].Y),
+				r, color.RGBA{baseR, baseG, baseB, alpha}, false)
+		}
+
+		// Animated flowing particles along path
+		// Place 3 particles per bot, evenly spaced and moving with phase
+		totalSegs := len(path) - pidx
+		if totalSegs > 0 {
+			for p := 0; p < 3; p++ {
+				// Particle position along path (0.0 to 1.0)
+				t := math.Mod(phase+float64(p)*0.33, 1.0)
+				segF := t * float64(totalSegs)
+				segIdx := int(segF)
+				segFrac := segF - float64(segIdx)
+
+				j := pidx + segIdx
+				if j >= len(path)-1 {
+					j = len(path) - 2
+					segFrac = 1.0
+				}
+				if j < pidx {
+					continue
+				}
+
+				// Interpolate position
+				px := path[j].X + (path[j+1].X-path[j].X)*segFrac
+				py := path[j].Y + (path[j+1].Y-path[j].Y)*segFrac
+
+				// Pulsing glow
+				pulse := uint8(140 + 80*math.Sin(phase*math.Pi*2+float64(p)*2.1))
+				vector.DrawFilledCircle(a, float32(px), float32(py),
+					3.5, color.RGBA{baseR, baseG, baseB, pulse}, false)
+			}
+		}
+
+		// Goal marker: pulsing ring at destination
+		if len(path) > 0 {
+			goal := path[len(path)-1]
+			pulseR := float32(6 + 3*math.Sin(phase*math.Pi*2))
+			vector.StrokeCircle(a, float32(goal.X), float32(goal.Y),
+				pulseR, 1.5, color.RGBA{baseR, baseG, baseB, 100}, false)
+		}
+	}
+}
+
+// drawNavGridOverlay renders the A* navigation grid debug visualization.
+// Green cells = free, Red cells = blocked by obstacles.
+func drawNavGridOverlay(a *ebiten.Image, ss *swarm.SwarmState) {
+	st := ss.AStar
+	if st == nil {
+		return
+	}
+
+	cellF := float32(st.CellSize)
+	for r := 0; r < st.GridRows; r++ {
+		for c := 0; c < st.GridCols; c++ {
+			idx := r*st.GridCols + c
+			x := float32(c) * cellF
+			y := float32(r) * cellF
+
+			if st.Blocked[idx] {
+				// Blocked: semi-transparent red
+				vector.DrawFilledRect(a, x, y, cellF, cellF,
+					color.RGBA{200, 40, 40, 50}, false)
+			} else {
+				// Free: very faint green
+				vector.DrawFilledRect(a, x, y, cellF, cellF,
+					color.RGBA{30, 160, 30, 15}, false)
+			}
+		}
+	}
+
+	// Draw grid lines (very subtle)
+	for r := 0; r <= st.GridRows; r++ {
+		y := float32(r) * cellF
+		vector.StrokeLine(a, 0, y, float32(st.GridCols)*cellF, y,
+			0.5, color.RGBA{80, 80, 80, 30}, false)
+	}
+	for c := 0; c <= st.GridCols; c++ {
+		x := float32(c) * cellF
+		vector.StrokeLine(a, x, 0, x, float32(st.GridRows)*cellF,
+			0.5, color.RGBA{80, 80, 80, 30}, false)
+	}
+}
+
+// drawFlockOverlay draws velocity lines and separation zones for flocking bots.
+func drawFlockOverlay(a *ebiten.Image, ss *swarm.SwarmState) {
+	for i := range ss.Bots {
+		bot := &ss.Bots[i]
+		bx := float32(bot.X)
+		by := float32(bot.Y)
+
+		// Velocity line (heading * speed, cyan)
+		if bot.Speed > 0.1 {
+			vlen := float32(20.0)
+			ex := bx + float32(math.Cos(bot.Angle))*vlen
+			ey := by + float32(math.Sin(bot.Angle))*vlen
+			vector.StrokeLine(a, bx, by, ex, ey, 1.0,
+				color.RGBA{0, 200, 220, 120}, false)
+		}
+
+		// Separation urgency ring (red, radius proportional to urgency)
+		if bot.FlockSeparation > 20 {
+			alpha := uint8(bot.FlockSeparation * 2)
+			if alpha > 180 {
+				alpha = 180
+			}
+			r := float32(4 + bot.FlockSeparation/10)
+			vector.StrokeCircle(a, bx, by, r, 1.0,
+				color.RGBA{255, 60, 60, alpha}, false)
+		}
+
+		// Alignment indicator (green arc in heading direction)
+		if bot.FlockAlign != 0 {
+			alignRad := float64(bot.FlockAlign) * math.Pi / 180
+			ex := bx + float32(math.Cos(bot.Angle+alignRad))*12
+			ey := by + float32(math.Sin(bot.Angle+alignRad))*12
+			vector.StrokeLine(a, bx, by, ex, ey, 0.8,
+				color.RGBA{0, 220, 80, 100}, false)
+		}
+	}
+}
+
+// drawRoleOverlay draws colored rings and labels for bot roles.
+func drawRoleOverlay(a *ebiten.Image, ss *swarm.SwarmState) {
+	for i := range ss.Bots {
+		bot := &ss.Bots[i]
+		bx := float32(bot.X)
+		by := float32(bot.Y)
+		r := float32(swarm.SwarmBotRadius + 3)
+
+		var c color.RGBA
+		var label string
+		switch bot.Role {
+		case swarm.BotRoleScout:
+			c = color.RGBA{0, 200, 255, 150}
+			label = "S"
+		case swarm.BotRoleWorker:
+			c = color.RGBA{255, 200, 0, 150}
+			label = "W"
+		case swarm.BotRoleGuard:
+			c = color.RGBA{255, 50, 50, 150}
+			label = "G"
+		default:
+			continue // no role, skip
+		}
+
+		// Colored ring
+		vector.StrokeCircle(a, bx, by, r, 1.5, c, false)
+
+		// Role letter
+		printColoredAt(a, label, int(bx)-3, int(by)-14, c)
+
+		// Reputation indicator (small bar below bot)
+		if bot.Reputation < 80 && bot.Reputation > 0 {
+			// Low reputation: orange/red warning
+			repFrac := float32(bot.Reputation) / 100.0
+			barW := float32(16) * repFrac
+			barColor := color.RGBA{255, uint8(200 * repFrac), 0, 180}
+			vector.DrawFilledRect(a, bx-8, by+r+2, barW, 2, barColor, false)
+		}
+	}
+
+	// Quorum decision indicators
+	if ss.QuorumOn && ss.Quorum != nil {
+		for _, dec := range ss.Quorum.Decisions {
+			cx := float32(dec.CenterX)
+			cy := float32(dec.CenterY)
+			radius := float32(20 + dec.Participants*3)
+			alpha := uint8(100 * dec.Strength)
+			if alpha < 30 {
+				alpha = 30
+			}
+
+			// Pulsing circle at decision center
+			phase := float32(ss.Tick%60) / 60.0
+			pulseR := radius * (0.8 + 0.4*phase)
+
+			var qc color.RGBA
+			switch dec.Proposal {
+			case 0: // Migrate
+				qc = color.RGBA{100, 200, 255, alpha}
+			case 1: // Cluster
+				qc = color.RGBA{255, 255, 100, alpha}
+			case 2: // Disperse
+				qc = color.RGBA{100, 255, 100, alpha}
+			case 3: // Alarm
+				qc = color.RGBA{255, 80, 80, alpha}
+			}
+			vector.StrokeCircle(a, cx, cy, pulseR, 1.5, qc, false)
+		}
+	}
+}
+
+// drawFireflyOverlay draws flash pulse indicators for firefly synchronization.
+func drawFireflyOverlay(a *ebiten.Image, ss *swarm.SwarmState) {
+	for i := range ss.Bots {
+		bot := &ss.Bots[i]
+		bx := float32(bot.X)
+		by := float32(bot.Y)
+
+		// Phase indicator: ring that fills up as phase approaches flash
+		phase := float32(bot.FlashPhase) / 255.0
+		r := float32(swarm.SwarmBotRadius) + 2 + phase*6
+
+		if bot.FlashSync == 1 {
+			// Flashing! Bright yellow burst
+			vector.DrawFilledCircle(a, bx, by, r+4, color.RGBA{255, 255, 100, 180}, false)
+			vector.StrokeCircle(a, bx, by, r+8, 1.0, color.RGBA{255, 255, 200, 80}, false)
+		} else {
+			// Oscillator phase glow: dim→bright as approaching flash
+			alpha := uint8(30 + phase*150)
+			c := color.RGBA{255, 220, uint8(50 + phase*200), alpha}
+			vector.StrokeCircle(a, bx, by, r, 1.0, c, false)
+		}
+	}
+}
+
+// drawVortexOverlay draws rotation arcs indicating vortex formation.
+func drawVortexOverlay(a *ebiten.Image, ss *swarm.SwarmState) {
+	for i := range ss.Bots {
+		bot := &ss.Bots[i]
+		if bot.VortexStrength < 10 {
+			continue
+		}
+		bx := float32(bot.X)
+		by := float32(bot.Y)
+
+		// Purple arc showing rotation direction
+		strength := float32(bot.VortexStrength) / 100.0
+		alpha := uint8(60 + strength*150)
+		r := float32(swarm.SwarmBotRadius) + 3 + strength*5
+		c := color.RGBA{180, 0, 255, alpha}
+		vector.StrokeCircle(a, bx, by, r, 1.2, c, false)
+
+		// Tangential arrow
+		perpAngle := bot.Angle + math.Pi/2
+		ex := bx + float32(math.Cos(perpAngle))*r*0.8
+		ey := by + float32(math.Sin(perpAngle))*r*0.8
+		vector.StrokeLine(a, bx, by, ex, ey, 0.8,
+			color.RGBA{200, 50, 255, alpha}, false)
 	}
 }
 

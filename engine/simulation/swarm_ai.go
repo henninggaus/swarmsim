@@ -78,6 +78,50 @@ func (s *Simulation) updateSwarmMode() {
 		}
 	}
 
+	// Phase 1.6: A* Pathfinding (staggered batch computation)
+	if ss.AStarOn {
+		swarm.TickAStar(ss)
+	}
+
+	// Phase 1.7: Flocking (Boids) sensor computation
+	swarm.TickFlocking(ss)
+
+	// Phase 1.8: Dynamic Role + Rogue Detection sensors
+	swarm.TickRoles(ss)
+	swarm.TickRogue(ss)
+
+	// Phase 1.9: Quorum Sensing (copy subsystem data to sensor cache)
+	if ss.QuorumOn && ss.Quorum != nil {
+		for i := range ss.Bots {
+			if i < len(ss.Quorum.Votes) {
+				ss.Bots[i].QuorumCount = ss.Quorum.Votes[i].LocalAgree
+				if ss.Quorum.Votes[i].QuorumMet {
+					ss.Bots[i].QuorumReached = 1
+				} else {
+					ss.Bots[i].QuorumReached = 0
+				}
+			}
+		}
+	}
+
+	// Phase 1.10: Lévy-Flight Foraging
+	if ss.LevyOn {
+		swarm.TickLevy(ss)
+	}
+
+	// Phase 1.11: Firefly Synchronization
+	if ss.FireflyOn {
+		swarm.TickFirefly(ss)
+	}
+
+	// Phase 1.12: Collective Transport
+	if ss.TransportOn {
+		swarm.TickTransport(ss)
+	}
+
+	// Phase 1.13: Vortex Swarming sensor computation
+	swarm.TickVortex(ss)
+
 	// Phase 2: Execute program on each bot (skip if anti-stuck breakout active)
 	for i := range ss.Bots {
 		bot := &ss.Bots[i]
@@ -1422,6 +1466,60 @@ func evaluateSwarmCondition(cond swarmscript.Condition, bot *swarm.SwarmBot, sna
 		return compareInt(bot.RecentCollision, cond.Op, cv)
 	case swarmscript.CondNeighborMinDist:
 		return compareInt(bot.NeighborMinDist, cond.Op, cv)
+	case swarmscript.CondPathDist:
+		return compareInt(bot.PathDist, cond.Op, cv)
+	case swarmscript.CondPathAngle:
+		return compareInt(bot.PathAngle, cond.Op, cv)
+
+	// Flocking (Boids) sensors
+	case swarmscript.CondFlockAlign:
+		return compareInt(bot.FlockAlign, cond.Op, cv)
+	case swarmscript.CondFlockCohesion:
+		return compareInt(bot.FlockCohesion, cond.Op, cv)
+	case swarmscript.CondFlockSeparation:
+		return compareInt(bot.FlockSeparation, cond.Op, cv)
+
+	// Dynamic Role sensors
+	case swarmscript.CondRole:
+		return compareInt(bot.Role, cond.Op, cv)
+	case swarmscript.CondRoleDemand:
+		return compareInt(bot.RoleDemand, cond.Op, cv)
+
+	// Quorum Sensing sensors
+	case swarmscript.CondVote:
+		return compareInt(bot.Vote, cond.Op, cv)
+	case swarmscript.CondQuorumCount:
+		return compareInt(bot.QuorumCount, cond.Op, cv)
+	case swarmscript.CondQuorumReached:
+		return compareInt(bot.QuorumReached, cond.Op, cv)
+
+	// Rogue Detection sensors
+	case swarmscript.CondReputation:
+		return compareInt(bot.Reputation, cond.Op, cv)
+	case swarmscript.CondSuspectNearby:
+		return compareInt(bot.SuspectNearby, cond.Op, cv)
+
+	// Lévy-Flight sensors
+	case swarmscript.CondLevyPhase:
+		return compareInt(bot.LevyPhase, cond.Op, cv)
+	case swarmscript.CondLevyStep:
+		return compareInt(bot.LevyStep, cond.Op, cv)
+
+	// Firefly Sync sensors
+	case swarmscript.CondFlashPhase:
+		return compareInt(bot.FlashPhase, cond.Op, cv)
+	case swarmscript.CondFlashSync:
+		return compareInt(bot.FlashSync, cond.Op, cv)
+
+	// Collective Transport sensors
+	case swarmscript.CondTransportNearby:
+		return compareInt(bot.TransportNearby, cond.Op, cv)
+	case swarmscript.CondTransportCount:
+		return compareInt(bot.TransportCount, cond.Op, cv)
+
+	// Vortex Swarming sensors
+	case swarmscript.CondVortexStrength:
+		return compareInt(bot.VortexStrength, cond.Op, cv)
 	}
 
 	return false
@@ -2082,6 +2180,53 @@ func executeSwarmAction(act swarmscript.Action, bot *swarm.SwarmBot, ss *swarm.S
 			}
 		}
 		bot.Speed = swarm.SwarmBotSpeed
+
+	case swarmscript.ActFollowPath:
+		// Follow computed A* path toward next waypoint
+		if ss.AStarOn && ss.AStar != nil {
+			swarm.FollowPath(bot, ss, botIdx)
+		} else {
+			bot.Speed = swarm.SwarmBotSpeed
+		}
+
+	case swarmscript.ActFlock:
+		// Apply all three Reynolds rules (separation + alignment + cohesion)
+		swarm.ApplyFlock(bot, ss, botIdx)
+
+	case swarmscript.ActAlign:
+		// Align heading with neighbors
+		swarm.ApplyAlign(bot, ss, botIdx)
+
+	case swarmscript.ActCohere:
+		// Steer toward neighbor center of mass
+		swarm.ApplyCohere(bot, ss, botIdx)
+
+	case swarmscript.ActBecomeScout:
+		swarm.SetRole(bot, swarm.BotRoleScout)
+
+	case swarmscript.ActBecomeWorker:
+		swarm.SetRole(bot, swarm.BotRoleWorker)
+
+	case swarmscript.ActBecomeGuard:
+		swarm.SetRole(bot, swarm.BotRoleGuard)
+
+	case swarmscript.ActVote:
+		bot.Vote = act.Param1
+
+	case swarmscript.ActFlagRogue:
+		swarm.FlagRogue(bot, ss, botIdx)
+
+	case swarmscript.ActLevyWalk:
+		swarm.ApplyLevyWalk(bot, ss, botIdx)
+
+	case swarmscript.ActFlash:
+		swarm.ApplyFlash(bot, ss, botIdx)
+
+	case swarmscript.ActAssistTransport:
+		swarm.ApplyAssistTransport(bot, ss, botIdx)
+
+	case swarmscript.ActVortex:
+		swarm.ApplyVortex(bot, ss, botIdx)
 
 	case swarmscript.ActDash:
 		// Double-speed burst for 10 ticks (costs 15 energy, 60 tick cooldown)

@@ -932,13 +932,59 @@ func (g *Game) handleSwarmInput() {
 		logger.Info("SWARM", "Color filter: %s", filterNames[ss.ColorFilter])
 	}
 
-	// P key: toggle message wave visualization
+	// P key: Shift+P = A* path overlay, plain P = message wave visualization
 	if inpututil.IsKeyJustPressed(ebiten.KeyP) && !ed.Focused && !ss.BotCountEdit {
-		ss.ShowMsgWaves = !ss.ShowMsgWaves
-		if !ss.ShowMsgWaves {
-			ss.MsgWaves = nil
+		if ebiten.IsKeyPressed(ebiten.KeyShift) {
+			if !ss.AStarOn {
+				swarm.InitAStar(ss)
+			}
+			ss.ShowPaths = !ss.ShowPaths
+			logger.Info("SWARM", "A* Pfade: %v", ss.ShowPaths)
+		} else {
+			ss.ShowMsgWaves = !ss.ShowMsgWaves
+			if !ss.ShowMsgWaves {
+				ss.MsgWaves = nil
+			}
+			logger.Info("SWARM", "Message waves: %v", ss.ShowMsgWaves)
 		}
-		logger.Info("SWARM", "Message waves: %v", ss.ShowMsgWaves)
+	}
+
+	// G key: Shift+G = A* nav grid debug overlay
+	if inpututil.IsKeyJustPressed(ebiten.KeyG) && !ed.Focused && !ss.BotCountEdit {
+		if ebiten.IsKeyPressed(ebiten.KeyShift) {
+			if !ss.AStarOn {
+				swarm.InitAStar(ss)
+			}
+			ss.ShowNavGrid = !ss.ShowNavGrid
+			logger.Info("SWARM", "A* Nav-Grid: %v", ss.ShowNavGrid)
+		}
+	}
+
+	// 7 key: Flocking velocity overlay
+	if inpututil.IsKeyJustPressed(ebiten.Key7) && !ed.Focused && !ss.BotCountEdit {
+		ss.ShowFlock = !ss.ShowFlock
+		logger.Info("SWARM", "Flock-Overlay: %v", ss.ShowFlock)
+	}
+
+	// 8 key: Role overlay
+	if inpututil.IsKeyJustPressed(ebiten.Key8) && !ed.Focused && !ss.BotCountEdit {
+		ss.ShowRoles = !ss.ShowRoles
+		logger.Info("SWARM", "Rollen-Overlay: %v", ss.ShowRoles)
+	}
+
+	// 9 key: Firefly flash overlay
+	if inpututil.IsKeyJustPressed(ebiten.Key9) && !ed.Focused && !ss.BotCountEdit {
+		if !ss.FireflyOn {
+			swarm.InitFirefly(ss)
+		}
+		ss.ShowFirefly = !ss.ShowFirefly
+		logger.Info("SWARM", "Firefly-Overlay: %v", ss.ShowFirefly)
+	}
+
+	// 0 key: Vortex overlay
+	if inpututil.IsKeyJustPressed(ebiten.Key0) && !ed.Focused && !ss.BotCountEdit {
+		ss.ShowVortex = !ss.ShowVortex
+		logger.Info("SWARM", "Vortex-Overlay: %v", ss.ShowVortex)
 	}
 
 	// C key: Shift+C = swarm center overlay, plain C = challenge/routes

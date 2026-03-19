@@ -83,6 +83,25 @@ const (
 	CondTimeSinceDelivery                        // time_since_delivery (ticks since last delivery)
 	CondRecentCollision                          // recent_collision (1 if collided recently)
 	CondNeighborMinDist                          // neighbor_min_dist (distance to closest neighbor)
+	CondPathDist                                 // path_dist (remaining A* path distance, 0 if no path)
+	CondPathAngle                                // path_angle (angle to next waypoint, -180..180)
+	CondFlockAlign                               // flock_align (angle diff to neighbor avg heading, -180..180)
+	CondFlockCohesion                            // flock_cohesion (distance to neighbor center of mass)
+	CondFlockSeparation                          // flock_separation (separation urgency 0-100)
+	CondRole                                     // role (0=none, 1=scout, 2=worker, 3=guard)
+	CondRoleDemand                               // role_demand (most needed role 1-3)
+	CondVote                                     // vote (current vote value)
+	CondQuorumCount                              // quorum_count (nearby bots with same vote)
+	CondQuorumReached                            // quorum_reached (1 if threshold met)
+	CondReputation                               // reputation (0-100, trust level)
+	CondSuspectNearby                            // suspect_nearby (1 if anomalous neighbor)
+	CondLevyPhase                                // levy_phase (0=idle, 1=short walk, 2=long jump)
+	CondLevyStep                                 // levy_step (remaining step distance)
+	CondFlashPhase                               // flash_phase (oscillator phase 0-255)
+	CondFlashSync                                // flash_sync (1 if currently flashing)
+	CondTransportNearby                          // transport_nearby (heavy objects in range)
+	CondTransportCount                           // transport_count (bots assisting nearest task)
+	CondVortexStrength                           // vortex_strength (local rotation strength 0-100)
 )
 
 // Condition represents a single boolean check in a rule.
@@ -146,6 +165,19 @@ const (
 	ActReverse                                 // REVERSE (turn 180° and move forward)
 	ActBrake                                   // BRAKE (reduce speed to 0 over 3 ticks)
 	ActScatterRandom                           // SCATTER_RANDOM (scatter away from neighbors)
+	ActFollowPath                              // FOLLOW_PATH (steer toward next A* waypoint)
+	ActFlock                                   // FLOCK (apply all Reynolds rules: separation+alignment+cohesion)
+	ActAlign                                   // ALIGN (align heading with neighbors)
+	ActCohere                                  // COHERE (steer toward neighbor center of mass)
+	ActBecomeScout                             // BECOME_SCOUT (switch role to scout)
+	ActBecomeWorker                            // BECOME_WORKER (switch role to worker)
+	ActBecomeGuard                             // BECOME_GUARD (switch role to guard)
+	ActVote                                    // VOTE N (cast a vote with value N)
+	ActFlagRogue                               // FLAG_ROGUE (decrease nearest neighbor's reputation)
+	ActLevyWalk                                // LEVY_WALK (Lévy flight: short walks + rare long jumps)
+	ActFlash                                   // FLASH (trigger immediate firefly flash)
+	ActAssistTransport                         // ASSIST_TRANSPORT (join nearest transport task)
+	ActVortex                                  // VORTEX (join/maintain vortex rotation)
 )
 
 // Action represents an action to execute when a rule matches.
@@ -299,6 +331,47 @@ var conditionNames = map[string]ConditionType{
 	"collision":           CondRecentCollision,
 	"neighbor_min_dist":   CondNeighborMinDist,
 	"nbr_min_dist":        CondNeighborMinDist,
+	// A* pathfinding sensors
+	"path_dist":  CondPathDist,
+	"path_angle": CondPathAngle,
+	"pdist":      CondPathDist,
+	"pangle":     CondPathAngle,
+	// Flocking (Boids) sensors
+	"flock_align":      CondFlockAlign,
+	"flock_cohesion":   CondFlockCohesion,
+	"flock_separation": CondFlockSeparation,
+	"flock_sep":        CondFlockSeparation,
+	"f_align":          CondFlockAlign,
+	"f_cohesion":       CondFlockCohesion,
+	"f_sep":            CondFlockSeparation,
+	// Dynamic Role sensors
+	"role":        CondRole,
+	"role_demand": CondRoleDemand,
+	// Quorum Sensing sensors
+	"vote":           CondVote,
+	"quorum_count":   CondQuorumCount,
+	"quorum_reached": CondQuorumReached,
+	"quorum":         CondQuorumReached,
+	// Rogue Detection sensors
+	"reputation":     CondReputation,
+	"suspect_nearby": CondSuspectNearby,
+	"suspect":        CondSuspectNearby,
+	"rep":            CondReputation,
+	// Lévy-Flight sensors
+	"levy_phase":        CondLevyPhase,
+	"levy_step":         CondLevyStep,
+	"levy":              CondLevyPhase,
+	// Firefly Sync sensors
+	"flash_phase":       CondFlashPhase,
+	"flash_sync":        CondFlashSync,
+	"flash":             CondFlashSync,
+	// Collective Transport sensors
+	"transport_nearby":  CondTransportNearby,
+	"transport_count":   CondTransportCount,
+	"transport":         CondTransportNearby,
+	// Vortex Swarming sensors
+	"vortex_strength":   CondVortexStrength,
+	"vortex":            CondVortexStrength,
 }
 
 // actionNames maps action name strings to (ActionType, paramCount).
@@ -378,6 +451,35 @@ var actionNames = map[string]struct {
 	"BRAKE":               {ActBrake, 0},
 	"SCATTER_RANDOM":      {ActScatterRandom, 0},
 	"SCATTER":             {ActScatterRandom, 0},
+	// A* pathfinding
+	"FOLLOW_PATH":         {ActFollowPath, 0},
+	"PATH":                {ActFollowPath, 0},
+	// Flocking (Boids) actions
+	"FLOCK":               {ActFlock, 0},
+	"ALIGN":               {ActAlign, 0},
+	"COHERE":              {ActCohere, 0},
+	// Dynamic Role actions
+	"BECOME_SCOUT":        {ActBecomeScout, 0},
+	"BECOME_WORKER":       {ActBecomeWorker, 0},
+	"BECOME_GUARD":        {ActBecomeGuard, 0},
+	"SCOUT":               {ActBecomeScout, 0},
+	"WORKER":              {ActBecomeWorker, 0},
+	"GUARD":               {ActBecomeGuard, 0},
+	// Quorum Sensing actions
+	"VOTE":                {ActVote, 1},
+	// Rogue Detection actions
+	"FLAG_ROGUE":          {ActFlagRogue, 0},
+	"FLAG":                {ActFlagRogue, 0},
+	// Lévy-Flight actions
+	"LEVY_WALK":           {ActLevyWalk, 0},
+	"LEVY":                {ActLevyWalk, 0},
+	// Firefly actions
+	"FLASH":               {ActFlash, 0},
+	// Collective Transport actions
+	"ASSIST_TRANSPORT":    {ActAssistTransport, 0},
+	"ASSIST":              {ActAssistTransport, 0},
+	// Vortex actions
+	"VORTEX":              {ActVortex, 0},
 }
 
 // --- SwarmScript syntax highlighting support ---
@@ -463,6 +565,25 @@ var highlightConditions = map[string]bool{
 	// Energy & advanced sensors
 	"energy": true, "bot_carrying": true, "time_since_delivery": true, "since_delivery": true,
 	"recent_collision": true, "collision": true, "neighbor_min_dist": true, "nbr_min_dist": true,
+	// A* pathfinding sensors
+	"path_dist": true, "path_angle": true, "pdist": true, "pangle": true,
+	// Flocking sensors
+	"flock_align": true, "flock_cohesion": true, "flock_separation": true,
+	"flock_sep": true, "f_align": true, "f_cohesion": true, "f_sep": true,
+	// Role sensors
+	"role": true, "role_demand": true,
+	// Quorum sensors
+	"vote": true, "quorum_count": true, "quorum_reached": true, "quorum": true,
+	// Rogue sensors
+	"reputation": true, "suspect_nearby": true, "suspect": true, "rep": true,
+	// Lévy-Flight sensors
+	"levy_phase": true, "levy_step": true, "levy": true,
+	// Firefly sensors
+	"flash_phase": true, "flash_sync": true, "flash": true,
+	// Transport sensors
+	"transport_nearby": true, "transport_count": true, "transport": true,
+	// Vortex sensors
+	"vortex_strength": true, "vortex": true,
 }
 
 var highlightActions = map[string]bool{
@@ -503,6 +624,25 @@ var highlightActions = map[string]bool{
 	"DASH": true, "EMERGENCY_BROADCAST": true, "EMERGENCY": true,
 	// Movement extensions
 	"REVERSE": true, "BRAKE": true, "SCATTER_RANDOM": true, "SCATTER": true,
+	// A* pathfinding
+	"FOLLOW_PATH": true, "PATH": true,
+	// Flocking
+	"FLOCK": true, "ALIGN": true, "COHERE": true,
+	// Roles
+	"BECOME_SCOUT": true, "BECOME_WORKER": true, "BECOME_GUARD": true,
+	"SCOUT": true, "WORKER": true, "GUARD": true,
+	// Quorum
+	"VOTE": true,
+	// Rogue
+	"FLAG_ROGUE": true, "FLAG": true,
+	// Lévy-Flight
+	"LEVY_WALK": true, "LEVY": true,
+	// Firefly
+	"FLASH": true,
+	// Transport
+	"ASSIST_TRANSPORT": true, "ASSIST": true,
+	// Vortex
+	"VORTEX": true,
 }
 
 // --- Reverse mapping functions (for block editor / serialization) ---
@@ -638,6 +778,44 @@ func ConditionTypeName(ct ConditionType) string {
 		return "collision"
 	case CondNeighborMinDist:
 		return "nbr_min_dist"
+	case CondPathDist:
+		return "path_dist"
+	case CondPathAngle:
+		return "path_angle"
+	case CondFlockAlign:
+		return "flock_align"
+	case CondFlockCohesion:
+		return "flock_cohesion"
+	case CondFlockSeparation:
+		return "flock_sep"
+	case CondRole:
+		return "role"
+	case CondRoleDemand:
+		return "role_demand"
+	case CondVote:
+		return "vote"
+	case CondQuorumCount:
+		return "quorum_count"
+	case CondQuorumReached:
+		return "quorum"
+	case CondReputation:
+		return "rep"
+	case CondSuspectNearby:
+		return "suspect"
+	case CondLevyPhase:
+		return "levy_phase"
+	case CondLevyStep:
+		return "levy_step"
+	case CondFlashPhase:
+		return "flash_phase"
+	case CondFlashSync:
+		return "flash_sync"
+	case CondTransportNearby:
+		return "transport_nearby"
+	case CondTransportCount:
+		return "transport_count"
+	case CondVortexStrength:
+		return "vortex_strength"
 	}
 	return "unknown"
 }
@@ -752,6 +930,32 @@ func ActionTypeName(at ActionType) string {
 		return "BRAKE"
 	case ActScatterRandom:
 		return "SCATTER"
+	case ActFollowPath:
+		return "FOLLOW_PATH"
+	case ActFlock:
+		return "FLOCK"
+	case ActAlign:
+		return "ALIGN"
+	case ActCohere:
+		return "COHERE"
+	case ActBecomeScout:
+		return "SCOUT"
+	case ActBecomeWorker:
+		return "WORKER"
+	case ActBecomeGuard:
+		return "GUARD"
+	case ActVote:
+		return "VOTE"
+	case ActFlagRogue:
+		return "FLAG"
+	case ActLevyWalk:
+		return "LEVY_WALK"
+	case ActFlash:
+		return "FLASH"
+	case ActAssistTransport:
+		return "ASSIST"
+	case ActVortex:
+		return "VORTEX"
 	}
 	return "UNKNOWN"
 }
@@ -777,7 +981,7 @@ func ActionParamCountByName(name string) int {
 // SensorGrouped returns sensor names organized in groups for dropdown display.
 var SensorGrouped = [][]string{
 	{"-- Nachbarn --", "neighbors", "near_dist", "leader", "follower", "chain_len"},
-	{"-- Navigation --", "edge", "obs_ahead", "obs_dist", "light", "wall_right", "wall_left", "wall_front", "pher"},
+	{"-- Navigation --", "edge", "obs_ahead", "obs_dist", "light", "wall_right", "wall_left", "wall_front", "pher", "path_dist", "path_angle", "flock_align", "flock_cohesion", "flock_sep"},
 	{"-- Zufall --", "rnd", "true"},
 	{"-- Delivery --", "carry", "match", "has_pkg", "p_dist", "d_dist", "pickup_color", "dropoff_color", "heard_beacon", "beacon_dist", "exploring"},
 	{"-- Kommunikation --", "msg", "heard_pickup", "heard_dropoff", "led_dist"},
@@ -786,12 +990,14 @@ var SensorGrouped = [][]string{
 	{"-- Truck --", "truck_here", "truck_pkg_count", "on_ramp", "nearest_truck_pkg"},
 	{"-- Schwarm --", "center_dist", "swarm_spread", "isolation", "res_grad_x", "res_grad_y"},
 	{"-- Erweitert --", "energy", "bot_carrying", "since_delivery", "collision", "nbr_min_dist"},
+	{"-- Rollen & Quorum --", "role", "role_demand", "vote", "quorum_count", "quorum", "rep", "suspect"},
+	{"-- Schwarm-KI --", "levy_phase", "levy_step", "flash_phase", "flash_sync", "transport_nearby", "transport_count", "vortex_strength"},
 }
 
 // ActionGrouped returns action names organized in groups for dropdown display.
 var ActionGrouped = [][]string{
 	{"-- Bewegung --", "FWD", "FWD_SLOW", "STOP", "TURN_LEFT", "TURN_RIGHT", "TURN_RANDOM"},
-	{"-- Navigation --", "TURN_TO_NEAREST", "TURN_FROM_NEAREST", "TURN_TO_CENTER", "TURN_TO_LIGHT", "AVOID_OBSTACLE", "WALL_FOLLOW_RIGHT", "WALL_FOLLOW_LEFT", "FOLLOW_PHER"},
+	{"-- Navigation --", "TURN_TO_NEAREST", "TURN_FROM_NEAREST", "TURN_TO_CENTER", "TURN_TO_LIGHT", "AVOID_OBSTACLE", "WALL_FOLLOW_RIGHT", "WALL_FOLLOW_LEFT", "FOLLOW_PHER", "FOLLOW_PATH", "FLOCK", "ALIGN", "COHERE"},
 	{"-- Delivery --", "PICKUP", "DROP", "GOTO_PICKUP", "GOTO_DROPOFF", "GOTO_LED", "GOTO_BEACON", "SPIRAL"},
 	{"-- Kommunikation --", "SEND_MESSAGE", "SEND_PICKUP", "SEND_DROPOFF", "GOTO_HEARD_PICKUP", "GOTO_HEARD_DROPOFF"},
 	{"-- LED --", "SET_LED", "LED_PICKUP", "LED_DROPOFF", "COPY_LED"},
@@ -799,6 +1005,8 @@ var ActionGrouped = [][]string{
 	{"-- Follow --", "FOLLOW_NEAREST", "UNFOLLOW"},
 	{"-- Truck --", "GOTO_RAMP", "GOTO_TRUCK_PKG"},
 	{"-- Spezial --", "DASH", "EMERGENCY", "REVERSE", "BRAKE", "SCATTER"},
+	{"-- Rollen & Quorum --", "SCOUT", "WORKER", "GUARD", "VOTE", "FLAG"},
+	{"-- Schwarm-KI --", "LEVY_WALK", "FLASH", "ASSIST", "VORTEX"},
 }
 
 // wordPos tracks a word and its column position in a line.

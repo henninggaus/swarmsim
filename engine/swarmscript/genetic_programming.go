@@ -46,6 +46,32 @@ var gpSensorPool = []gpSensorEntry{
 	{CondTimeSinceDelivery, 0, 500},
 	{CondRecentCollision, 0, 1},
 	{CondNeighborMinDist, 0, 200},
+	{CondPathDist, 0, 500},
+	{CondPathAngle, 0, 180},
+	// Flocking sensors
+	{CondFlockAlign, 0, 180},
+	{CondFlockCohesion, 0, 200},
+	{CondFlockSeparation, 0, 100},
+	// Role sensors
+	{CondRole, 0, 3},
+	{CondRoleDemand, 1, 3},
+	// Quorum sensors
+	{CondQuorumCount, 0, 10},
+	{CondQuorumReached, 0, 1},
+	// Rogue sensors
+	{CondReputation, 0, 100},
+	{CondSuspectNearby, 0, 1},
+	// Lévy-Flight sensors
+	{CondLevyPhase, 0, 2},
+	{CondLevyStep, 0, 300},
+	// Firefly sensors
+	{CondFlashPhase, 0, 255},
+	{CondFlashSync, 0, 1},
+	// Transport sensors
+	{CondTransportNearby, 0, 5},
+	{CondTransportCount, 0, 8},
+	// Vortex sensors
+	{CondVortexStrength, 0, 100},
 }
 
 // gpActionEntry defines an action template for random generation.
@@ -86,6 +112,29 @@ var gpActionPool = []gpActionEntry{
 	{ActReverse, 0, 0, 0},
 	{ActBrake, 0, 0, 0},
 	{ActScatterRandom, 0, 0, 0},
+	{ActFollowPath, 0, 0, 0},
+	// Flocking
+	{ActFlock, 0, 0, 0},
+	{ActAlign, 0, 0, 0},
+	{ActCohere, 0, 0, 0},
+	// Roles
+	{ActBecomeScout, 0, 0, 0},
+	{ActBecomeWorker, 0, 0, 0},
+	{ActBecomeGuard, 0, 0, 0},
+	// Quorum
+	{ActVote, 1, 0, 0},
+	{ActVote, 2, 0, 0},
+	{ActVote, 3, 0, 0},
+	// Rogue
+	{ActFlagRogue, 0, 0, 0},
+	// Lévy-Flight
+	{ActLevyWalk, 0, 0, 0},
+	// Firefly
+	{ActFlash, 0, 0, 0},
+	// Transport
+	{ActAssistTransport, 0, 0, 0},
+	// Vortex
+	{ActVortex, 0, 0, 0},
 }
 
 // GenerateRandomProgram creates a random SwarmScript program with numRules rules.
