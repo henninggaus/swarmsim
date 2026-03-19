@@ -99,7 +99,21 @@ func (st *StatsTracker) RecordDelivery(correct bool, team int) {
 }
 
 // UpdateHeatmap updates the heatmap grid with current bot positions.
+// Applies periodic decay every 5000 ticks to prevent unbounded growth in long sessions.
 func (st *StatsTracker) UpdateHeatmap(ss *SwarmState) {
+	// Periodic decay: halve all values every 5000 ticks to prevent overflow
+	if ss.Tick > 0 && ss.Tick%5000 == 0 {
+		st.HeatmapMax = 0
+		for cx := 0; cx < 80; cx++ {
+			for cy := 0; cy < 60; cy++ {
+				st.HeatmapGrid[cx][cy] /= 2
+				if st.HeatmapGrid[cx][cy] > st.HeatmapMax {
+					st.HeatmapMax = st.HeatmapGrid[cx][cy]
+				}
+			}
+		}
+	}
+
 	cellW := ss.ArenaW / 80.0
 	cellH := ss.ArenaH / 60.0
 	for i := range ss.Bots {
@@ -169,6 +183,9 @@ func (st *StatsTracker) AddPickupEvent(botIdx int, colorName string) {
 
 // RecordActionAt records an action event at a world position for the action heatmap.
 func (st *StatsTracker) RecordActionAt(x, y, arenaW, arenaH float64) {
+	if arenaW <= 0 || arenaH <= 0 {
+		return
+	}
 	cellW := arenaW / 80.0
 	cellH := arenaH / 60.0
 	cx := int(x / cellW)

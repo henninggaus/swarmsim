@@ -239,9 +239,11 @@ func MutateProgram(rng *rand.Rand, p *SwarmProgram) {
 			act := gpActionPool[rng.Intn(len(gpActionPool))]
 			p.Rules[i].Action = Action{Type: act.Type, Param1: act.Param1, Param2: act.Param2, Param3: act.Param3}
 		case roll < 0.90:
-			// Rule swap: swap with another random rule
-			j := rng.Intn(len(p.Rules) - 1) // exclude fallback
-			p.Rules[i], p.Rules[j] = p.Rules[j], p.Rules[i]
+			// Rule swap: swap with another random rule (exclude fallback)
+			if len(p.Rules) > 2 {
+				j := rng.Intn(len(p.Rules) - 1)
+				p.Rules[i], p.Rules[j] = p.Rules[j], p.Rules[i]
+			}
 		default:
 			// Operator mutation: change comparison operator
 			if len(p.Rules[i].Conditions) > 0 {

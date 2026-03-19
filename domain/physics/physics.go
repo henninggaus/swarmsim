@@ -124,7 +124,11 @@ func ResolveCircleRectOverlap(cx, cy, cr, rx, ry, rw, rh float64) (float64, floa
 
 // NewSpatialHash creates a spatial hash for the given arena size and cell size.
 // Pre-allocates all cell slices to avoid per-frame heap allocations.
+// Returns nil if any dimension or cellSize is invalid.
 func NewSpatialHash(arenaW, arenaH, cellSize float64) *SpatialHash {
+	if cellSize <= 0 || arenaW <= 0 || arenaH <= 0 {
+		return nil
+	}
 	cols := int(math.Ceil(arenaW / cellSize))
 	rows := int(math.Ceil(arenaH / cellSize))
 	total := cols * rows

@@ -35,13 +35,18 @@ func ClipboardRead(callback func(string)) {
 		callback("")
 		return
 	}
-	thenFn := js.FuncOf(func(this js.Value, args []js.Value) interface{} {
+	var thenFn, catchFn js.Func
+	thenFn = js.FuncOf(func(this js.Value, args []js.Value) interface{} {
+		defer thenFn.Release()
+		defer catchFn.Release()
 		if len(args) > 0 {
 			callback(args[0].String())
 		}
 		return nil
 	})
-	catchFn := js.FuncOf(func(this js.Value, args []js.Value) interface{} {
+	catchFn = js.FuncOf(func(this js.Value, args []js.Value) interface{} {
+		defer thenFn.Release()
+		defer catchFn.Release()
 		callback("")
 		return nil
 	})

@@ -208,6 +208,9 @@ func drawDashFitnessGraph(screen *ebiten.Image, ss *swarm.SwarmState, gx, gy, gw
 		}
 		bPts := bN - bStart
 		for i := 1; i < bPts; i++ {
+			if bStart+i >= len(baseline) || bStart+i-1 >= len(baseline) {
+				break
+			}
 			x0 := float32(gx) + float32(i-1)/float32(bPts-1)*float32(gw)
 			x1 := float32(gx) + float32(i)/float32(bPts-1)*float32(gw)
 			y0b := float32(gy+gh) - float32(baseline[bStart+i-1].Best/maxFit)*float32(gh)

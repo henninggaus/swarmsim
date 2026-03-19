@@ -75,7 +75,9 @@ func DrawConsole(screen *ebiten.Image, entries []logger.LogEntry, isSwarmMode bo
 		line := timeStr + " [" + e.Tag + "] " + e.Message
 		// Truncate long lines
 		maxChars := (panelW - consolePadding*2) / charW
-		if len(line) > maxChars {
+		if maxChars < 4 {
+			line = "..."
+		} else if len(line) > maxChars {
 			line = line[:maxChars-3] + "..."
 		}
 		// Dim timestamp
