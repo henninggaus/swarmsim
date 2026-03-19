@@ -10,11 +10,16 @@ import (
 	"image/png"
 	"os"
 	"swarmsim/logger"
+	"sync"
 	"time"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 )
+
+// gifMu protects Renderer fields written by the background GIF encoding goroutine
+// (GIFEncoding, GIFEncodedFile) from concurrent access on the main/draw thread.
+var gifMu sync.Mutex
 
 const (
 	gifFrameSkip = 4   // capture every 4th frame (25% of frames)
@@ -84,8 +89,10 @@ func StopRecording(r *Renderer) {
 	go func() {
 		fname := encodeGIF(frames)
 		// Signal completion back to renderer (checked in Draw)
+		gifMu.Lock()
 		r.GIFEncodedFile = fname
 		r.GIFEncoding = false
+		gifMu.Unlock()
 	}()
 }
 
@@ -141,6 +148,11 @@ func CaptureGIFFrame(screen *ebiten.Image, r *Renderer) bool {
 
 	pix := make([]byte, srcW*srcH*4)
 	screen.ReadPixels(pix)
+
+	// Stop before exceeding max frames (prevents 301+ frame overruns)
+	if r.RecFrameCount >= gifMaxFrames {
+		return true
+	}
 
 	// Downscale to 50% (fast box averaging, no dithering)
 	scaled := halfScale(pix, srcW, srcH)
@@ -213,7 +225,15 @@ func DrawCaptureOverlay(screen *ebiten.Image, r *Renderer) {
 	}
 
 	// "Encoding GIF..." overlay with spinner
-	if r.GIFEncoding {
+	gifMu.Lock()
+	encoding := r.GIFEncoding
+	encodedFile := r.GIFEncodedFile
+	if !encoding && encodedFile != "" {
+		r.GIFEncodedFile = ""
+	}
+	gifMu.Unlock()
+
+	if encoding {
 		spinChars := []string{"|", "/", "-", "\\"}
 		spin := spinChars[(r.RecBlinkTick/8)%4]
 		r.RecBlinkTick++
@@ -226,14 +246,10 @@ func DrawCaptureOverlay(screen *ebiten.Image, r *Renderer) {
 		printColoredAt(screen, text, x, y+2, color.RGBA{120, 180, 255, 255})
 	}
 
-	// Check if background encoding finished
-	if !r.GIFEncoding && r.GIFEncodedFile != "" {
-		fname := r.GIFEncodedFile
-		r.GIFEncodedFile = ""
-		if fname != "" {
-			r.OverlayText = "GIF saved: " + fname
-			r.OverlayTimer = 90
-		}
+	// Check if background encoding finished (using mutex-protected snapshot above)
+	if !encoding && encodedFile != "" {
+		r.OverlayText = "GIF saved: " + encodedFile
+		r.OverlayTimer = 90
 	}
 
 	// REC indicator (blinking red dot + frame counter)

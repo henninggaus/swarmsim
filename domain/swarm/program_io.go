@@ -37,17 +37,7 @@ func ExportProgram(ss *SwarmState, filename string) error {
 	}
 
 	// Average params across bots
-	var avgParams [26]float64
-	if len(ss.Bots) > 0 {
-		for i := range ss.Bots {
-			for p := 0; p < 26; p++ {
-				avgParams[p] += ss.Bots[i].ParamValues[p]
-			}
-		}
-		for p := 0; p < 26; p++ {
-			avgParams[p] /= float64(len(ss.Bots))
-		}
-	}
+	avgParams := AverageParamsAcrossBots(ss.Bots, nil)
 
 	sf := SwarmFile{
 		Name:       ss.ProgramName,

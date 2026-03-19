@@ -10,6 +10,41 @@ import (
 	"swarmsim/logger"
 )
 
+const (
+	// SpawnAreaMargin is the minimum distance from arena edges for bot/station spawning.
+	SpawnAreaMargin = 30.0
+
+	// SensorNoNeighbor is the sentinel value for "no neighbor/obstacle detected".
+	SensorNoNeighbor = 999.0
+
+	// BotDefaultEnergy is the starting energy for bots on reset.
+	BotDefaultEnergy = 100.0
+)
+
+// NewSwarmBot creates a fully initialized SwarmBot at the given position.
+// All sensor caches and sentinel values are set to safe defaults.
+func NewSwarmBot(x, y float64, rng *rand.Rand) SwarmBot {
+	return SwarmBot{
+		X:                   x,
+		Y:                   y,
+		Angle:               rng.Float64() * 2 * math.Pi,
+		LEDColor:            [3]uint8{255, 255, 255},
+		Energy:              BotDefaultEnergy,
+		FollowTargetIdx:     -1,
+		FollowerIdx:         -1,
+		ObstacleDist:        SensorNoNeighbor,
+		NearestIdx:          -1,
+		StuckPrevX:          x,
+		StuckPrevY:          y,
+		CarryingPkg:         -1,
+		NearestPickupDist:   SensorNoNeighbor,
+		NearestDropoffDist:  SensorNoNeighbor,
+		NearestPickupIdx:    -1,
+		NearestDropoffIdx:   -1,
+		NearestMatchLEDDist: SensorNoNeighbor,
+	}
+}
+
 // NewSwarmState creates and initializes a fresh swarm scenario.
 func NewSwarmState(rng *rand.Rand, botCount int) *SwarmState {
 	ss := &SwarmState{
@@ -28,27 +63,37 @@ func NewSwarmState(rng *rand.Rand, botCount int) *SwarmState {
 		SwarmCamZoom: 1.0,
 	}
 
-	// Set up presets
-	ss.PresetNames = []string{
-		"Aggregation", "Dispersion", "Orbit", "Color Wave", "Flocking",
-		"Snake Formation", "Obstacle Nav", "Pulse Sync", "Trail Follow", "Ant Colony",
-		"Simple Delivery", "Delivery Comm", "Delivery Roles",
-		"Simple Unload", "Coordinated Unload",
-		"Evolving Delivery", "Evolving Truck",
-		"Maze Explorer",
-		"GP: Random Start",
-		"GP: Seeded Start",
-		"Neuro: Delivery",
+	// Set up presets as type-safe pairs (name + source always stay together)
+	ss.Presets = []SwarmPreset{
+		{"Aggregation", presetAggregation},
+		{"Dispersion", presetDispersion},
+		{"Orbit", presetOrbit},
+		{"Color Wave", presetColorWave},
+		{"Flocking", presetFlocking},
+		{"Snake Formation", presetSnakeFormation},
+		{"Obstacle Nav", presetObstacleNav},
+		{"Pulse Sync", presetPulseSync},
+		{"Trail Follow", presetTrailFollow},
+		{"Ant Colony", presetAntColony},
+		{"Simple Delivery", presetSimpleDelivery},
+		{"Delivery Comm", presetDeliveryComm},
+		{"Delivery Roles", presetDeliveryRoles},
+		{"Simple Unload", presetSimpleUnload},
+		{"Coordinated Unload", presetCoordinatedUnload},
+		{"Evolving Delivery", presetEvolvingDelivery},
+		{"Evolving Truck", presetEvolvingTruckUnload},
+		{"Maze Explorer", presetMazeExplorer},
+		{"GP: Random Start", presetGPRandomStart},
+		{"GP: Seeded Start", presetGPSeededStart},
+		{"Neuro: Delivery", presetNeuroDelivery},
 	}
-	ss.PresetPrograms = []string{
-		presetAggregation, presetDispersion, presetOrbit, presetColorWave, presetFlocking,
-		presetSnakeFormation, presetObstacleNav, presetPulseSync, presetTrailFollow, presetAntColony,
-		presetSimpleDelivery, presetDeliveryComm, presetDeliveryRoles,
-		presetSimpleUnload, presetCoordinatedUnload,
-		presetEvolvingDelivery, presetEvolvingTruckUnload,
-		presetMazeExplorer,
-		presetGPRandomStart, presetGPSeededStart,
-		presetNeuroDelivery,
+
+	// Backward-compatible parallel arrays (derived from Presets)
+	ss.PresetNames = make([]string, len(ss.Presets))
+	ss.PresetPrograms = make([]string, len(ss.Presets))
+	for i, p := range ss.Presets {
+		ss.PresetNames[i] = p.Name
+		ss.PresetPrograms[i] = p.Source
 	}
 
 	// Initialize editor with default preset
@@ -74,31 +119,13 @@ func NewSwarmState(rng *rand.Rand, botCount int) *SwarmState {
 	return ss
 }
 
-// spawnBots creates bots at random positions.
+// spawnBots creates bots at random positions within the arena.
 func (ss *SwarmState) spawnBots(count int) {
-	margin := 30.0
 	ss.Bots = make([]SwarmBot, count)
 	for i := range ss.Bots {
-		startX := margin + ss.Rng.Float64()*(ss.ArenaW-2*margin)
-		startY := margin + ss.Rng.Float64()*(ss.ArenaH-2*margin)
-		ss.Bots[i] = SwarmBot{
-			X:                   startX,
-			Y:                   startY,
-			Angle:               ss.Rng.Float64() * 2 * math.Pi,
-			LEDColor:            [3]uint8{255, 255, 255},
-			FollowTargetIdx:     -1,
-			FollowerIdx:         -1,
-			ObstacleDist:        999,
-			NearestIdx:          -1,
-			StuckPrevX:          startX,
-			StuckPrevY:          startY,
-			CarryingPkg:         -1,
-			NearestPickupDist:   999,
-			NearestDropoffDist:  999,
-			NearestPickupIdx:    -1,
-			NearestDropoffIdx:   -1,
-			NearestMatchLEDDist: 999,
-		}
+		x := SpawnAreaMargin + ss.Rng.Float64()*(ss.ArenaW-2*SpawnAreaMargin)
+		y := SpawnAreaMargin + ss.Rng.Float64()*(ss.ArenaH-2*SpawnAreaMargin)
+		ss.Bots[i] = NewSwarmBot(x, y, ss.Rng)
 	}
 	ss.BotCount = count
 }
@@ -120,10 +147,11 @@ func (ss *SwarmState) RespawnBots(count int) {
 
 // ResetBots resets all bot positions and internal state but keeps bot count.
 func (ss *SwarmState) ResetBots() {
-	margin := 30.0
 	for i := range ss.Bots {
-		ss.Bots[i].X = margin + ss.Rng.Float64()*(ss.ArenaW-2*margin)
-		ss.Bots[i].Y = margin + ss.Rng.Float64()*(ss.ArenaH-2*margin)
+		x := SpawnAreaMargin + ss.Rng.Float64()*(ss.ArenaW-2*SpawnAreaMargin)
+		y := SpawnAreaMargin + ss.Rng.Float64()*(ss.ArenaH-2*SpawnAreaMargin)
+		ss.Bots[i].X = x
+		ss.Bots[i].Y = y
 		ss.Bots[i].Angle = ss.Rng.Float64() * 2 * math.Pi
 		ss.Bots[i].Speed = 0
 		ss.Bots[i].LEDColor = [3]uint8{255, 255, 255}
@@ -141,22 +169,22 @@ func (ss *SwarmState) ResetBots() {
 		ss.Bots[i].NearestLEDG = 0
 		ss.Bots[i].NearestLEDB = 0
 		ss.Bots[i].ObstacleAhead = false
-		ss.Bots[i].ObstacleDist = 999
+		ss.Bots[i].ObstacleDist = SensorNoNeighbor
 		ss.Bots[i].NearestIdx = -1
 		ss.Bots[i].StuckTicks = 0
-		ss.Bots[i].StuckPrevX = ss.Bots[i].X
-		ss.Bots[i].StuckPrevY = ss.Bots[i].Y
+		ss.Bots[i].StuckPrevX = x
+		ss.Bots[i].StuckPrevY = y
 		ss.Bots[i].StuckCooldown = 0
 		ss.Bots[i].Trail = [30][2]float64{}
 		ss.Bots[i].TrailIdx = 0
 		ss.Bots[i].CarryingPkg = -1
-		ss.Bots[i].NearestPickupDist = 999
-		ss.Bots[i].NearestDropoffDist = 999
+		ss.Bots[i].NearestPickupDist = SensorNoNeighbor
+		ss.Bots[i].NearestDropoffDist = SensorNoNeighbor
 		ss.Bots[i].NearestPickupIdx = -1
 		ss.Bots[i].NearestDropoffIdx = -1
-		ss.Bots[i].NearestMatchLEDDist = 999
+		ss.Bots[i].NearestMatchLEDDist = SensorNoNeighbor
 		ss.Bots[i].NearestMatchLEDAngle = 0
-		ss.Bots[i].Energy = 100 // full energy on reset
+		ss.Bots[i].Energy = BotDefaultEnergy
 	}
 	ss.Tick = 0
 	ss.PrevMessages = nil
@@ -174,8 +202,8 @@ func (ss *SwarmState) ResetDeliveryState() {
 	// Clear bot carrying state and delivery sensor caches
 	for i := range ss.Bots {
 		ss.Bots[i].CarryingPkg = -1
-		ss.Bots[i].NearestPickupDist = 999
-		ss.Bots[i].NearestDropoffDist = 999
+		ss.Bots[i].NearestPickupDist = SensorNoNeighbor
+		ss.Bots[i].NearestDropoffDist = SensorNoNeighbor
 		ss.Bots[i].NearestPickupIdx = -1
 		ss.Bots[i].NearestDropoffIdx = -1
 		ss.Bots[i].NearestPickupColor = 0
@@ -184,7 +212,7 @@ func (ss *SwarmState) ResetDeliveryState() {
 		ss.Bots[i].DropoffMatch = false
 		ss.Bots[i].HeardPickupColor = 0
 		ss.Bots[i].HeardDropoffColor = 0
-		ss.Bots[i].NearestMatchLEDDist = 999
+		ss.Bots[i].NearestMatchLEDDist = SensorNoNeighbor
 		ss.Bots[i].NearestMatchLEDAngle = 0
 	}
 	ss.resetDeliveryPackages()
@@ -672,6 +700,26 @@ func NeighborDelta(ax, ay, bx, by float64, ss *SwarmState) (float64, float64) {
 		}
 	}
 	return dx, dy
+}
+
+// AverageParamsAcrossBots computes the mean of each parameter $A-$Z across all bots.
+// If usedOnly is non-nil, only parameters marked as used are averaged.
+func AverageParamsAcrossBots(bots []SwarmBot, usedOnly *[26]bool) [26]float64 {
+	var avg [26]float64
+	if len(bots) == 0 {
+		return avg
+	}
+	for p := 0; p < 26; p++ {
+		if usedOnly != nil && !usedOnly[p] {
+			continue
+		}
+		total := 0.0
+		for i := range bots {
+			total += bots[i].ParamValues[p]
+		}
+		avg[p] = total / float64(len(bots))
+	}
+	return avg
 }
 
 // --- Preset Programs ---

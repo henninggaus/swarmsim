@@ -5,6 +5,7 @@ package render
 import (
 	"os"
 	"path/filepath"
+	"swarmsim/logger"
 )
 
 func tutorialDoneDir() string {
@@ -31,6 +32,11 @@ func MarkTutorialDone() {
 	if dir == "" {
 		return
 	}
-	_ = os.MkdirAll(dir, 0o755)
-	_ = os.WriteFile(filepath.Join(dir, "tutorial_done"), []byte("done"), 0o644)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		logger.Warn("TUTORIAL", "Failed to create config dir: %v", err)
+		return
+	}
+	if err := os.WriteFile(filepath.Join(dir, "tutorial_done"), []byte("done"), 0o644); err != nil {
+		logger.Warn("TUTORIAL", "Failed to save tutorial state: %v", err)
+	}
 }

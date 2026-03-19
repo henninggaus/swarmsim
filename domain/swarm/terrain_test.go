@@ -81,15 +81,13 @@ func TestGeneratePerlinTerrain(t *testing.T) {
 	tg := NewTerrainGrid(800, 800, 20)
 	GeneratePerlinTerrain(rng, tg)
 
-	hasWater := false
 	hasGrass := false
+	biomeSet := make(map[BiomeType]bool)
 	for _, c := range tg.Cells {
 		if c.Height < 0 || c.Height > 1 {
 			t.Errorf("height out of range: %f", c.Height)
 		}
-		if c.Biome == BiomeWater {
-			hasWater = true
-		}
+		biomeSet[c.Biome] = true
 		if c.Biome == BiomeGrass {
 			hasGrass = true
 		}
@@ -97,7 +95,10 @@ func TestGeneratePerlinTerrain(t *testing.T) {
 	if !hasGrass {
 		t.Error("should have some grass biome")
 	}
-	_ = hasWater // water may or may not appear depending on noise
+	// Verify biome diversity: at least 2 distinct biome types should be generated.
+	if len(biomeSet) < 2 {
+		t.Errorf("expected at least 2 biome types, got %d", len(biomeSet))
+	}
 }
 
 func TestTerrainHeightGradient(t *testing.T) {

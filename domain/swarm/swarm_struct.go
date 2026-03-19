@@ -40,6 +40,14 @@ const (
 	TruckRoundDone                        // all trucks in round delivered
 )
 
+// SwarmPreset pairs a preset name with its SwarmScript source code.
+// This replaces the parallel PresetNames/PresetPrograms arrays to prevent
+// accidental divergence (wrong name mapped to wrong program).
+type SwarmPreset struct {
+	Name   string
+	Source string
+}
+
 // SwarmBot is a simple programmable robot with no identity.
 type SwarmBot struct {
 	X, Y  float64 // world position
@@ -375,6 +383,12 @@ type SwarmState struct {
 	ErrorMsg  string // parse error message (empty if no error)
 	ErrorLine int    // 1-based line of error, 0 if none
 
+	// Presets holds all built-in SwarmScript programs as name+source pairs.
+	// Using a struct slice prevents name/program arrays from diverging.
+	Presets []SwarmPreset
+
+	// Deprecated: use Presets[i].Name / Presets[i].Source instead.
+	// Kept temporarily for backward compatibility during migration.
 	PresetNames    []string
 	PresetPrograms []string
 	DropdownOpen   bool

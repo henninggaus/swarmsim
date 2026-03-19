@@ -2,6 +2,7 @@ package swarm
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
 	"swarmsim/logger"
 )
@@ -30,18 +31,8 @@ func SavePreset(ss *SwarmState, name string) {
 		UsedParams: ss.UsedParams,
 	}
 
-	// Average params across bots
-	if len(ss.Bots) > 0 {
-		for p := 0; p < 26; p++ {
-			if ss.UsedParams[p] {
-				total := 0.0
-				for i := range ss.Bots {
-					total += ss.Bots[i].ParamValues[p]
-				}
-				preset.Params[p] = total / float64(len(ss.Bots))
-			}
-		}
-	}
+	// Average params across bots (only used parameters)
+	preset.Params = AverageParamsAcrossBots(ss.Bots, &ss.UsedParams)
 
 	// Save program source
 	if ss.Editor != nil && len(ss.Editor.Lines) > 0 {
@@ -120,11 +111,14 @@ func DeletePreset(name string) {
 func loadPresetStore() PresetStore {
 	data, err := os.ReadFile(presetsFile)
 	if err != nil {
+		if !errors.Is(err, os.ErrNotExist) {
+			logger.Warn("PRESET", "Failed to read %s: %v", presetsFile, err)
+		}
 		return PresetStore{}
 	}
 	var store PresetStore
 	if err := json.Unmarshal(data, &store); err != nil {
-		logger.Warn("PRESET", "Parse error: %v", err)
+		logger.Warn("PRESET", "Parse error in %s: %v (resetting)", presetsFile, err)
 		return PresetStore{}
 	}
 	return store

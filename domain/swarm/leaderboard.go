@@ -2,6 +2,7 @@ package swarm
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
 	"sort"
 	"swarmsim/logger"
@@ -30,14 +31,19 @@ type LeaderboardState struct {
 }
 
 // LoadLeaderboard reads the leaderboard from disk.
+// Returns an empty leaderboard if the file doesn't exist yet (first run).
+// Logs a warning if the file exists but can't be read or parsed.
 func LoadLeaderboard() *LeaderboardState {
 	lb := &LeaderboardState{}
 	data, err := os.ReadFile(leaderboardFile)
 	if err != nil {
+		if !errors.Is(err, os.ErrNotExist) {
+			logger.Warn("LEADERBOARD", "Failed to read %s: %v", leaderboardFile, err)
+		}
 		return lb
 	}
 	if err := json.Unmarshal(data, lb); err != nil {
-		logger.Warn("LEADERBOARD", "Parse error: %v", err)
+		logger.Warn("LEADERBOARD", "Parse error in %s: %v (resetting)", leaderboardFile, err)
 		return &LeaderboardState{}
 	}
 	return lb
@@ -55,9 +61,23 @@ func SaveLeaderboard(lb *LeaderboardState) {
 	}
 }
 
+// maxLeaderboardNameLen limits entry names to prevent memory abuse.
+const maxLeaderboardNameLen = 100
+
 // SubmitScore adds a score if it qualifies for the leaderboard.
 // Returns true if the score was added (new highscore).
 func SubmitScore(lb *LeaderboardState, entry LeaderboardEntry) bool {
+	// Validate inputs
+	if entry.Name == "" || len(entry.Name) > maxLeaderboardNameLen {
+		return false
+	}
+	if entry.Correct < 0 || entry.Wrong < 0 || entry.Deliveries < 0 {
+		return false
+	}
+	if entry.BotCount <= 0 || entry.Ticks < 0 {
+		return false
+	}
+
 	// Calculate score: correct * 10 + wrong * 2
 	entry.Score = entry.Correct*10 + entry.Wrong*2
 	if entry.Deliveries > 0 {
