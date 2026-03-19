@@ -102,6 +102,49 @@ const (
 	CondTransportNearby                          // transport_nearby (heavy objects in range)
 	CondTransportCount                           // transport_count (bots assisting nearest task)
 	CondVortexStrength                           // vortex_strength (local rotation strength 0-100)
+	CondWaggleDancing                            // waggle_dancing (1 if performing dance)
+	CondWaggleTarget                             // waggle_target (angle to decoded target, -180..180)
+	CondMorphA                                   // morph_a (activator concentration 0-100)
+	CondMorphH                                   // morph_h (inhibitor concentration 0-100)
+	CondEvasionAlert                             // evasion_alert (1 if fleeing)
+	CondEvasionWave                              // evasion_wave (ticks since alarm)
+	CondSlimeTrail                               // slime_trail (trail intensity 0-100)
+	CondSlimeGrad                                // slime_grad (angle to strongest trail -180..180)
+	CondBridgeActive                             // bridge_active (1 if part of bridge)
+	CondBridgeNearby                             // bridge_nearby (count of nearby bridge bots)
+	CondShapeDist                                // shape_dist (distance to shape target)
+	CondShapeAngle                               // shape_angle (angle to shape target -180..180)
+	CondShapeProgress                            // shape_progress (% of bots arrived 0-100)
+	CondWaveFlash                                // wave_flash (1 if currently flashing)
+	CondWavePhase                                // wave_phase (distance from wave front 0-100)
+	CondShepherdRole                             // shepherd_role (1=shepherd, 0=flock)
+	CondShepherdDist                             // shepherd_dist (distance to flock center)
+	CondFlockToTarget                            // flock_to_target (distance from flock to target)
+	CondPSOFitness                               // pso_fitness (current fitness 0-100)
+	CondPSOBest                                  // pso_best (personal best fitness)
+	CondPSOGlobalDist                            // pso_global_dist (distance to global best)
+	CondPredRole                                 // pred_role (1=predator, 0=prey)
+	CondPreyDist                                 // prey_dist (distance to nearest opponent)
+	CondPredCatches                              // pred_catches (predator catch count)
+	CondMagChainLen                              // mag_chain_len (magnetic chain length)
+	CondMagLinked                                // mag_linked (1 if in chain)
+	CondMagAlign                                 // mag_align (alignment -100..100)
+	CondDivGroup                                 // div_group (0 or 1)
+	CondDivPhase                                 // div_phase (cycle phase 0-100)
+	CondDivDist                                  // div_dist (distance to group center)
+	CondVFormPos                                 // vform_pos (position in V: 0=leader, +right, -left)
+	CondVFormDraft                               // vform_draft (1 if in draft zone)
+	CondVFormLeader                              // vform_leader (1 if current leader)
+	CondBroodCarrying                            // brood_carrying (1 if carrying item)
+	CondBroodItemColor                           // brood_item_color (0=none, 1=red, 2=green, 3=blue)
+	CondBroodDensity                             // brood_density (nearby item count)
+	CondBroodSameColor                           // brood_same_color (nearby same-color items)
+	CondJellyPhase                               // jelly_phase (oscillator phase 0-100)
+	CondJellyExpanding                           // jelly_expanding (1=expanding, 0=contracting)
+	CondJellyRadius                              // jelly_radius (distance to swarm center)
+	CondImmuneRole                               // immune_role (0=normal, 1=antibody, 2=pathogen)
+	CondImmuneAlert                              // immune_alert (antibody alert 0-100)
+	CondImmunePathDist                           // immune_path_dist (distance to nearest pathogen)
 )
 
 // Condition represents a single boolean check in a rule.
@@ -178,6 +221,24 @@ const (
 	ActFlash                                   // FLASH (trigger immediate firefly flash)
 	ActAssistTransport                         // ASSIST_TRANSPORT (join nearest transport task)
 	ActVortex                                  // VORTEX (join/maintain vortex rotation)
+	ActWaggleDance                             // WAGGLE_DANCE (perform waggle dance to advertise location)
+	ActFollowDance                             // FOLLOW_DANCE (steer toward decoded waggle dance target)
+	ActMorphColor                              // MORPH_COLOR (set LED based on morphogen concentrations)
+	ActEvade                                   // EVADE (trigger evasion alarm + flee)
+	ActFollowSlime                             // FOLLOW_SLIME (follow slime mold trail gradient)
+	ActFormBridge                              // FORM_BRIDGE (join or start an ant bridge)
+	ActCrossBridge                             // CROSS_BRIDGE (cross a nearby ant bridge)
+	ActFormShape                               // FORM_SHAPE (steer toward shape formation target)
+	ActWaveFlash                               // WAVE_FLASH (participate in Mexican wave)
+	ActShepherd                                // SHEPHERD (herd flock or flee from shepherd)
+	ActPSOMove                                 // PSO_MOVE (follow PSO velocity toward optimum)
+	ActPredator                                // PREDATOR (chase prey or flee from predator)
+	ActMagnetic                                // MAGNETIC (apply magnetic dipole forces)
+	ActDivide                                  // DIVIDE (apply cell division forces)
+	ActVFormation                              // V_FORMATION (steer into V-formation position)
+	ActBroodSort                               // BROOD_SORT (pick up or drop items by density)
+	ActJellyfishPulse                          // JELLYFISH_PULSE (expand/contract with swarm)
+	ActImmune                                  // IMMUNE (antibody chase / pathogen flee)
 )
 
 // Action represents an action to execute when a rule matches.
@@ -372,6 +433,85 @@ var conditionNames = map[string]ConditionType{
 	// Vortex Swarming sensors
 	"vortex_strength":   CondVortexStrength,
 	"vortex":            CondVortexStrength,
+	// Waggle Dance sensors
+	"waggle_dancing":    CondWaggleDancing,
+	"waggle_target":     CondWaggleTarget,
+	"dancing":           CondWaggleDancing,
+	"waggle":            CondWaggleTarget,
+	// Morphogen sensors
+	"morph_a":            CondMorphA,
+	"morph_h":            CondMorphH,
+	"activator":          CondMorphA,
+	"inhibitor":          CondMorphH,
+	// Evasion Wave sensors
+	"evasion_alert":      CondEvasionAlert,
+	"evasion_wave":       CondEvasionWave,
+	"evasion":            CondEvasionAlert,
+	"alarm":              CondEvasionAlert,
+	// Slime Mold sensors
+	"slime_trail":        CondSlimeTrail,
+	"slime_grad":         CondSlimeGrad,
+	"slime":              CondSlimeTrail,
+	// Ant Bridge sensors
+	"bridge_active":      CondBridgeActive,
+	"bridge_nearby":      CondBridgeNearby,
+	"bridge":             CondBridgeActive,
+	// Shape Formation sensors
+	"shape_dist":         CondShapeDist,
+	"shape_angle":        CondShapeAngle,
+	"shape_progress":     CondShapeProgress,
+	"shape":              CondShapeDist,
+	// Mexican Wave sensors
+	"wave_flash":         CondWaveFlash,
+	"wave_phase":         CondWavePhase,
+	"wave":               CondWaveFlash,
+	// Shepherd-Flock sensors
+	"shepherd_role":      CondShepherdRole,
+	"shepherd_dist":      CondShepherdDist,
+	"flock_to_target":    CondFlockToTarget,
+	"shepherd":           CondShepherdRole,
+	// PSO sensors
+	"pso_fitness":        CondPSOFitness,
+	"pso_best":           CondPSOBest,
+	"pso_global_dist":    CondPSOGlobalDist,
+	"pso":                CondPSOFitness,
+	// Predator-Prey sensors
+	"pred_role":           CondPredRole,
+	"prey_dist":           CondPreyDist,
+	"pred_catches":        CondPredCatches,
+	"predator":            CondPredRole,
+	"prey":                CondPreyDist,
+	// Magnetic Chain sensors
+	"mag_chain_len":       CondMagChainLen,
+	"mag_linked":          CondMagLinked,
+	"mag_align":           CondMagAlign,
+	"magnetic":            CondMagLinked,
+	// Cell Division sensors
+	"div_group":           CondDivGroup,
+	"div_phase":           CondDivPhase,
+	"div_dist":            CondDivDist,
+	"division":            CondDivPhase,
+	// V-Formation sensors
+	"vform_pos":           CondVFormPos,
+	"vform_draft":         CondVFormDraft,
+	"vform_leader":        CondVFormLeader,
+	"v_formation":         CondVFormDraft,
+	// Brood Sorting sensors
+	"brood_carrying":      CondBroodCarrying,
+	"brood_item_color":    CondBroodItemColor,
+	"brood_density":       CondBroodDensity,
+	"brood_same_color":    CondBroodSameColor,
+	"brood":               CondBroodCarrying,
+	// Jellyfish Pulse sensors
+	"jelly_phase":         CondJellyPhase,
+	"jelly_expanding":     CondJellyExpanding,
+	"jelly_radius":        CondJellyRadius,
+	"jellyfish":           CondJellyPhase,
+	// Immune System sensors
+	"immune_role":         CondImmuneRole,
+	"immune_alert":        CondImmuneAlert,
+	"immune_path_dist":    CondImmunePathDist,
+	"immune":              CondImmuneRole,
 }
 
 // actionNames maps action name strings to (ActionType, paramCount).
@@ -480,6 +620,56 @@ var actionNames = map[string]struct {
 	"ASSIST":              {ActAssistTransport, 0},
 	// Vortex actions
 	"VORTEX":              {ActVortex, 0},
+	// Waggle Dance actions
+	"WAGGLE_DANCE":        {ActWaggleDance, 0},
+	"WAGGLE":              {ActWaggleDance, 0},
+	"FOLLOW_DANCE":        {ActFollowDance, 0},
+	// Morphogen actions
+	"MORPH_COLOR":         {ActMorphColor, 0},
+	"MORPH":               {ActMorphColor, 0},
+	// Evasion actions
+	"EVADE":               {ActEvade, 0},
+	"FLEE":                {ActEvade, 0},
+	// Slime Mold actions
+	"FOLLOW_SLIME":        {ActFollowSlime, 0},
+	"SLIME":               {ActFollowSlime, 0},
+	// Ant Bridge actions
+	"FORM_BRIDGE":         {ActFormBridge, 0},
+	"BRIDGE":              {ActFormBridge, 0},
+	"CROSS_BRIDGE":        {ActCrossBridge, 0},
+	// Shape Formation actions
+	"FORM_SHAPE":          {ActFormShape, 0},
+	"SHAPE":               {ActFormShape, 0},
+	// Mexican Wave actions
+	"WAVE_FLASH":          {ActWaveFlash, 0},
+	"WAVE":                {ActWaveFlash, 0},
+	// Shepherd actions
+	"SHEPHERD":            {ActShepherd, 0},
+	"HERD":                {ActShepherd, 0},
+	// PSO actions
+	"PSO_MOVE":            {ActPSOMove, 0},
+	"PSO":                 {ActPSOMove, 0},
+	// Predator-Prey actions
+	"PREDATOR":            {ActPredator, 0},
+	"HUNT":                {ActPredator, 0},
+	// Magnetic actions
+	"MAGNETIC":            {ActMagnetic, 0},
+	"MAGNET":              {ActMagnetic, 0},
+	// Division actions
+	"DIVIDE":              {ActDivide, 0},
+	"MITOSIS":             {ActDivide, 0},
+	// V-Formation actions
+	"V_FORMATION":         {ActVFormation, 0},
+	"V_FORM":              {ActVFormation, 0},
+	// Brood Sorting actions
+	"BROOD_SORT":          {ActBroodSort, 0},
+	"BROOD":               {ActBroodSort, 0},
+	// Jellyfish Pulse actions
+	"JELLYFISH_PULSE":     {ActJellyfishPulse, 0},
+	"JELLYFISH":           {ActJellyfishPulse, 0},
+	// Immune System actions
+	"IMMUNE":              {ActImmune, 0},
+	"ANTIBODY":            {ActImmune, 0},
 }
 
 // --- SwarmScript syntax highlighting support ---
@@ -584,6 +774,38 @@ var highlightConditions = map[string]bool{
 	"transport_nearby": true, "transport_count": true, "transport": true,
 	// Vortex sensors
 	"vortex_strength": true, "vortex": true,
+	// Waggle Dance sensors
+	"waggle_dancing": true, "waggle_target": true, "dancing": true, "waggle": true,
+	// Morphogen sensors
+	"morph_a": true, "morph_h": true, "activator": true, "inhibitor": true,
+	// Evasion sensors
+	"evasion_alert": true, "evasion_wave": true, "evasion": true, "alarm": true,
+	// Slime Mold sensors
+	"slime_trail": true, "slime_grad": true, "slime": true,
+	// Ant Bridge sensors
+	"bridge_active": true, "bridge_nearby": true, "bridge": true,
+	// Shape Formation sensors
+	"shape_dist": true, "shape_angle": true, "shape_progress": true, "shape": true,
+	// Mexican Wave sensors
+	"wave_flash": true, "wave_phase": true, "wave": true,
+	// Shepherd-Flock sensors
+	"shepherd_role": true, "shepherd_dist": true, "flock_to_target": true, "shepherd": true,
+	// PSO sensors
+	"pso_fitness": true, "pso_best": true, "pso_global_dist": true, "pso": true,
+	// Predator-Prey sensors
+	"pred_role": true, "prey_dist": true, "pred_catches": true, "predator": true, "prey": true,
+	// Magnetic Chain sensors
+	"mag_chain_len": true, "mag_linked": true, "mag_align": true, "magnetic": true,
+	// Cell Division sensors
+	"div_group": true, "div_phase": true, "div_dist": true, "division": true,
+	// V-Formation sensors
+	"vform_pos": true, "vform_draft": true, "vform_leader": true, "v_formation": true,
+	// Brood Sorting sensors
+	"brood_carrying": true, "brood_item_color": true, "brood_density": true, "brood_same_color": true, "brood": true,
+	// Jellyfish Pulse sensors
+	"jelly_phase": true, "jelly_expanding": true, "jelly_radius": true, "jellyfish": true,
+	// Immune System sensors
+	"immune_role": true, "immune_alert": true, "immune_path_dist": true, "immune": true,
 }
 
 var highlightActions = map[string]bool{
@@ -643,6 +865,38 @@ var highlightActions = map[string]bool{
 	"ASSIST_TRANSPORT": true, "ASSIST": true,
 	// Vortex
 	"VORTEX": true,
+	// Waggle Dance
+	"WAGGLE_DANCE": true, "WAGGLE": true, "FOLLOW_DANCE": true,
+	// Morphogen
+	"MORPH_COLOR": true, "MORPH": true,
+	// Evasion
+	"EVADE": true, "FLEE": true,
+	// Slime Mold
+	"FOLLOW_SLIME": true, "SLIME": true,
+	// Ant Bridge
+	"FORM_BRIDGE": true, "BRIDGE": true, "CROSS_BRIDGE": true,
+	// Shape Formation
+	"FORM_SHAPE": true, "SHAPE": true,
+	// Mexican Wave
+	"WAVE_FLASH": true, "WAVE": true,
+	// Shepherd
+	"SHEPHERD": true, "HERD": true,
+	// PSO
+	"PSO_MOVE": true, "PSO": true,
+	// Predator-Prey
+	"PREDATOR": true, "HUNT": true,
+	// Magnetic
+	"MAGNETIC": true, "MAGNET": true,
+	// Division
+	"DIVIDE": true, "MITOSIS": true,
+	// V-Formation
+	"V_FORMATION": true, "V_FORM": true,
+	// Brood Sorting
+	"BROOD_SORT": true, "BROOD": true,
+	// Jellyfish Pulse
+	"JELLYFISH_PULSE": true, "JELLYFISH": true,
+	// Immune System
+	"IMMUNE": true, "ANTIBODY": true,
 }
 
 // --- Reverse mapping functions (for block editor / serialization) ---
@@ -816,6 +1070,92 @@ func ConditionTypeName(ct ConditionType) string {
 		return "transport_count"
 	case CondVortexStrength:
 		return "vortex_strength"
+	case CondWaggleDancing:
+		return "waggle_dancing"
+	case CondWaggleTarget:
+		return "waggle_target"
+	case CondMorphA:
+		return "morph_a"
+	case CondMorphH:
+		return "morph_h"
+	case CondEvasionAlert:
+		return "evasion_alert"
+	case CondEvasionWave:
+		return "evasion_wave"
+	case CondSlimeTrail:
+		return "slime_trail"
+	case CondSlimeGrad:
+		return "slime_grad"
+	case CondBridgeActive:
+		return "bridge_active"
+	case CondBridgeNearby:
+		return "bridge_nearby"
+	case CondShapeDist:
+		return "shape_dist"
+	case CondShapeAngle:
+		return "shape_angle"
+	case CondShapeProgress:
+		return "shape_progress"
+	case CondWaveFlash:
+		return "wave_flash"
+	case CondWavePhase:
+		return "wave_phase"
+	case CondShepherdRole:
+		return "shepherd_role"
+	case CondShepherdDist:
+		return "shepherd_dist"
+	case CondFlockToTarget:
+		return "flock_to_target"
+	case CondPSOFitness:
+		return "pso_fitness"
+	case CondPSOBest:
+		return "pso_best"
+	case CondPSOGlobalDist:
+		return "pso_global_dist"
+	case CondPredRole:
+		return "pred_role"
+	case CondPreyDist:
+		return "prey_dist"
+	case CondPredCatches:
+		return "pred_catches"
+	case CondMagChainLen:
+		return "mag_chain_len"
+	case CondMagLinked:
+		return "mag_linked"
+	case CondMagAlign:
+		return "mag_align"
+	case CondDivGroup:
+		return "div_group"
+	case CondDivPhase:
+		return "div_phase"
+	case CondDivDist:
+		return "div_dist"
+	case CondVFormPos:
+		return "vform_pos"
+	case CondVFormDraft:
+		return "vform_draft"
+	case CondVFormLeader:
+		return "vform_leader"
+	case CondBroodCarrying:
+		return "brood_carrying"
+	case CondBroodItemColor:
+		return "brood_item_color"
+	case CondBroodDensity:
+		return "brood_density"
+	case CondBroodSameColor:
+		return "brood_same_color"
+	case CondJellyPhase:
+		return "jelly_phase"
+	case CondJellyExpanding:
+		return "jelly_expanding"
+	case CondJellyRadius:
+		return "jelly_radius"
+	case CondImmuneRole:
+		return "immune_role"
+	case CondImmuneAlert:
+		return "immune_alert"
+	case CondImmunePathDist:
+		return "immune_path_dist"
 	}
 	return "unknown"
 }
@@ -956,6 +1296,42 @@ func ActionTypeName(at ActionType) string {
 		return "ASSIST"
 	case ActVortex:
 		return "VORTEX"
+	case ActWaggleDance:
+		return "WAGGLE"
+	case ActFollowDance:
+		return "FOLLOW_DANCE"
+	case ActMorphColor:
+		return "MORPH"
+	case ActEvade:
+		return "EVADE"
+	case ActFollowSlime:
+		return "FOLLOW_SLIME"
+	case ActFormBridge:
+		return "FORM_BRIDGE"
+	case ActCrossBridge:
+		return "CROSS_BRIDGE"
+	case ActFormShape:
+		return "FORM_SHAPE"
+	case ActWaveFlash:
+		return "WAVE_FLASH"
+	case ActShepherd:
+		return "SHEPHERD"
+	case ActPSOMove:
+		return "PSO_MOVE"
+	case ActPredator:
+		return "PREDATOR"
+	case ActMagnetic:
+		return "MAGNETIC"
+	case ActDivide:
+		return "DIVIDE"
+	case ActVFormation:
+		return "V_FORMATION"
+	case ActBroodSort:
+		return "BROOD_SORT"
+	case ActJellyfishPulse:
+		return "JELLYFISH_PULSE"
+	case ActImmune:
+		return "IMMUNE"
 	}
 	return "UNKNOWN"
 }
@@ -992,6 +1368,10 @@ var SensorGrouped = [][]string{
 	{"-- Erweitert --", "energy", "bot_carrying", "since_delivery", "collision", "nbr_min_dist"},
 	{"-- Rollen & Quorum --", "role", "role_demand", "vote", "quorum_count", "quorum", "rep", "suspect"},
 	{"-- Schwarm-KI --", "levy_phase", "levy_step", "flash_phase", "flash_sync", "transport_nearby", "transport_count", "vortex_strength"},
+	{"-- Bio-Inspiration --", "waggle_dancing", "waggle_target", "morph_a", "morph_h", "evasion_alert", "evasion_wave", "slime_trail", "slime_grad"},
+	{"-- Emergent --", "bridge_active", "bridge_nearby", "shape_dist", "shape_angle", "shape_progress", "wave_flash", "wave_phase", "shepherd_role", "shepherd_dist", "flock_to_target"},
+	{"-- Advanced --", "pso_fitness", "pso_best", "pso_global_dist", "pred_role", "prey_dist", "pred_catches", "mag_chain_len", "mag_linked", "mag_align", "div_group", "div_phase", "div_dist"},
+	{"-- Batch 5 --", "vform_pos", "vform_draft", "vform_leader", "brood_carrying", "brood_item_color", "brood_density", "brood_same_color", "jelly_phase", "jelly_expanding", "jelly_radius", "immune_role", "immune_alert", "immune_path_dist"},
 }
 
 // ActionGrouped returns action names organized in groups for dropdown display.
@@ -1007,6 +1387,10 @@ var ActionGrouped = [][]string{
 	{"-- Spezial --", "DASH", "EMERGENCY", "REVERSE", "BRAKE", "SCATTER"},
 	{"-- Rollen & Quorum --", "SCOUT", "WORKER", "GUARD", "VOTE", "FLAG"},
 	{"-- Schwarm-KI --", "LEVY_WALK", "FLASH", "ASSIST", "VORTEX"},
+	{"-- Bio-Inspiration --", "WAGGLE", "FOLLOW_DANCE", "MORPH", "EVADE", "FOLLOW_SLIME"},
+	{"-- Emergent --", "FORM_BRIDGE", "CROSS_BRIDGE", "FORM_SHAPE", "WAVE_FLASH", "SHEPHERD"},
+	{"-- Advanced --", "PSO_MOVE", "PREDATOR", "MAGNETIC", "DIVIDE"},
+	{"-- Batch 5 --", "V_FORMATION", "BROOD_SORT", "JELLYFISH_PULSE", "IMMUNE"},
 }
 
 // wordPos tracks a word and its column position in a line.

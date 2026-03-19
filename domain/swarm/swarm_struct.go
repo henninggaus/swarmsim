@@ -162,6 +162,82 @@ type SwarmBot struct {
 	// Vortex Swarming sensor cache
 	VortexStrength int // local vortex rotation strength (0-100)
 
+	// Waggle Dance sensor cache
+	WaggleDancing int // 1 if currently performing waggle dance
+	WaggleTarget  int // angle to decoded dance target (-180..180, 0=none)
+
+	// Morphogen Gradient sensor cache
+	MorphA int // activator concentration (0-100)
+	MorphH int // inhibitor concentration (0-100)
+
+	// Predator Evasion Wave sensor cache
+	EvasionAlert int // 1 if currently fleeing
+	EvasionWave  int // ticks since alarm started (0=not alarmed)
+
+	// Slime Mold Network sensor cache
+	SlimeTrail int // trail intensity at current position (0-100)
+	SlimeGrad  int // angle to strongest trail gradient (-180..180)
+
+	// Ant Bridge sensor cache
+	BridgeActive int // 1 if this bot is part of a bridge
+	BridgePos    int // position in bridge chain (0 = anchor)
+	BridgeNearby int // count of nearby bridge bots
+
+	// Shape Formation sensor cache (for existing ShapeFormation system)
+	ShapeDist     int // distance to shape target position
+	ShapeAngle    int // angle to shape target (-180..180)
+	ShapeProgress int // % of bots that arrived at targets (0-100)
+
+	// Mexican Wave sensor cache
+	WaveFlash int // 1 if currently flashing in wave
+	WavePhase int // distance from wave front (0=on front, 100=far)
+
+	// Shepherd-Flock sensor cache
+	ShepherdRole  int // 1 if this bot is a shepherd, 0 if flock
+	ShepherdDist  int // distance to flock center
+	FlockToTarget int // distance from flock center to target
+
+	// PSO sensor cache
+	PSOFitness    int // current fitness at this position (0-100)
+	PSOBest       int // personal best fitness achieved
+	PSOGlobalDist int // distance to global best position
+
+	// Predator-Prey sensor cache (for existing PredatorPrey system)
+	PredRole    int // 1=predator, 0=prey
+	PreyDist    int // distance to nearest opponent
+	PredCatches int // catch count (predators only)
+
+	// Magnetic Chain sensor cache
+	MagChainLen int // length of chain this bot belongs to
+	MagLinked   int // 1 if linked in a chain
+	MagAlign    int // alignment with neighbors (-100..100)
+
+	// Cell Division sensor cache
+	DivGroup int // 0 or 1 — which group
+	DivPhase int // division cycle phase (0-100)
+	DivDist  int // distance to own group center
+
+	// V-Formation sensor cache
+	VFormPos    int // position in V: 0=leader, +N=right, -N=left
+	VFormDraft  int // 1 if in draft zone (energy saving)
+	VFormLeader int // 1 if current leader
+
+	// Brood Sorting sensor cache
+	BroodCarrying  int // 1 if carrying an item
+	BroodItemColor int // carried item color (0=none, 1=red, 2=green, 3=blue)
+	BroodDensity   int // count of nearby items
+	BroodSameColor int // count of nearby same-color items
+
+	// Jellyfish Pulse sensor cache
+	JellyPhase     int // oscillator phase (0-100)
+	JellyExpanding int // 1 if in expansion phase, 0 if contracting
+	JellyRadius    int // distance to swarm center
+
+	// Immune System sensor cache
+	ImmuneRole     int // 0=normal, 1=antibody, 2=pathogen
+	ImmuneAlert    int // antibody alert level (0-100)
+	ImmunePathDist int // distance to nearest pathogen
+
 	// Brake mechanics
 	BrakeTimer int // >0 = braking (speed ramps down over 3 ticks)
 
@@ -733,9 +809,14 @@ type SwarmState struct {
 	Hebbian   *HebbianState
 	HebbianOn bool
 
-	// Swarm immune system
+	// Swarm immune system (behavioral — immune.go)
 	Immune   *ImmuneState
 	ImmuneOn bool
+
+	// Swarm immune response (antibody/pathogen — immune_system.go)
+	ImmuneSwarm   *ImmuneSwarmState
+	ImmuneSwarmOn bool
+	ShowImmune    bool
 
 	// Meta-evolution
 	MetaEvo   *MetaEvoState
@@ -846,6 +927,70 @@ type SwarmState struct {
 	// Collective Transport
 	Transport   *TransportState
 	TransportOn bool
+
+	// Waggle Dance
+	Waggle   *WaggleState
+	WaggleOn bool
+
+	// Morphogen Gradients
+	Morphogen   *MorphogenState
+	MorphogenOn bool
+	ShowMorphogen bool // Shift+M: morphogen pattern overlay
+
+	// Predator Evasion Waves
+	Evasion   *EvasionState
+	EvasionOn bool
+	ShowEvasion bool // Shift+E: evasion wave overlay
+
+	// Slime Mold Network
+	Slime   *SlimeState
+	SlimeOn bool
+	ShowSlime bool // Shift+S: slime trail overlay
+
+	// Ant Bridge
+	Bridge   *BridgeState
+	BridgeOn bool
+	ShowBridge bool
+
+	// Mexican Wave
+	Wave   *WaveState
+	WaveOn bool
+	ShowWave bool
+
+	// Shepherd-Flock
+	Shepherd   *ShepherdState
+	ShepherdOn bool
+	ShowShepherd bool
+
+	// Particle Swarm Optimization
+	PSO   *PSOState
+	PSOOn bool
+	ShowPSO bool
+
+	// Magnetic Dipole Chains
+	Magnetic   *MagState
+	MagneticOn bool
+	ShowMagnetic bool
+
+	// Cell Division (Mitosis)
+	Division   *DivisionState
+	DivisionOn bool
+	ShowDivision bool
+
+	// V-Formation (Geese Flight)
+	VFormation   *VFormationState
+	VFormationOn bool
+	ShowVFormation bool
+
+	// Brood Sorting (Deneubourg)
+	Brood   *BroodState
+	BroodOn bool
+	ShowBrood bool
+
+	// Jellyfish Pulse
+	Jellyfish   *JellyfishState
+	JellyfishOn bool
+	ShowJellyfish bool
 
 	// Block editor
 	BlockEditorActive bool

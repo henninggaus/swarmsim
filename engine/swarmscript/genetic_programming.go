@@ -72,6 +72,65 @@ var gpSensorPool = []gpSensorEntry{
 	{CondTransportCount, 0, 8},
 	// Vortex sensors
 	{CondVortexStrength, 0, 100},
+	// Waggle Dance sensors
+	{CondWaggleDancing, 0, 1},
+	{CondWaggleTarget, 0, 180},
+	// Morphogen sensors
+	{CondMorphA, 0, 100},
+	{CondMorphH, 0, 100},
+	// Evasion sensors
+	{CondEvasionAlert, 0, 1},
+	{CondEvasionWave, 0, 40},
+	// Slime Mold sensors
+	{CondSlimeTrail, 0, 100},
+	{CondSlimeGrad, 0, 180},
+	// Ant Bridge sensors
+	{CondBridgeActive, 0, 1},
+	{CondBridgeNearby, 0, 5},
+	// Shape Formation sensors
+	{CondShapeDist, 0, 500},
+	{CondShapeAngle, 0, 180},
+	{CondShapeProgress, 0, 100},
+	// Mexican Wave sensors
+	{CondWaveFlash, 0, 1},
+	{CondWavePhase, 0, 100},
+	// Shepherd-Flock sensors
+	{CondShepherdRole, 0, 1},
+	{CondShepherdDist, 0, 500},
+	{CondFlockToTarget, 0, 500},
+	// PSO sensors
+	{CondPSOFitness, 0, 100},
+	{CondPSOBest, 0, 100},
+	{CondPSOGlobalDist, 0, 500},
+	// Predator-Prey sensors
+	{CondPredRole, 0, 1},
+	{CondPreyDist, 0, 300},
+	{CondPredCatches, 0, 20},
+	// Magnetic Chain sensors
+	{CondMagChainLen, 1, 12},
+	{CondMagLinked, 0, 1},
+	{CondMagAlign, 0, 100},
+	// Cell Division sensors
+	{CondDivGroup, 0, 1},
+	{CondDivPhase, 0, 100},
+	{CondDivDist, 0, 500},
+	// V-Formation sensors
+	{CondVFormPos, -20, 20},
+	{CondVFormDraft, 0, 1},
+	{CondVFormLeader, 0, 1},
+	// Brood Sorting sensors
+	{CondBroodCarrying, 0, 1},
+	{CondBroodItemColor, 0, 3},
+	{CondBroodDensity, 0, 50},
+	{CondBroodSameColor, 0, 20},
+	// Jellyfish Pulse sensors
+	{CondJellyPhase, 0, 100},
+	{CondJellyExpanding, 0, 1},
+	{CondJellyRadius, 0, 500},
+	// Immune System sensors
+	{CondImmuneRole, 0, 2},
+	{CondImmuneAlert, 0, 100},
+	{CondImmunePathDist, 0, 500},
 }
 
 // gpActionEntry defines an action template for random generation.
@@ -135,6 +194,40 @@ var gpActionPool = []gpActionEntry{
 	{ActAssistTransport, 0, 0, 0},
 	// Vortex
 	{ActVortex, 0, 0, 0},
+	// Waggle Dance
+	{ActWaggleDance, 0, 0, 0},
+	{ActFollowDance, 0, 0, 0},
+	// Morphogen
+	{ActMorphColor, 0, 0, 0},
+	// Evasion
+	{ActEvade, 0, 0, 0},
+	// Slime Mold
+	{ActFollowSlime, 0, 0, 0},
+	// Ant Bridge
+	{ActFormBridge, 0, 0, 0},
+	{ActCrossBridge, 0, 0, 0},
+	// Shape Formation
+	{ActFormShape, 0, 0, 0},
+	// Mexican Wave
+	{ActWaveFlash, 0, 0, 0},
+	// Shepherd
+	{ActShepherd, 0, 0, 0},
+	// PSO
+	{ActPSOMove, 0, 0, 0},
+	// Predator-Prey
+	{ActPredator, 0, 0, 0},
+	// Magnetic
+	{ActMagnetic, 0, 0, 0},
+	// Division
+	{ActDivide, 0, 0, 0},
+	// V-Formation
+	{ActVFormation, 0, 0, 0},
+	// Brood Sorting
+	{ActBroodSort, 0, 0, 0},
+	// Jellyfish Pulse
+	{ActJellyfishPulse, 0, 0, 0},
+	// Immune System
+	{ActImmune, 0, 0, 0},
 }
 
 // GenerateRandomProgram creates a random SwarmScript program with numRules rules.

@@ -122,6 +122,133 @@ func (s *Simulation) updateSwarmMode() {
 	// Phase 1.13: Vortex Swarming sensor computation
 	swarm.TickVortex(ss)
 
+	// Phase 1.14: Waggle Dance
+	if ss.WaggleOn {
+		swarm.TickWaggle(ss)
+	}
+
+	// Phase 1.15: Morphogen Gradients
+	if ss.MorphogenOn {
+		swarm.TickMorphogen(ss)
+	}
+
+	// Phase 1.16: Predator Evasion Waves
+	if ss.EvasionOn {
+		swarm.TickEvasion(ss)
+	}
+
+	// Phase 1.17: Slime Mold Network
+	if ss.SlimeOn {
+		swarm.TickSlime(ss)
+	}
+
+	// Phase 1.18: Ant Bridge
+	if ss.BridgeOn {
+		swarm.TickBridge(ss)
+	}
+
+	// Phase 1.19: Shape Formation (SwarmScript sensor cache)
+	if ss.ShapeFormationOn && ss.ShapeFormation != nil {
+		// Update sensor cache for SwarmScript from existing shape formation
+		for i := range ss.Bots {
+			if i < len(ss.ShapeFormation.Assigned) && ss.ShapeFormation.Assigned[i] >= 0 {
+				target := ss.ShapeFormation.TargetPositions[ss.ShapeFormation.Assigned[i]]
+				dx := target[0] - ss.Bots[i].X
+				dy := target[1] - ss.Bots[i].Y
+				dist := math.Sqrt(dx*dx + dy*dy)
+				ss.Bots[i].ShapeDist = int(math.Min(9999, dist))
+				targetAngle := math.Atan2(dy, dx)
+				diff := targetAngle - ss.Bots[i].Angle
+				for diff > math.Pi {
+					diff -= 2 * math.Pi
+				}
+				for diff < -math.Pi {
+					diff += 2 * math.Pi
+				}
+				ss.Bots[i].ShapeAngle = int(diff * 180 / math.Pi)
+			}
+			ss.Bots[i].ShapeProgress = int(ss.ShapeFormation.Convergence * 100)
+		}
+	}
+
+	// Phase 1.20: Mexican Wave
+	if ss.WaveOn {
+		swarm.TickWave(ss)
+	}
+
+	// Phase 1.21: Shepherd-Flock
+	if ss.ShepherdOn {
+		swarm.TickShepherd(ss)
+	}
+
+	// Phase 1.22: Particle Swarm Optimization
+	if ss.PSOOn {
+		swarm.TickPSO(ss)
+	}
+
+	// Phase 1.23: Predator-Prey sensor cache
+	if ss.PredatorPreyOn && ss.PredatorPrey != nil {
+		for i := range ss.Bots {
+			if i < len(ss.PredatorPrey.Roles) {
+				if ss.PredatorPrey.Roles[i] == swarm.RolePredator {
+					ss.Bots[i].PredRole = 1
+				} else {
+					ss.Bots[i].PredRole = 0
+				}
+				// Find nearest opponent distance
+				bestDist := 9999.0
+				for j := range ss.Bots {
+					if j == i || j >= len(ss.PredatorPrey.Roles) {
+						continue
+					}
+					if ss.PredatorPrey.Roles[j] == ss.PredatorPrey.Roles[i] {
+						continue
+					}
+					dx := ss.Bots[j].X - ss.Bots[i].X
+					dy := ss.Bots[j].Y - ss.Bots[i].Y
+					d := math.Sqrt(dx*dx + dy*dy)
+					if d < bestDist {
+						bestDist = d
+					}
+				}
+				ss.Bots[i].PreyDist = int(math.Min(9999, bestDist))
+				if i < len(ss.PredatorPrey.CatchCount) {
+					ss.Bots[i].PredCatches = ss.PredatorPrey.CatchCount[i]
+				}
+			}
+		}
+	}
+
+	// Phase 1.24: Magnetic Dipole Chains
+	if ss.MagneticOn {
+		swarm.TickMagnetic(ss)
+	}
+
+	// Phase 1.25: Cell Division
+	if ss.DivisionOn {
+		swarm.TickDivision(ss)
+	}
+
+	// Phase 1.26: V-Formation
+	if ss.VFormationOn {
+		swarm.TickVFormation(ss)
+	}
+
+	// Phase 1.27: Brood Sorting
+	if ss.BroodOn {
+		swarm.TickBrood(ss)
+	}
+
+	// Phase 1.28: Jellyfish Pulse
+	if ss.JellyfishOn {
+		swarm.TickJellyfish(ss)
+	}
+
+	// Phase 1.29: Immune Swarm (antibody/pathogen)
+	if ss.ImmuneSwarmOn {
+		swarm.TickImmuneSwarm(ss)
+	}
+
 	// Phase 2: Execute program on each bot (skip if anti-stuck breakout active)
 	for i := range ss.Bots {
 		bot := &ss.Bots[i]
@@ -1520,6 +1647,120 @@ func evaluateSwarmCondition(cond swarmscript.Condition, bot *swarm.SwarmBot, sna
 	// Vortex Swarming sensors
 	case swarmscript.CondVortexStrength:
 		return compareInt(bot.VortexStrength, cond.Op, cv)
+
+	// Waggle Dance sensors
+	case swarmscript.CondWaggleDancing:
+		return compareInt(bot.WaggleDancing, cond.Op, cv)
+	case swarmscript.CondWaggleTarget:
+		return compareInt(bot.WaggleTarget, cond.Op, cv)
+
+	// Morphogen sensors
+	case swarmscript.CondMorphA:
+		return compareInt(bot.MorphA, cond.Op, cv)
+	case swarmscript.CondMorphH:
+		return compareInt(bot.MorphH, cond.Op, cv)
+
+	// Evasion Wave sensors
+	case swarmscript.CondEvasionAlert:
+		return compareInt(bot.EvasionAlert, cond.Op, cv)
+	case swarmscript.CondEvasionWave:
+		return compareInt(bot.EvasionWave, cond.Op, cv)
+
+	// Slime Mold sensors
+	case swarmscript.CondSlimeTrail:
+		return compareInt(bot.SlimeTrail, cond.Op, cv)
+	case swarmscript.CondSlimeGrad:
+		return compareInt(bot.SlimeGrad, cond.Op, cv)
+
+	// Ant Bridge sensors
+	case swarmscript.CondBridgeActive:
+		return compareInt(bot.BridgeActive, cond.Op, cv)
+	case swarmscript.CondBridgeNearby:
+		return compareInt(bot.BridgeNearby, cond.Op, cv)
+
+	// Shape Formation sensors
+	case swarmscript.CondShapeDist:
+		return compareInt(bot.ShapeDist, cond.Op, cv)
+	case swarmscript.CondShapeAngle:
+		return compareInt(bot.ShapeAngle, cond.Op, cv)
+	case swarmscript.CondShapeProgress:
+		return compareInt(bot.ShapeProgress, cond.Op, cv)
+
+	// Mexican Wave sensors
+	case swarmscript.CondWaveFlash:
+		return compareInt(bot.WaveFlash, cond.Op, cv)
+	case swarmscript.CondWavePhase:
+		return compareInt(bot.WavePhase, cond.Op, cv)
+
+	// Shepherd-Flock sensors
+	case swarmscript.CondShepherdRole:
+		return compareInt(bot.ShepherdRole, cond.Op, cv)
+	case swarmscript.CondShepherdDist:
+		return compareInt(bot.ShepherdDist, cond.Op, cv)
+	case swarmscript.CondFlockToTarget:
+		return compareInt(bot.FlockToTarget, cond.Op, cv)
+
+	// PSO sensors
+	case swarmscript.CondPSOFitness:
+		return compareInt(bot.PSOFitness, cond.Op, cv)
+	case swarmscript.CondPSOBest:
+		return compareInt(bot.PSOBest, cond.Op, cv)
+	case swarmscript.CondPSOGlobalDist:
+		return compareInt(bot.PSOGlobalDist, cond.Op, cv)
+
+	// Predator-Prey sensors
+	case swarmscript.CondPredRole:
+		return compareInt(bot.PredRole, cond.Op, cv)
+	case swarmscript.CondPreyDist:
+		return compareInt(bot.PreyDist, cond.Op, cv)
+	case swarmscript.CondPredCatches:
+		return compareInt(bot.PredCatches, cond.Op, cv)
+
+	// Magnetic Chain sensors
+	case swarmscript.CondMagChainLen:
+		return compareInt(bot.MagChainLen, cond.Op, cv)
+	case swarmscript.CondMagLinked:
+		return compareInt(bot.MagLinked, cond.Op, cv)
+	case swarmscript.CondMagAlign:
+		return compareInt(bot.MagAlign, cond.Op, cv)
+
+	// Cell Division sensors
+	case swarmscript.CondDivGroup:
+		return compareInt(bot.DivGroup, cond.Op, cv)
+	case swarmscript.CondDivPhase:
+		return compareInt(bot.DivPhase, cond.Op, cv)
+	case swarmscript.CondDivDist:
+		return compareInt(bot.DivDist, cond.Op, cv)
+	// V-Formation conditions
+	case swarmscript.CondVFormPos:
+		return compareInt(bot.VFormPos, cond.Op, cv)
+	case swarmscript.CondVFormDraft:
+		return compareInt(bot.VFormDraft, cond.Op, cv)
+	case swarmscript.CondVFormLeader:
+		return compareInt(bot.VFormLeader, cond.Op, cv)
+	// Brood Sorting conditions
+	case swarmscript.CondBroodCarrying:
+		return compareInt(bot.BroodCarrying, cond.Op, cv)
+	case swarmscript.CondBroodItemColor:
+		return compareInt(bot.BroodItemColor, cond.Op, cv)
+	case swarmscript.CondBroodDensity:
+		return compareInt(bot.BroodDensity, cond.Op, cv)
+	case swarmscript.CondBroodSameColor:
+		return compareInt(bot.BroodSameColor, cond.Op, cv)
+	// Jellyfish Pulse conditions
+	case swarmscript.CondJellyPhase:
+		return compareInt(bot.JellyPhase, cond.Op, cv)
+	case swarmscript.CondJellyExpanding:
+		return compareInt(bot.JellyExpanding, cond.Op, cv)
+	case swarmscript.CondJellyRadius:
+		return compareInt(bot.JellyRadius, cond.Op, cv)
+	// Immune System conditions
+	case swarmscript.CondImmuneRole:
+		return compareInt(bot.ImmuneRole, cond.Op, cv)
+	case swarmscript.CondImmuneAlert:
+		return compareInt(bot.ImmuneAlert, cond.Op, cv)
+	case swarmscript.CondImmunePathDist:
+		return compareInt(bot.ImmunePathDist, cond.Op, cv)
 	}
 
 	return false
@@ -2227,6 +2468,92 @@ func executeSwarmAction(act swarmscript.Action, bot *swarm.SwarmBot, ss *swarm.S
 
 	case swarmscript.ActVortex:
 		swarm.ApplyVortex(bot, ss, botIdx)
+
+	case swarmscript.ActWaggleDance:
+		swarm.ApplyWaggleDance(bot, ss, botIdx)
+
+	case swarmscript.ActFollowDance:
+		swarm.ApplyFollowDance(bot, ss, botIdx)
+
+	case swarmscript.ActMorphColor:
+		swarm.ApplyMorphColor(bot, ss, botIdx)
+
+	case swarmscript.ActEvade:
+		swarm.ApplyEvade(bot, ss, botIdx)
+
+	case swarmscript.ActFollowSlime:
+		swarm.ApplyFollowSlime(bot, ss, botIdx)
+
+	case swarmscript.ActFormBridge:
+		swarm.ApplyFormBridge(bot, ss, botIdx)
+
+	case swarmscript.ActCrossBridge:
+		swarm.ApplyCrossBridge(bot, ss, botIdx)
+
+	case swarmscript.ActFormShape:
+		if ss.ShapeFormationOn && ss.ShapeFormation != nil {
+			// Steer toward assigned shape target
+			if botIdx < len(ss.ShapeFormation.Assigned) && ss.ShapeFormation.Assigned[botIdx] >= 0 {
+				target := ss.ShapeFormation.TargetPositions[ss.ShapeFormation.Assigned[botIdx]]
+				dx := target[0] - bot.X
+				dy := target[1] - bot.Y
+				dist := math.Sqrt(dx*dx + dy*dy)
+				if dist > 8 {
+					targetAngle := math.Atan2(dy, dx)
+					diff := targetAngle - bot.Angle
+					for diff > math.Pi {
+						diff -= 2 * math.Pi
+					}
+					for diff < -math.Pi {
+						diff += 2 * math.Pi
+					}
+					if diff > 0.15 {
+						diff = 0.15
+					} else if diff < -0.15 {
+						diff = -0.15
+					}
+					bot.Angle += diff
+					if dist < 30 {
+						bot.Speed = swarm.SwarmBotSpeed * 0.4
+					} else {
+						bot.Speed = swarm.SwarmBotSpeed
+					}
+				} else {
+					bot.Speed = 0
+					bot.LEDColor = [3]uint8{0, 255, 100}
+				}
+			}
+		}
+
+	case swarmscript.ActWaveFlash:
+		swarm.ApplyWaveFlash(bot, ss, botIdx)
+
+	case swarmscript.ActShepherd:
+		swarm.ApplyShepherd(bot, ss, botIdx)
+
+	case swarmscript.ActPSOMove:
+		swarm.ApplyPSOMove(bot, ss, botIdx)
+
+	case swarmscript.ActPredator:
+		swarm.ApplyPredator(bot, ss, botIdx)
+
+	case swarmscript.ActMagnetic:
+		swarm.ApplyMagnetic(bot, ss, botIdx)
+
+	case swarmscript.ActDivide:
+		swarm.ApplyDivision(bot, ss, botIdx)
+
+	case swarmscript.ActVFormation:
+		swarm.ApplyVFormation(bot, ss, botIdx)
+
+	case swarmscript.ActBroodSort:
+		swarm.ApplyBroodSort(bot, ss, botIdx)
+
+	case swarmscript.ActJellyfishPulse:
+		swarm.ApplyJellyfishPulse(bot, ss, botIdx)
+
+	case swarmscript.ActImmune:
+		swarm.ApplyImmuneSwarm(bot, ss, botIdx)
 
 	case swarmscript.ActDash:
 		// Double-speed burst for 10 ticks (costs 15 energy, 60 tick cooldown)

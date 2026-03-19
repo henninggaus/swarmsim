@@ -468,3 +468,75 @@ func IsPrey(pp *PredatorPreyState, idx int) bool {
 	}
 	return pp.Roles[idx] == RolePrey
 }
+
+// ApplyPredator executes SwarmScript-triggered predator/prey behavior.
+// Predators chase nearest prey, prey flee from nearest predator.
+func ApplyPredator(bot *SwarmBot, ss *SwarmState, idx int) {
+	pp := ss.PredatorPrey
+	if pp == nil || idx >= len(pp.Roles) || ss.Hash == nil {
+		bot.Speed = SwarmBotSpeed
+		return
+	}
+
+	isPred := pp.Roles[idx] == RolePredator
+	searchRadius := 150.0
+
+	nearIDs := ss.Hash.Query(bot.X, bot.Y, searchRadius)
+	bestDist := math.MaxFloat64
+	bestAngle := bot.Angle
+
+	for _, j := range nearIDs {
+		if j == idx || j < 0 || j >= len(ss.Bots) || j >= len(pp.Roles) {
+			continue
+		}
+		// Opposite role
+		if isPred == (pp.Roles[j] == RolePredator) {
+			continue
+		}
+		dx := ss.Bots[j].X - bot.X
+		dy := ss.Bots[j].Y - bot.Y
+		d := math.Sqrt(dx*dx + dy*dy)
+		if d < bestDist {
+			bestDist = d
+			bestAngle = math.Atan2(dy, dx)
+		}
+	}
+
+	if bestDist < searchRadius {
+		targetAngle := bestAngle
+		if !isPred {
+			// Prey: flee (opposite direction)
+			targetAngle += math.Pi
+		}
+		diff := targetAngle - bot.Angle
+		for diff > math.Pi {
+			diff -= 2 * math.Pi
+		}
+		for diff < -math.Pi {
+			diff += 2 * math.Pi
+		}
+		steer := 0.2
+		if diff > steer {
+			diff = steer
+		} else if diff < -steer {
+			diff = -steer
+		}
+		bot.Angle += diff
+
+		if isPred {
+			bot.Speed = SwarmBotSpeed * 1.5
+			bot.LEDColor = [3]uint8{255, 50, 50}
+		} else {
+			bot.Speed = SwarmBotSpeed * 1.3
+			bot.LEDColor = [3]uint8{50, 255, 50}
+		}
+	} else {
+		// No target nearby: patrol
+		bot.Speed = SwarmBotSpeed
+		if isPred {
+			bot.LEDColor = [3]uint8{200, 80, 80}
+		} else {
+			bot.LEDColor = [3]uint8{80, 200, 80}
+		}
+	}
+}

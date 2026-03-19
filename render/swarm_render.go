@@ -286,6 +286,71 @@ func (r *Renderer) DrawSwarmMode(screen *ebiten.Image, s *simulation.Simulation,
 		drawVortexOverlay(a, ss)
 	}
 
+	// Draw morphogen pattern overlay (Shift+M toggle)
+	if ss.ShowMorphogen && ss.MorphogenOn && ss.Morphogen != nil {
+		drawMorphogenOverlay(a, ss)
+	}
+
+	// Draw evasion wave overlay (Shift+E toggle)
+	if ss.ShowEvasion && ss.EvasionOn && ss.Evasion != nil {
+		drawEvasionOverlay(a, ss)
+	}
+
+	// Draw slime trail overlay (Shift+S toggle)
+	if ss.ShowSlime && ss.SlimeOn && ss.Slime != nil {
+		drawSlimeOverlay(a, ss)
+	}
+
+	// Draw bridge overlay (Shift+B toggle)
+	if ss.ShowBridge && ss.BridgeOn && ss.Bridge != nil {
+		drawBridgeOverlay(a, ss)
+	}
+
+	// Draw wave overlay (Shift+W toggle)
+	if ss.ShowWave && ss.WaveOn && ss.Wave != nil {
+		drawWaveOverlay(a, ss)
+	}
+
+	// Draw shepherd overlay (Shift+H toggle)
+	if ss.ShowShepherd && ss.ShepherdOn && ss.Shepherd != nil {
+		drawShepherdOverlay(a, ss)
+	}
+
+	// Draw PSO fitness landscape overlay (Shift+P toggle)
+	if ss.ShowPSO && ss.PSOOn && ss.PSO != nil {
+		drawPSOOverlay(a, ss)
+	}
+
+	// Draw magnetic chain overlay (Shift+G toggle)
+	if ss.ShowMagnetic && ss.MagneticOn && ss.Magnetic != nil {
+		drawMagneticOverlay(a, ss)
+	}
+
+	// Draw division overlay (Shift+D toggle)
+	if ss.ShowDivision && ss.DivisionOn && ss.Division != nil {
+		drawDivisionOverlay(a, ss)
+	}
+
+	// Draw V-Formation overlay (Shift+V toggle)
+	if ss.ShowVFormation && ss.VFormationOn && ss.VFormation != nil {
+		drawVFormationOverlay(a, ss)
+	}
+
+	// Draw brood sorting overlay (Shift+O toggle)
+	if ss.ShowBrood && ss.BroodOn && ss.Brood != nil {
+		drawBroodOverlay(a, ss)
+	}
+
+	// Draw jellyfish pulse overlay (Shift+J toggle)
+	if ss.ShowJellyfish && ss.JellyfishOn && ss.Jellyfish != nil {
+		drawJellyfishOverlay(a, ss)
+	}
+
+	// Draw immune system overlay (Shift+I toggle)
+	if ss.ShowImmune && ss.ImmuneSwarmOn && ss.ImmuneSwarm != nil {
+		drawImmuneOverlay(a, ss)
+	}
+
 	// Draw message wave rings
 	if ss.ShowMsgWaves {
 		for _, w := range ss.MsgWaves {
@@ -2092,6 +2157,337 @@ func drawVortexOverlay(a *ebiten.Image, ss *swarm.SwarmState) {
 		ey := by + float32(math.Sin(perpAngle))*r*0.8
 		vector.StrokeLine(a, bx, by, ex, ey, 0.8,
 			color.RGBA{200, 50, 255, alpha}, false)
+	}
+}
+
+// drawMorphogenOverlay draws activator/inhibitor concentration as colored auras.
+func drawMorphogenOverlay(a *ebiten.Image, ss *swarm.SwarmState) {
+	for i := range ss.Bots {
+		bot := &ss.Bots[i]
+		bx := float32(bot.X)
+		by := float32(bot.Y)
+
+		activ := float32(bot.MorphA) / 100.0
+		inhib := float32(bot.MorphH) / 100.0
+		r := float32(swarm.SwarmBotRadius) + 2 + activ*6
+		c := color.RGBA{
+			uint8(activ * 255),
+			uint8((1 - abs32(activ-inhib)) * 150),
+			uint8(inhib * 255),
+			uint8(60 + activ*120),
+		}
+		vector.DrawFilledCircle(a, bx, by, r, c, false)
+	}
+}
+
+func abs32(x float32) float32 {
+	if x < 0 {
+		return -x
+	}
+	return x
+}
+
+// drawEvasionOverlay draws expanding red rings for evasion wave propagation.
+func drawEvasionOverlay(a *ebiten.Image, ss *swarm.SwarmState) {
+	for i := range ss.Bots {
+		bot := &ss.Bots[i]
+		if bot.EvasionAlert == 0 {
+			continue
+		}
+		bx := float32(bot.X)
+		by := float32(bot.Y)
+
+		// Expanding red ring based on wave progress
+		wave := float32(bot.EvasionWave)
+		r := float32(swarm.SwarmBotRadius) + wave*0.8
+		alpha := uint8(200 - wave*4)
+		if alpha < 30 {
+			alpha = 30
+		}
+		vector.StrokeCircle(a, bx, by, r, 2.0,
+			color.RGBA{255, 30, 0, alpha}, false)
+
+		// Direction arrow (flee heading)
+		if ss.Evasion != nil && i < len(ss.Evasion.FleeAngle) {
+			fleeAng := ss.Evasion.FleeAngle[i]
+			ex := bx + float32(math.Cos(fleeAng))*r
+			ey := by + float32(math.Sin(fleeAng))*r
+			vector.StrokeLine(a, bx, by, ex, ey, 1.0,
+				color.RGBA{255, 100, 50, alpha}, false)
+		}
+	}
+}
+
+// drawSlimeOverlay draws the slime trail grid as a translucent green heatmap.
+func drawSlimeOverlay(a *ebiten.Image, ss *swarm.SwarmState) {
+	st := ss.Slime
+	cellW := float32(st.CellSize)
+	for row := 0; row < st.Rows; row++ {
+		for col := 0; col < st.Cols; col++ {
+			val := st.Grid[row*st.Cols+col]
+			if val < 0.01 {
+				continue
+			}
+			alpha := uint8(val * 180)
+			green := uint8(100 + val*155)
+			vector.DrawFilledRect(a, float32(col)*cellW, float32(row)*cellW,
+				cellW, cellW, color.RGBA{0, green, green / 3, alpha}, false)
+		}
+	}
+}
+
+// drawBridgeOverlay draws ant bridge chains as gold connecting lines.
+func drawBridgeOverlay(a *ebiten.Image, ss *swarm.SwarmState) {
+	st := ss.Bridge
+	for i := range ss.Bots {
+		if !st.InBridge[i] {
+			continue
+		}
+		bot := &ss.Bots[i]
+		// Draw gold circle at bridge bot position
+		vector.DrawFilledCircle(a, float32(bot.X), float32(bot.Y), 6,
+			color.RGBA{255, 200, 0, 150}, false)
+		// Connect to nearest bridge neighbor in same chain
+		for j := i + 1; j < len(ss.Bots); j++ {
+			if !st.InBridge[j] || st.ChainID[j] != st.ChainID[i] {
+				continue
+			}
+			dx := ss.Bots[j].X - bot.X
+			dy := ss.Bots[j].Y - bot.Y
+			if dx*dx+dy*dy < 900 { // within 30px
+				vector.StrokeLine(a, float32(bot.X), float32(bot.Y),
+					float32(ss.Bots[j].X), float32(ss.Bots[j].Y),
+					3, color.RGBA{255, 200, 0, 120}, false)
+			}
+		}
+	}
+}
+
+// drawWaveOverlay draws Mexican wave flash effects.
+func drawWaveOverlay(a *ebiten.Image, ss *swarm.SwarmState) {
+	st := ss.Wave
+	for i := range ss.Bots {
+		if i >= len(st.FlashTick) {
+			continue
+		}
+		ticksSince := ss.Tick - st.FlashTick[i]
+		if ticksSince >= 20 {
+			continue
+		}
+		bot := &ss.Bots[i]
+		intensity := float32(1.0 - float64(ticksSince)/20.0)
+		radius := 4 + intensity*8
+		alpha := uint8(intensity * 200)
+		var r, g, b uint8
+		switch st.Mode {
+		case swarm.WaveLinear:
+			r, g, b = alpha, alpha, 0
+		case swarm.WaveRadial:
+			r, g, b = 0, alpha, alpha
+		default:
+			r, g, b = alpha, 0, alpha
+		}
+		vector.DrawFilledCircle(a, float32(bot.X), float32(bot.Y), radius,
+			color.RGBA{r, g, b, alpha}, false)
+	}
+}
+
+// drawShepherdOverlay draws shepherd drive zones and flock center.
+func drawShepherdOverlay(a *ebiten.Image, ss *swarm.SwarmState) {
+	st := ss.Shepherd
+	// Draw flock center
+	vector.DrawFilledCircle(a, float32(st.FlockCX), float32(st.FlockCY), 8,
+		color.RGBA{100, 100, 255, 150}, false)
+	// Draw target
+	vector.DrawFilledCircle(a, float32(st.TargetX), float32(st.TargetY), 10,
+		color.RGBA{255, 50, 50, 150}, false)
+	// Line from flock center to target
+	vector.StrokeLine(a, float32(st.FlockCX), float32(st.FlockCY),
+		float32(st.TargetX), float32(st.TargetY),
+		2, color.RGBA{255, 100, 100, 80}, false)
+	// Draw shepherd drive radius
+	for i := range ss.Bots {
+		if i >= len(st.IsShepherd) || !st.IsShepherd[i] {
+			continue
+		}
+		bot := &ss.Bots[i]
+		vector.StrokeCircle(a, float32(bot.X), float32(bot.Y), 120,
+			1.5, color.RGBA{255, 80, 80, 60}, false)
+	}
+}
+
+// drawPSOOverlay draws Gaussian fitness landscape peaks and global best marker.
+func drawPSOOverlay(a *ebiten.Image, ss *swarm.SwarmState) {
+	st := ss.PSO
+	// Draw peaks as translucent circles
+	for p := range st.PeakX {
+		radius := float32(st.PeakS[p])
+		intensity := uint8(st.PeakH[p] * 2)
+		vector.DrawFilledCircle(a, float32(st.PeakX[p]), float32(st.PeakY[p]),
+			radius, color.RGBA{0, intensity, 0, 40}, false)
+		vector.StrokeCircle(a, float32(st.PeakX[p]), float32(st.PeakY[p]),
+			radius*0.5, 1.5, color.RGBA{0, intensity, 0, 80}, false)
+	}
+	// Draw global best marker
+	vector.DrawFilledCircle(a, float32(st.GlobalX), float32(st.GlobalY), 8,
+		color.RGBA{255, 255, 0, 200}, false)
+	vector.StrokeCircle(a, float32(st.GlobalX), float32(st.GlobalY), 12,
+		2, color.RGBA{255, 255, 0, 120}, false)
+}
+
+// drawMagneticOverlay draws magnetic chain links between bots.
+func drawMagneticOverlay(a *ebiten.Image, ss *swarm.SwarmState) {
+	st := ss.Magnetic
+	for i := range ss.Bots {
+		if i >= len(st.ChainNext) {
+			break
+		}
+		j := st.ChainNext[i]
+		if j < 0 || j >= len(ss.Bots) {
+			continue
+		}
+		// Draw link line
+		chainLen := st.ChainLen[i]
+		intensity := uint8(100 + int(float64(chainLen)*20))
+		if intensity < 100 {
+			intensity = 100
+		}
+		vector.StrokeLine(a, float32(ss.Bots[i].X), float32(ss.Bots[i].Y),
+			float32(ss.Bots[j].X), float32(ss.Bots[j].Y),
+			2.5, color.RGBA{50, intensity / 2, intensity, 150}, false)
+	}
+}
+
+// drawDivisionOverlay draws the division split line and group centers.
+func drawDivisionOverlay(a *ebiten.Image, ss *swarm.SwarmState) {
+	st := ss.Division
+	cx := float32(ss.ArenaW / 2)
+	cy := float32(ss.ArenaH / 2)
+
+	// Draw split axis line
+	splitNormal := float64(st.SplitAxis) + math.Pi/2
+	lineLen := float32(400)
+	dx := lineLen * float32(math.Cos(splitNormal))
+	dy := lineLen * float32(math.Sin(splitNormal))
+	alpha := uint8(60 + int(st.Phase*120))
+	vector.StrokeLine(a, cx-dx, cy-dy, cx+dx, cy+dy,
+		2, color.RGBA{200, 200, 200, alpha}, false)
+
+	// Group A center (magenta)
+	vector.DrawFilledCircle(a, float32(st.CenterAX), float32(st.CenterAY), 8,
+		color.RGBA{200, 50, 150, 150}, false)
+	// Group B center (cyan)
+	vector.DrawFilledCircle(a, float32(st.CenterBX), float32(st.CenterBY), 8,
+		color.RGBA{50, 150, 200, 150}, false)
+}
+
+// drawVFormationOverlay draws leader marker, wing lines, and draft zones.
+func drawVFormationOverlay(a *ebiten.Image, ss *swarm.SwarmState) {
+	st := ss.VFormation
+	if st.LeaderIdx >= len(ss.Bots) {
+		return
+	}
+	leader := &ss.Bots[st.LeaderIdx]
+
+	// Gold circle around leader
+	vector.StrokeCircle(a, float32(leader.X), float32(leader.Y), 12,
+		2, color.RGBA{255, 255, 100, 180}, false)
+
+	// Draw wing lines from leader to wing bots
+	for i := range ss.Bots {
+		if i == st.LeaderIdx || !st.InFormation[i] {
+			continue
+		}
+		bot := &ss.Bots[i]
+		var c color.RGBA
+		if st.FormPos[i] > 0 {
+			c = color.RGBA{200, 150, 50, 60} // orange right wing
+		} else {
+			c = color.RGBA{50, 150, 200, 60} // blue left wing
+		}
+		vector.StrokeLine(a, float32(leader.X), float32(leader.Y),
+			float32(bot.X), float32(bot.Y), 1, c, false)
+	}
+
+	// Migration direction arrow from leader
+	arrLen := float32(30)
+	ax := float32(leader.X) + arrLen*float32(math.Cos(st.MigAngle))
+	ay := float32(leader.Y) + arrLen*float32(math.Sin(st.MigAngle))
+	vector.StrokeLine(a, float32(leader.X), float32(leader.Y), ax, ay,
+		2, color.RGBA{255, 255, 100, 150}, false)
+}
+
+// drawBroodOverlay draws brood sorting items on the arena.
+func drawBroodOverlay(a *ebiten.Image, ss *swarm.SwarmState) {
+	st := ss.Brood
+	for i := range st.Items {
+		item := &st.Items[i]
+		if item.Held {
+			continue // held items follow carrier, skip overlay
+		}
+		var c color.RGBA
+		switch item.Color {
+		case 0:
+			c = color.RGBA{255, 80, 80, 150} // red
+		case 1:
+			c = color.RGBA{80, 255, 80, 150} // green
+		case 2:
+			c = color.RGBA{80, 80, 255, 150} // blue
+		}
+		vector.DrawFilledCircle(a, float32(item.X), float32(item.Y), 4, c, false)
+	}
+}
+
+// drawJellyfishOverlay draws the pulsing center and expansion/contraction rings.
+func drawJellyfishOverlay(a *ebiten.Image, ss *swarm.SwarmState) {
+	st := ss.Jellyfish
+	cx, cy := float32(st.CenterX), float32(st.CenterY)
+
+	// Draw center marker
+	vector.DrawFilledCircle(a, cx, cy, 5, color.RGBA{0, 220, 220, 120}, false)
+
+	// Draw pulse rings at min and max radius
+	vector.StrokeCircle(a, cx, cy, 40, 1, color.RGBA{0, 200, 200, 40}, false)  // min
+	vector.StrokeCircle(a, cx, cy, 200, 1, color.RGBA{0, 200, 200, 40}, false) // max
+
+	// Draw current average radius ring
+	var totalDist float64
+	for i := range ss.Bots {
+		dx := ss.Bots[i].X - st.CenterX
+		dy := ss.Bots[i].Y - st.CenterY
+		totalDist += math.Sqrt(dx*dx + dy*dy)
+	}
+	if len(ss.Bots) > 0 {
+		avgR := float32(totalDist / float64(len(ss.Bots)))
+		vector.StrokeCircle(a, cx, cy, avgR, 2, color.RGBA{0, 220, 220, 80}, false)
+	}
+}
+
+// drawImmuneOverlay draws antibody/pathogen markers and alert connections.
+func drawImmuneOverlay(a *ebiten.Image, ss *swarm.SwarmState) {
+	st := ss.ImmuneSwarm
+	for i := range ss.Bots {
+		if i >= len(st.IsAntibody) {
+			break
+		}
+		bot := &ss.Bots[i]
+		if st.IsPathogen[i] {
+			// Purple X for pathogens
+			x, y := float32(bot.X), float32(bot.Y)
+			vector.StrokeLine(a, x-6, y-6, x+6, y+6, 2, color.RGBA{180, 0, 180, 180}, false)
+			vector.StrokeLine(a, x+6, y-6, x-6, y+6, 2, color.RGBA{180, 0, 180, 180}, false)
+			// Neutralization progress ring
+			if st.NeutralizeTimer[i] > 0 {
+				progress := float32(st.NeutralizeTimer[i]) / 30.0
+				vector.StrokeCircle(a, x, y, 10+progress*5, 2,
+					color.RGBA{255, 100, 100, uint8(100 + progress*155)}, false)
+			}
+		} else if st.IsAntibody[i] && st.AlertLevel[i] > 0.1 {
+			// Draw alert line from antibody to signal source
+			vector.StrokeLine(a, float32(bot.X), float32(bot.Y),
+				float32(st.SignalX[i]), float32(st.SignalY[i]),
+				1, color.RGBA{255, 80, 80, uint8(st.AlertLevel[i] * 80)}, false)
+		}
 	}
 }
 

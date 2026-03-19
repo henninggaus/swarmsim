@@ -1,0 +1,198 @@
+package swarm
+
+import "math"
+
+// Particle Swarm Optimization (PSO): Bots act as particles searching for
+// an optimum on a fitness landscape. Each bot remembers its personal best
+// position and is attracted toward both its own best and the global best.
+// Classic Kennedy & Eberhart (1995) algorithm visualized as swarm behavior.
+
+const (
+	psoInertia    = 0.7   // velocity damping (momentum)
+	psoCognitive  = 1.5   // attraction toward personal best
+	psoSocial     = 2.0   // attraction toward global best
+	psoMaxVel     = 3.0   // max velocity component
+	psoUpdateRate = 5     // ticks between fitness evaluations
+)
+
+// PSOState holds per-bot PSO optimization state.
+type PSOState struct {
+	VelX      []float64 // velocity X
+	VelY      []float64 // velocity Y
+	BestX     []float64 // personal best position X
+	BestY     []float64 // personal best position Y
+	BestFit   []float64 // personal best fitness
+	GlobalX   float64   // global best X
+	GlobalY   float64   // global best Y
+	GlobalFit float64   // global best fitness
+	// Fitness landscape: sum of Gaussian peaks
+	PeakX []float64
+	PeakY []float64
+	PeakH []float64 // height (strength)
+	PeakS []float64 // sigma (spread)
+}
+
+// InitPSO allocates PSO state with a random fitness landscape.
+func InitPSO(ss *SwarmState) {
+	n := len(ss.Bots)
+	st := &PSOState{
+		VelX:    make([]float64, n),
+		VelY:    make([]float64, n),
+		BestX:   make([]float64, n),
+		BestY:   make([]float64, n),
+		BestFit: make([]float64, n),
+	}
+
+	// Generate 3-5 Gaussian peaks as fitness landscape
+	numPeaks := 3 + ss.Rng.Intn(3)
+	st.PeakX = make([]float64, numPeaks)
+	st.PeakY = make([]float64, numPeaks)
+	st.PeakH = make([]float64, numPeaks)
+	st.PeakS = make([]float64, numPeaks)
+	for p := 0; p < numPeaks; p++ {
+		st.PeakX[p] = ss.ArenaW*0.1 + ss.Rng.Float64()*ss.ArenaW*0.8
+		st.PeakY[p] = ss.ArenaH*0.1 + ss.Rng.Float64()*ss.ArenaH*0.8
+		st.PeakH[p] = 50 + ss.Rng.Float64()*50
+		st.PeakS[p] = 40 + ss.Rng.Float64()*80
+	}
+
+	// Initialize personal bests
+	st.GlobalFit = -1
+	for i := range ss.Bots {
+		st.BestX[i] = ss.Bots[i].X
+		st.BestY[i] = ss.Bots[i].Y
+		f := psoEvaluate(st, ss.Bots[i].X, ss.Bots[i].Y)
+		st.BestFit[i] = f
+		if f > st.GlobalFit {
+			st.GlobalFit = f
+			st.GlobalX = ss.Bots[i].X
+			st.GlobalY = ss.Bots[i].Y
+		}
+	}
+
+	ss.PSO = st
+	ss.PSOOn = true
+}
+
+// ClearPSO frees PSO state.
+func ClearPSO(ss *SwarmState) {
+	ss.PSO = nil
+	ss.PSOOn = false
+}
+
+// psoEvaluate computes the fitness at a given position.
+func psoEvaluate(st *PSOState, x, y float64) float64 {
+	fit := 0.0
+	for p := range st.PeakX {
+		dx := x - st.PeakX[p]
+		dy := y - st.PeakY[p]
+		fit += st.PeakH[p] * math.Exp(-(dx*dx+dy*dy)/(2*st.PeakS[p]*st.PeakS[p]))
+	}
+	return fit
+}
+
+// TickPSO updates PSO velocities, evaluates fitness, updates bests.
+func TickPSO(ss *SwarmState) {
+	if ss.PSO == nil || ss.Rng == nil {
+		return
+	}
+	st := ss.PSO
+
+	// Grow slices if bots added
+	for len(st.VelX) < len(ss.Bots) {
+		st.VelX = append(st.VelX, 0)
+		st.VelY = append(st.VelY, 0)
+		st.BestX = append(st.BestX, ss.Bots[len(st.BestX)].X)
+		st.BestY = append(st.BestY, ss.Bots[len(st.BestY)].Y)
+		st.BestFit = append(st.BestFit, 0)
+	}
+
+	evaluate := ss.Tick%psoUpdateRate == 0
+
+	for i := range ss.Bots {
+		bot := &ss.Bots[i]
+
+		if evaluate {
+			f := psoEvaluate(st, bot.X, bot.Y)
+			if f > st.BestFit[i] {
+				st.BestFit[i] = f
+				st.BestX[i] = bot.X
+				st.BestY[i] = bot.Y
+			}
+			if f > st.GlobalFit {
+				st.GlobalFit = f
+				st.GlobalX = bot.X
+				st.GlobalY = bot.Y
+			}
+		}
+
+		// PSO velocity update
+		r1 := ss.Rng.Float64()
+		r2 := ss.Rng.Float64()
+		st.VelX[i] = psoInertia*st.VelX[i] +
+			psoCognitive*r1*(st.BestX[i]-bot.X) +
+			psoSocial*r2*(st.GlobalX-bot.X)
+		st.VelY[i] = psoInertia*st.VelY[i] +
+			psoCognitive*r1*(st.BestY[i]-bot.Y) +
+			psoSocial*r2*(st.GlobalY-bot.Y)
+
+		// Clamp velocity
+		if st.VelX[i] > psoMaxVel {
+			st.VelX[i] = psoMaxVel
+		} else if st.VelX[i] < -psoMaxVel {
+			st.VelX[i] = -psoMaxVel
+		}
+		if st.VelY[i] > psoMaxVel {
+			st.VelY[i] = psoMaxVel
+		} else if st.VelY[i] < -psoMaxVel {
+			st.VelY[i] = -psoMaxVel
+		}
+
+		// Update sensor cache
+		currentFit := psoEvaluate(st, bot.X, bot.Y)
+		bot.PSOFitness = int(currentFit)
+		bot.PSOBest = int(st.BestFit[i])
+
+		// Distance to global best
+		dx := st.GlobalX - bot.X
+		dy := st.GlobalY - bot.Y
+		bot.PSOGlobalDist = int(math.Min(9999, math.Sqrt(dx*dx+dy*dy)))
+	}
+}
+
+// ApplyPSOMove applies PSO velocity to bot movement.
+func ApplyPSOMove(bot *SwarmBot, ss *SwarmState, idx int) {
+	if ss.PSO == nil || idx >= len(ss.PSO.VelX) {
+		bot.Speed = SwarmBotSpeed
+		return
+	}
+	st := ss.PSO
+
+	// Steer toward velocity vector
+	vx, vy := st.VelX[idx], st.VelY[idx]
+	speed := math.Sqrt(vx*vx + vy*vy)
+	if speed > 0.1 {
+		targetAngle := math.Atan2(vy, vx)
+		diff := targetAngle - bot.Angle
+		for diff > math.Pi {
+			diff -= 2 * math.Pi
+		}
+		for diff < -math.Pi {
+			diff += 2 * math.Pi
+		}
+		if diff > 0.2 {
+			diff = 0.2
+		} else if diff < -0.2 {
+			diff = -0.2
+		}
+		bot.Angle += diff
+		bot.Speed = math.Min(speed*0.5, SwarmBotSpeed)
+	} else {
+		bot.Speed = 0
+	}
+
+	// LED: green = high fitness, red = low fitness
+	fit := psoEvaluate(st, bot.X, bot.Y)
+	t := math.Min(1, fit/80.0)
+	bot.LEDColor = [3]uint8{uint8((1 - t) * 255), uint8(t * 255), 50}
+}

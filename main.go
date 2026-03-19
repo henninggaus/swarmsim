@@ -987,6 +987,123 @@ func (g *Game) handleSwarmInput() {
 		logger.Info("SWARM", "Vortex-Overlay: %v", ss.ShowVortex)
 	}
 
+	// Shift+M key: Morphogen pattern overlay
+	if inpututil.IsKeyJustPressed(ebiten.KeyM) && ebiten.IsKeyPressed(ebiten.KeyShift) && !ed.Focused && !ss.BotCountEdit {
+		if !ss.MorphogenOn {
+			swarm.InitMorphogen(ss)
+		}
+		ss.ShowMorphogen = !ss.ShowMorphogen
+		logger.Info("SWARM", "Morphogen-Overlay: %v", ss.ShowMorphogen)
+	}
+
+	// Shift+E key: Evasion wave overlay
+	if inpututil.IsKeyJustPressed(ebiten.KeyE) && ebiten.IsKeyPressed(ebiten.KeyShift) && !ed.Focused && !ss.BotCountEdit {
+		if !ss.EvasionOn {
+			swarm.InitEvasion(ss)
+		}
+		ss.ShowEvasion = !ss.ShowEvasion
+		logger.Info("SWARM", "Evasion-Overlay: %v", ss.ShowEvasion)
+	}
+
+	// Shift+S key: Slime trail overlay
+	if inpututil.IsKeyJustPressed(ebiten.KeyS) && ebiten.IsKeyPressed(ebiten.KeyShift) && !ed.Focused && !ss.BotCountEdit {
+		if !ss.SlimeOn {
+			swarm.InitSlime(ss)
+		}
+		ss.ShowSlime = !ss.ShowSlime
+		logger.Info("SWARM", "Slime-Overlay: %v", ss.ShowSlime)
+	}
+
+	// Shift+B key: Bridge overlay
+	if inpututil.IsKeyJustPressed(ebiten.KeyB) && ebiten.IsKeyPressed(ebiten.KeyShift) && !ed.Focused && !ss.BotCountEdit {
+		if !ss.BridgeOn {
+			swarm.InitBridge(ss)
+		}
+		ss.ShowBridge = !ss.ShowBridge
+		logger.Info("SWARM", "Bridge-Overlay: %v", ss.ShowBridge)
+	}
+
+	// Shift+W key: Wave overlay
+	if inpututil.IsKeyJustPressed(ebiten.KeyW) && ebiten.IsKeyPressed(ebiten.KeyShift) && !ed.Focused && !ss.BotCountEdit {
+		if !ss.WaveOn {
+			swarm.InitWave(ss)
+		}
+		ss.ShowWave = !ss.ShowWave
+		logger.Info("SWARM", "Wave-Overlay: %v", ss.ShowWave)
+	}
+
+	// Shift+H key: Shepherd overlay
+	if inpututil.IsKeyJustPressed(ebiten.KeyH) && ebiten.IsKeyPressed(ebiten.KeyShift) && !ed.Focused && !ss.BotCountEdit {
+		if !ss.ShepherdOn {
+			swarm.InitShepherd(ss)
+		}
+		ss.ShowShepherd = !ss.ShowShepherd
+		logger.Info("SWARM", "Shepherd-Overlay: %v", ss.ShowShepherd)
+	}
+
+	// Shift+P key: PSO fitness landscape overlay
+	if inpututil.IsKeyJustPressed(ebiten.KeyP) && ebiten.IsKeyPressed(ebiten.KeyShift) && !ed.Focused && !ss.BotCountEdit {
+		if !ss.PSOOn {
+			swarm.InitPSO(ss)
+		}
+		ss.ShowPSO = !ss.ShowPSO
+		logger.Info("SWARM", "PSO-Overlay: %v", ss.ShowPSO)
+	}
+
+	// Shift+G key: Magnetic chain overlay
+	if inpututil.IsKeyJustPressed(ebiten.KeyG) && ebiten.IsKeyPressed(ebiten.KeyShift) && !ed.Focused && !ss.BotCountEdit {
+		if !ss.MagneticOn {
+			swarm.InitMagnetic(ss)
+		}
+		ss.ShowMagnetic = !ss.ShowMagnetic
+		logger.Info("SWARM", "Magnetic-Overlay: %v", ss.ShowMagnetic)
+	}
+
+	// Shift+D key: Cell Division overlay
+	if inpututil.IsKeyJustPressed(ebiten.KeyD) && ebiten.IsKeyPressed(ebiten.KeyShift) && !ed.Focused && !ss.BotCountEdit {
+		if !ss.DivisionOn {
+			swarm.InitDivision(ss)
+		}
+		ss.ShowDivision = !ss.ShowDivision
+		logger.Info("SWARM", "Division-Overlay: %v", ss.ShowDivision)
+	}
+
+	// Shift+V key: V-Formation overlay
+	if inpututil.IsKeyJustPressed(ebiten.KeyV) && ebiten.IsKeyPressed(ebiten.KeyShift) && !ed.Focused && !ss.BotCountEdit {
+		if !ss.VFormationOn {
+			swarm.InitVFormation(ss)
+		}
+		ss.ShowVFormation = !ss.ShowVFormation
+		logger.Info("SWARM", "V-Formation-Overlay: %v", ss.ShowVFormation)
+	}
+
+	// Shift+O key: Brood Sorting overlay
+	if inpututil.IsKeyJustPressed(ebiten.KeyO) && ebiten.IsKeyPressed(ebiten.KeyShift) && !ed.Focused && !ss.BotCountEdit {
+		if !ss.BroodOn {
+			swarm.InitBrood(ss)
+		}
+		ss.ShowBrood = !ss.ShowBrood
+		logger.Info("SWARM", "Brood-Overlay: %v", ss.ShowBrood)
+	}
+
+	// Shift+U key: Jellyfish Pulse overlay
+	if inpututil.IsKeyJustPressed(ebiten.KeyU) && ebiten.IsKeyPressed(ebiten.KeyShift) && !ed.Focused && !ss.BotCountEdit {
+		if !ss.JellyfishOn {
+			swarm.InitJellyfish(ss)
+		}
+		ss.ShowJellyfish = !ss.ShowJellyfish
+		logger.Info("SWARM", "Jellyfish-Overlay: %v", ss.ShowJellyfish)
+	}
+
+	// Shift+I key: Immune System overlay
+	if inpututil.IsKeyJustPressed(ebiten.KeyI) && ebiten.IsKeyPressed(ebiten.KeyShift) && !ed.Focused && !ss.BotCountEdit {
+		if !ss.ImmuneSwarmOn {
+			swarm.InitImmuneSwarm(ss)
+		}
+		ss.ShowImmune = !ss.ShowImmune
+		logger.Info("SWARM", "Immune-Overlay: %v", ss.ShowImmune)
+	}
+
 	// C key: Shift+C = swarm center overlay, plain C = challenge/routes
 	if inpututil.IsKeyJustPressed(ebiten.KeyC) && !ed.Focused && !ss.BotCountEdit {
 		if ebiten.IsKeyPressed(ebiten.KeyShift) {
@@ -1197,7 +1314,7 @@ func (g *Game) handleSwarmInput() {
 	}
 
 	// V key: toggle genome visualization (when editor not focused + evolution on)
-	if inpututil.IsKeyJustPressed(ebiten.KeyV) && !ed.Focused && !ss.BotCountEdit {
+	if inpututil.IsKeyJustPressed(ebiten.KeyV) && !ed.Focused && !ss.BotCountEdit && !ebiten.IsKeyPressed(ebiten.KeyShift) {
 		if ss.EvolutionOn {
 			ss.ShowGenomeViz = !ss.ShowGenomeViz
 			swarm.RecordOverlayUsed(ss, "genome")
@@ -1276,7 +1393,7 @@ func (g *Game) handleSwarmInput() {
 	}
 
 	// U key: tournament mode
-	if inpututil.IsKeyJustPressed(ebiten.KeyU) && !ed.Focused && !ss.BotCountEdit {
+	if inpututil.IsKeyJustPressed(ebiten.KeyU) && !ed.Focused && !ss.BotCountEdit && !ebiten.IsKeyPressed(ebiten.KeyShift) {
 		if !ss.TournamentOn {
 			// Add current program to tournament roster and open tournament
 			name := ss.ProgramName
@@ -1316,7 +1433,7 @@ func (g *Game) handleSwarmInput() {
 	}
 
 	// O key: toggle arena edit mode
-	if inpututil.IsKeyJustPressed(ebiten.KeyO) && !ed.Focused && !ss.BotCountEdit {
+	if inpututil.IsKeyJustPressed(ebiten.KeyO) && !ed.Focused && !ss.BotCountEdit && !ebiten.IsKeyPressed(ebiten.KeyShift) && !ebiten.IsKeyPressed(ebiten.KeyControl) {
 		ss.ArenaEditMode = !ss.ArenaEditMode
 		ss.ArenaDragIdx = -1
 		if ss.ArenaEditMode {
