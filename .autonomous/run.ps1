@@ -140,6 +140,11 @@ Aktualisiere PROGRESS.md nach JEDEM abgeschlossenen Schritt mit Status und Erken
 
 Write-OK "Prompt-Laenge: $($finalPrompt.Length) Zeichen"
 
+# --- Prompt als Datei speichern (vermeidet Shell-Escaping-Probleme) ---
+$promptFile = Join-Path (Split-Path -Parent $MyInvocation.MyCommand.Path) "_prompt.tmp.md"
+$finalPrompt | Out-File -FilePath $promptFile -Encoding utf8NoBOM
+Write-OK "Prompt geschrieben: $promptFile"
+
 # --- Alten Container entfernen falls vorhanden ---
 podman rm -f $ContainerName 2>$null | Out-Null
 
@@ -158,13 +163,14 @@ Write-Host "Stoppen:      podman stop $ContainerName" -ForegroundColor DarkGray
 Write-Host "Morgen:       cd $RepoPath && git log --oneline" -ForegroundColor DarkGray
 Write-Host ""
 
-# Container starten mit persistentem Auth-Volume
+# Container starten: Prompt wird als Datei gemountet und per cat reingepipet
 podman run -d `
     --name $ContainerName `
     -v "${RepoPath}:/workspace" `
     -v "${VolumeName}:/home/claude" `
+    -v "${promptFile}:/tmp/prompt.md:ro" `
     $ImageName `
-    claude -p --dangerously-skip-permissions "$finalPrompt"
+    bash -c "cat /tmp/prompt.md | claude -p --dangerously-skip-permissions"
 
 if ($LASTEXITCODE -eq 0) {
     Write-OK "Container laeuft! Claude arbeitet jetzt autonom."
