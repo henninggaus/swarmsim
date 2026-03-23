@@ -146,6 +146,19 @@ var gpSensorPool = []gpSensorEntry{
 	// ACO sensors
 	{CondACOTrail, 0, 100},
 	{CondACOGrad, -180, 180},
+	// Metaheuristic sensors
+	{CondBFOHealth, 0, 100},
+	{CondBFOSwimming, 0, 1},
+	{CondBFONutrient, 0, 100},
+	{CondGWORank, 0, 3},
+	{CondGWOFitness, 0, 100},
+	{CondGWOAlphaDist, 0, 500},
+	{CondWOAPhase, 0, 2},
+	{CondWOAFitness, 0, 100},
+	{CondWOABestDist, 0, 500},
+	{CondMFOFlame, -1, 10},
+	{CondMFOFitness, 0, 100},
+	{CondMFOFlameDist, 0, 500},
 }
 
 // gpActionEntry defines an action template for random generation.
@@ -251,6 +264,14 @@ var gpActionPool = []gpActionEntry{
 	{ActAmoeba, 0, 0, 0},
 	// ACO
 	{ActACO, 0, 0, 0},
+	// Metaheuristic optimizers
+	{ActBFO, 0, 0, 0},
+	{ActGWO, 0, 0, 0},
+	{ActWOA, 0, 0, 0},
+	{ActMFO, 0, 0, 0},
+	{ActCuckoo, 0, 0, 0},
+	{ActDE, 0, 0, 0},
+	{ActABC, 0, 0, 0},
 }
 
 // GenerateRandomProgram creates a random SwarmScript program with numRules rules.

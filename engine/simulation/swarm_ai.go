@@ -187,34 +187,45 @@ func (s *Simulation) updateSwarmMode() {
 	}
 
 	// Phase 1.23: Predator-Prey sensor cache
+	// Uses spatial hash with expanding search radii instead of O(n²) brute force.
 	if ss.PredatorPreyOn && ss.PredatorPrey != nil {
 		for i := range ss.Bots {
-			if i < len(ss.PredatorPrey.Roles) {
-				if ss.PredatorPrey.Roles[i] == swarm.RolePredator {
-					ss.Bots[i].PredRole = 1
-				} else {
-					ss.Bots[i].PredRole = 0
-				}
-				// Find nearest opponent distance
-				bestDist := 9999.0
-				for j := range ss.Bots {
+			if i >= len(ss.PredatorPrey.Roles) {
+				continue
+			}
+			if ss.PredatorPrey.Roles[i] == swarm.RolePredator {
+				ss.Bots[i].PredRole = 1
+			} else {
+				ss.Bots[i].PredRole = 0
+			}
+			// Find nearest opponent using spatial hash with expanding radii.
+			// Most opponents are nearby, so start small and widen only if needed.
+			bestDist := 9999.0
+			myRole := ss.PredatorPrey.Roles[i]
+			bx, by := ss.Bots[i].X, ss.Bots[i].Y
+			for _, radius := range [3]float64{150, 400, ss.ArenaW + ss.ArenaH} {
+				candidates := ss.Hash.Query(bx, by, radius)
+				for _, j := range candidates {
 					if j == i || j >= len(ss.PredatorPrey.Roles) {
 						continue
 					}
-					if ss.PredatorPrey.Roles[j] == ss.PredatorPrey.Roles[i] {
+					if ss.PredatorPrey.Roles[j] == myRole {
 						continue
 					}
-					dx := ss.Bots[j].X - ss.Bots[i].X
-					dy := ss.Bots[j].Y - ss.Bots[i].Y
+					dx := ss.Bots[j].X - bx
+					dy := ss.Bots[j].Y - by
 					d := math.Sqrt(dx*dx + dy*dy)
 					if d < bestDist {
 						bestDist = d
 					}
 				}
-				ss.Bots[i].PreyDist = int(math.Min(9999, bestDist))
-				if i < len(ss.PredatorPrey.CatchCount) {
-					ss.Bots[i].PredCatches = ss.PredatorPrey.CatchCount[i]
+				if bestDist < radius {
+					break // found opponent within this radius, no need to search wider
 				}
+			}
+			ss.Bots[i].PreyDist = int(math.Min(9999, bestDist))
+			if i < len(ss.PredatorPrey.CatchCount) {
+				ss.Bots[i].PredCatches = ss.PredatorPrey.CatchCount[i]
 			}
 		}
 	}
@@ -267,6 +278,41 @@ func (s *Simulation) updateSwarmMode() {
 	// Phase 1.33: Ant Colony Optimization
 	if ss.ACOOn {
 		swarm.TickACO(ss)
+	}
+
+	// Phase 1.34: Bacterial Foraging Optimization
+	if ss.BFOOn {
+		swarm.TickBFO(ss)
+	}
+
+	// Phase 1.35: Grey Wolf Optimizer
+	if ss.GWOOn {
+		swarm.TickGWO(ss)
+	}
+
+	// Phase 1.36: Whale Optimization Algorithm
+	if ss.WOAOn {
+		swarm.TickWOA(ss)
+	}
+
+	// Phase 1.37: Moth-Flame Optimization
+	if ss.MFOOn {
+		swarm.TickMFO(ss)
+	}
+
+	// Phase 1.38: Cuckoo Search
+	if ss.CuckooOn {
+		swarm.TickCuckoo(ss)
+	}
+
+	// Phase 1.39: Differential Evolution
+	if ss.DEOn {
+		swarm.TickDE(ss)
+	}
+
+	// Phase 1.40: Artificial Bee Colony
+	if ss.ABCOn {
+		swarm.TickABC(ss)
 	}
 
 	// Phase 2: Execute program on each bot (skip if anti-stuck breakout active)
@@ -595,6 +641,14 @@ func (s *Simulation) updateSwarmMode() {
 	// Phase 4.88: Tournament timer
 	if ss.TournamentOn && ss.TournamentPhase == 1 {
 		swarm.TournamentTick(ss)
+	}
+
+	// Phase 4.88b: Algorithm auto-tournament — tick the active algorithm via
+	// the centralized dispatch (which also records convergence) and advance
+	// the tournament queue when the current algorithm's budget expires.
+	if ss.AlgoTournamentOn {
+		swarm.TickSwarmAlgorithm(ss)
+		swarm.TickAlgoTournament(ss)
 	}
 
 	// Phase 4.9: Challenge timer update
@@ -1807,6 +1861,149 @@ func evaluateSwarmCondition(cond swarmscript.Condition, bot *swarm.SwarmBot, sna
 		return compareInt(bot.ACOTrail, cond.Op, cv)
 	case swarmscript.CondACOGrad:
 		return compareInt(bot.ACOGrad, cond.Op, cv)
+	// Bacterial Foraging conditions
+	case swarmscript.CondBFOHealth:
+		return compareInt(bot.BFOHealth, cond.Op, cv)
+	case swarmscript.CondBFOSwimming:
+		return compareInt(bot.BFOSwimming, cond.Op, cv)
+	case swarmscript.CondBFONutrient:
+		return compareInt(bot.BFONutrient, cond.Op, cv)
+	// Grey Wolf Optimizer conditions
+	case swarmscript.CondGWORank:
+		return compareInt(bot.GWORank, cond.Op, cv)
+	case swarmscript.CondGWOFitness:
+		return compareInt(bot.GWOFitness, cond.Op, cv)
+	case swarmscript.CondGWOAlphaDist:
+		return compareInt(bot.GWOAlphaDist, cond.Op, cv)
+	// Whale Optimization conditions
+	case swarmscript.CondWOAPhase:
+		return compareInt(bot.WOAPhase, cond.Op, cv)
+	case swarmscript.CondWOAFitness:
+		return compareInt(bot.WOAFitness, cond.Op, cv)
+	case swarmscript.CondWOABestDist:
+		return compareInt(bot.WOABestDist, cond.Op, cv)
+	// Moth-Flame Optimization conditions
+	case swarmscript.CondMFOFlame:
+		return compareInt(bot.MFOFlame, cond.Op, cv)
+	case swarmscript.CondMFOFitness:
+		return compareInt(bot.MFOFitness, cond.Op, cv)
+	case swarmscript.CondMFOFlameDist:
+		return compareInt(bot.MFOFlameDist, cond.Op, cv)
+	// Cuckoo Search conditions
+	case swarmscript.CondCuckooFitness:
+		return compareInt(bot.CuckooFitness, cond.Op, cv)
+	case swarmscript.CondCuckooNestAge:
+		return compareInt(bot.CuckooNestAge, cond.Op, cv)
+	case swarmscript.CondCuckooBest:
+		return compareInt(bot.CuckooBest, cond.Op, cv)
+	// Differential Evolution conditions
+	case swarmscript.CondDEFitness:
+		return compareInt(bot.DEFitness, cond.Op, cv)
+	case swarmscript.CondDEBestDist:
+		return compareInt(bot.DEBestDist, cond.Op, cv)
+	case swarmscript.CondDEPhase:
+		return compareInt(bot.DEPhase, cond.Op, cv)
+	// Artificial Bee Colony conditions
+	case swarmscript.CondABCFitness:
+		return compareInt(bot.ABCFitness, cond.Op, cv)
+	case swarmscript.CondABCRole:
+		return compareInt(bot.ABCRole, cond.Op, cv)
+	case swarmscript.CondABCBestDist:
+		return compareInt(bot.ABCBestDist, cond.Op, cv)
+	// Harmony Search Optimization conditions
+	case swarmscript.CondHSOFitness:
+		return compareInt(bot.HSOFitness, cond.Op, cv)
+	case swarmscript.CondHSOPhase:
+		return compareInt(bot.HSOPhase, cond.Op, cv)
+	case swarmscript.CondHSOBestDist:
+		return compareInt(bot.HSOBestDist, cond.Op, cv)
+	// Bat Algorithm conditions
+	case swarmscript.CondBatLoud:
+		return compareInt(bot.BatLoud, cond.Op, cv)
+	case swarmscript.CondBatPulse:
+		return compareInt(bot.BatPulse, cond.Op, cv)
+	case swarmscript.CondBatFitness:
+		return compareInt(bot.BatFitness, cond.Op, cv)
+	case swarmscript.CondBatBestDist:
+		return compareInt(bot.BatBestDist, cond.Op, cv)
+	// Salp Swarm Algorithm conditions
+	case swarmscript.CondSSARole:
+		return compareInt(bot.SSARole, cond.Op, cv)
+	case swarmscript.CondSSAFitness:
+		return compareInt(bot.SSAFitness, cond.Op, cv)
+	case swarmscript.CondSSAFoodDist:
+		return compareInt(bot.SSAFoodDist, cond.Op, cv)
+	// Gravitational Search Algorithm conditions
+	case swarmscript.CondGSAMass:
+		return compareInt(bot.GSAMass, cond.Op, cv)
+	case swarmscript.CondGSAForce:
+		return compareInt(bot.GSAForce, cond.Op, cv)
+	case swarmscript.CondGSABestDist:
+		return compareInt(bot.GSABestDist, cond.Op, cv)
+	// Flower Pollination Algorithm conditions
+	case swarmscript.CondFPAFitness:
+		return compareInt(bot.FPAFitness, cond.Op, cv)
+	case swarmscript.CondFPAType:
+		return compareInt(bot.FPAType, cond.Op, cv)
+	case swarmscript.CondFPABestDist:
+		return compareInt(bot.FPABestDist, cond.Op, cv)
+	// Harris Hawks Optimization conditions
+	case swarmscript.CondHHOPhase:
+		return compareInt(bot.HHOPhase, cond.Op, cv)
+	case swarmscript.CondHHOFitness:
+		return compareInt(bot.HHOFitness, cond.Op, cv)
+	case swarmscript.CondHHOBestDist:
+		return compareInt(bot.HHOBestDist, cond.Op, cv)
+	// Simulated Annealing conditions
+	case swarmscript.CondSAFitness:
+		return compareInt(bot.SAFitness, cond.Op, cv)
+	case swarmscript.CondSATemp:
+		return compareInt(bot.SATemp, cond.Op, cv)
+	case swarmscript.CondSABestDist:
+		return compareInt(bot.SABestDist, cond.Op, cv)
+	// Aquila Optimizer conditions
+	case swarmscript.CondAOPhase:
+		return compareInt(bot.AOPhase, cond.Op, cv)
+	case swarmscript.CondAOFitness:
+		return compareInt(bot.AOFitness, cond.Op, cv)
+	case swarmscript.CondAOBestDist:
+		return compareInt(bot.AOBestDist, cond.Op, cv)
+	// Sine Cosine Algorithm conditions
+	case swarmscript.CondSCAFitness:
+		return compareInt(bot.SCAFitness, cond.Op, cv)
+	case swarmscript.CondSCAPhase:
+		return compareInt(bot.SCAPhase, cond.Op, cv)
+	case swarmscript.CondSCABestDist:
+		return compareInt(bot.SCABestDist, cond.Op, cv)
+	// Dragonfly Algorithm conditions
+	case swarmscript.CondDAFitness:
+		return compareInt(bot.DAFitness, cond.Op, cv)
+	case swarmscript.CondDARole:
+		return compareInt(bot.DARole, cond.Op, cv)
+	case swarmscript.CondDAFoodDist:
+		return compareInt(bot.DAFoodDist, cond.Op, cv)
+	// Teaching-Learning-Based Optimization conditions
+	case swarmscript.CondTLBOFitness:
+		return compareInt(bot.TLBOFitness, cond.Op, cv)
+	case swarmscript.CondTLBOPhase:
+		return compareInt(bot.TLBOPhase, cond.Op, cv)
+	case swarmscript.CondTLBOTeacherDist:
+		return compareInt(bot.TLBOTeacherDist, cond.Op, cv)
+	// Equilibrium Optimizer conditions
+	case swarmscript.CondEOFitness:
+		return compareInt(bot.EOFitness, cond.Op, cv)
+	case swarmscript.CondEOPhase:
+		return compareInt(bot.EOPhase, cond.Op, cv)
+	case swarmscript.CondEOEquilDist:
+		return compareInt(bot.EOEquilDist, cond.Op, cv)
+
+	// Jaya Algorithm conditions
+	case swarmscript.CondJayaFitness:
+		return compareInt(bot.JayaFitness, cond.Op, cv)
+	case swarmscript.CondJayaBestDist:
+		return compareInt(bot.JayaBestDist, cond.Op, cv)
+	case swarmscript.CondJayaWorstDist:
+		return compareInt(bot.JayaWorstDist, cond.Op, cv)
 	}
 
 	return false
@@ -2612,6 +2809,27 @@ func executeSwarmAction(act swarmscript.Action, bot *swarm.SwarmBot, ss *swarm.S
 
 	case swarmscript.ActACO:
 		swarm.ApplyACO(bot, ss, botIdx)
+
+	case swarmscript.ActBFO:
+		swarm.ApplyBFO(bot, ss, botIdx)
+
+	case swarmscript.ActGWO:
+		swarm.ApplyGWO(bot, ss, botIdx)
+
+	case swarmscript.ActWOA:
+		swarm.ApplyWOA(bot, ss, botIdx)
+
+	case swarmscript.ActMFO:
+		swarm.ApplyMFO(bot, ss, botIdx)
+
+	case swarmscript.ActCuckoo:
+		swarm.ApplyCuckoo(bot, ss, botIdx)
+
+	case swarmscript.ActDE:
+		swarm.ApplyDE(bot, ss, botIdx)
+
+	case swarmscript.ActABC:
+		swarm.ApplyABC(bot, ss, botIdx)
 
 	case swarmscript.ActDash:
 		// Double-speed burst for 10 ticks (costs 15 energy, 60 tick cooldown)

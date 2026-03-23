@@ -146,24 +146,56 @@ func TickQuorum(ss *SwarmState) {
 	qs.TotalVotes = 0
 	totalQuorum := 0.0
 
+	// Use spatial hash if available. Ensure hash is populated with current
+	// bot positions (main sim loop rebuilds it each tick, but this is
+	// cheap O(n) insurance for standalone/test invocations).
+	useSpatial := ss.Hash != nil
+	if useSpatial {
+		ss.Hash.Clear()
+		for i := range ss.Bots {
+			ss.Hash.Insert(i, ss.Bots[i].X, ss.Bots[i].Y)
+		}
+	}
+
 	for i := range ss.Bots {
 		localCount := 0
 		localAgree := 0
 		totalConf := 0.0
 
-		for j := range ss.Bots {
-			if i == j {
-				continue
+		if useSpatial {
+			// O(n·k): query only nearby bots via spatial hash
+			nearIDs := ss.Hash.Query(ss.Bots[i].X, ss.Bots[i].Y, qs.VoteRange)
+			for _, j := range nearIDs {
+				if j == i || j >= n {
+					continue
+				}
+				dx := ss.Bots[i].X - ss.Bots[j].X
+				dy := ss.Bots[i].Y - ss.Bots[j].Y
+				if dx*dx+dy*dy > rangeSq {
+					continue
+				}
+				localCount++
+				if qs.Votes[j].Proposal == qs.Votes[i].Proposal {
+					localAgree++
+					totalConf += qs.Votes[j].Confidence
+				}
 			}
-			dx := ss.Bots[i].X - ss.Bots[j].X
-			dy := ss.Bots[i].Y - ss.Bots[j].Y
-			if dx*dx+dy*dy > rangeSq {
-				continue
-			}
-			localCount++
-			if qs.Votes[j].Proposal == qs.Votes[i].Proposal {
-				localAgree++
-				totalConf += qs.Votes[j].Confidence
+		} else {
+			// Fallback: brute-force O(n²)
+			for j := range ss.Bots {
+				if i == j {
+					continue
+				}
+				dx := ss.Bots[i].X - ss.Bots[j].X
+				dy := ss.Bots[i].Y - ss.Bots[j].Y
+				if dx*dx+dy*dy > rangeSq {
+					continue
+				}
+				localCount++
+				if qs.Votes[j].Proposal == qs.Votes[i].Proposal {
+					localAgree++
+					totalConf += qs.Votes[j].Confidence
+				}
 			}
 		}
 
@@ -181,19 +213,38 @@ func TickQuorum(ss *SwarmState) {
 
 				// Only the bot with highest confidence in cluster triggers decision
 				isLeader := true
-				for j := range ss.Bots {
-					if j == i {
-						continue
+				if useSpatial {
+					nearIDs := ss.Hash.Query(ss.Bots[i].X, ss.Bots[i].Y, qs.VoteRange)
+					for _, j := range nearIDs {
+						if j == i || j >= n {
+							continue
+						}
+						dx := ss.Bots[i].X - ss.Bots[j].X
+						dy := ss.Bots[i].Y - ss.Bots[j].Y
+						if dx*dx+dy*dy > rangeSq {
+							continue
+						}
+						if qs.Votes[j].Proposal == qs.Votes[i].Proposal &&
+							qs.Votes[j].Confidence > qs.Votes[i].Confidence {
+							isLeader = false
+							break
+						}
 					}
-					dx := ss.Bots[i].X - ss.Bots[j].X
-					dy := ss.Bots[i].Y - ss.Bots[j].Y
-					if dx*dx+dy*dy > rangeSq {
-						continue
-					}
-					if qs.Votes[j].Proposal == qs.Votes[i].Proposal &&
-						qs.Votes[j].Confidence > qs.Votes[i].Confidence {
-						isLeader = false
-						break
+				} else {
+					for j := range ss.Bots {
+						if j == i {
+							continue
+						}
+						dx := ss.Bots[i].X - ss.Bots[j].X
+						dy := ss.Bots[i].Y - ss.Bots[j].Y
+						if dx*dx+dy*dy > rangeSq {
+							continue
+						}
+						if qs.Votes[j].Proposal == qs.Votes[i].Proposal &&
+							qs.Votes[j].Confidence > qs.Votes[i].Confidence {
+							isLeader = false
+							break
+						}
 					}
 				}
 
@@ -274,21 +325,41 @@ func socialInfluence(ss *SwarmState, qs *QuorumState) {
 	rangeSq := qs.VoteRange * qs.VoteRange
 	n := len(ss.Bots)
 	newProposals := make([]int, n)
-	copy(newProposals, make([]int, n)) // init
+	useSpatial := ss.Hash != nil
 
 	for i := range ss.Bots {
 		counts := make([]int, qs.NumProposals)
-		for j := range ss.Bots {
-			if i == j {
-				continue
+
+		if useSpatial {
+			// O(n·k): query only nearby bots via spatial hash
+			nearIDs := ss.Hash.Query(ss.Bots[i].X, ss.Bots[i].Y, qs.VoteRange)
+			for _, j := range nearIDs {
+				if j == i || j >= n {
+					continue
+				}
+				dx := ss.Bots[i].X - ss.Bots[j].X
+				dy := ss.Bots[i].Y - ss.Bots[j].Y
+				if dx*dx+dy*dy > rangeSq {
+					continue
+				}
+				if qs.Votes[j].Proposal < qs.NumProposals {
+					counts[qs.Votes[j].Proposal]++
+				}
 			}
-			dx := ss.Bots[i].X - ss.Bots[j].X
-			dy := ss.Bots[i].Y - ss.Bots[j].Y
-			if dx*dx+dy*dy > rangeSq {
-				continue
-			}
-			if qs.Votes[j].Proposal < qs.NumProposals {
-				counts[qs.Votes[j].Proposal]++
+		} else {
+			// Fallback: brute-force O(n²)
+			for j := range ss.Bots {
+				if i == j {
+					continue
+				}
+				dx := ss.Bots[i].X - ss.Bots[j].X
+				dy := ss.Bots[i].Y - ss.Bots[j].Y
+				if dx*dx+dy*dy > rangeSq {
+					continue
+				}
+				if qs.Votes[j].Proposal < qs.NumProposals {
+					counts[qs.Votes[j].Proposal]++
+				}
 			}
 		}
 

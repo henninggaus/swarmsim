@@ -5,6 +5,7 @@ import (
 	"image"
 	"image/color"
 	"math"
+	"sort"
 	"swarmsim/domain/swarm"
 	"swarmsim/engine/simulation"
 	"swarmsim/engine/swarmscript"
@@ -194,21 +195,27 @@ func (r *Renderer) DrawSwarmMode(screen *ebiten.Image, s *simulation.Simulation,
 	}
 
 	// Communication graph overlay (K key)
+	// Uses spatial hash for O(m·k) instead of O(m·n) where k = nearby bots.
 	if ss.ShowCommGraph && len(ss.PrevMessages) > 0 {
 		commRange := float32(swarm.SwarmCommRange)
+		commRangeSq := commRange * commRange
 		for _, msg := range ss.PrevMessages {
 			sx := float32(msg.X)
 			sy := float32(msg.Y)
 			// Draw small broadcast ring at sender
 			vector.StrokeCircle(a, sx, sy, commRange, 1, color.RGBA{100, 200, 255, 40}, false)
-			// Draw lines to receiving bots (within comm range)
-			for bi := range ss.Bots {
+			// Draw lines to receiving bots (within comm range) via spatial hash
+			nearIDs := ss.Hash.Query(msg.X, msg.Y, swarm.SwarmCommRange)
+			for _, bi := range nearIDs {
+				if bi < 0 || bi >= len(ss.Bots) {
+					continue
+				}
 				bot := &ss.Bots[bi]
 				dx := float32(bot.X) - sx
 				dy := float32(bot.Y) - sy
-				dist := dx*dx + dy*dy
-				if dist < commRange*commRange && dist > 4 {
-					alpha := uint8(120 - 80*dist/(commRange*commRange))
+				distSq := dx*dx + dy*dy
+				if distSq < commRangeSq && distSq > 4 {
+					alpha := uint8(120 - 80*distSq/commRangeSq)
 					lineCol := color.RGBA{100, 200, 255, alpha}
 					vector.StrokeLine(a, sx, sy, float32(bot.X), float32(bot.Y), 1, lineCol, false)
 				}
@@ -316,9 +323,10 @@ func (r *Renderer) DrawSwarmMode(screen *ebiten.Image, s *simulation.Simulation,
 		drawShepherdOverlay(a, ss)
 	}
 
-	// Draw PSO fitness landscape overlay (Shift+P toggle)
-	if ss.ShowPSO && ss.PSOOn && ss.PSO != nil {
-		drawPSOOverlay(a, ss)
+	// Draw fitness landscape heatmap overlay (Shift+P toggle)
+	// Works for any algorithm that uses the shared fitness landscape.
+	if ss.ShowPSO && ss.SwarmAlgo != nil && (len(ss.SwarmAlgo.FitPeakX) > 0 || ss.SwarmAlgo.FitnessFunc != swarm.FitGaussian) {
+		r.drawFitnessLandscapeOverlay(a, ss)
 	}
 
 	// Draw magnetic chain overlay (Shift+G toggle)
@@ -371,6 +379,106 @@ func (r *Renderer) DrawSwarmMode(screen *ebiten.Image, s *simulation.Simulation,
 		drawACOOverlay(a, ss)
 	}
 
+	// Draw GWO overlay (6 key toggle) — lines from wolves to alpha/beta/delta
+	if ss.ShowGWO && ss.GWOOn && ss.GWO != nil {
+		drawGWOOverlay(a, ss)
+	}
+
+	// Draw WOA overlay (Shift+X toggle) — spiral paths around best whale
+	if ss.ShowWOA && ss.WOAOn && ss.WOA != nil {
+		drawWOAOverlay(a, ss)
+	}
+
+	// Draw BFO overlay (Shift+Z toggle) — nutrient field and swim/tumble markers
+	if ss.ShowBFO && ss.BFOOn && ss.BFO != nil {
+		drawBFOOverlay(a, ss)
+	}
+
+	// Draw MFO overlay (Shift+R toggle) — lines from moths to their flames
+	if ss.ShowMFO && ss.MFOOn && ss.MFO != nil {
+		drawMFOOverlay(a, ss)
+	}
+
+	// Draw Cuckoo Search overlay — lines from nests to global best
+	if ss.ShowCuckoo && ss.CuckooOn && ss.Cuckoo != nil {
+		drawCuckooOverlay(a, ss)
+	}
+
+	// Draw Differential Evolution overlay — trial position targets
+	if ss.ShowDE && ss.DEOn && ss.DE != nil {
+		drawDEOverlay(a, ss)
+	}
+
+	// Draw Artificial Bee Colony overlay — best food source and role indicators
+	if ss.ShowABC && ss.ABCOn && ss.ABC != nil {
+		drawABCOverlay(a, ss)
+	}
+
+	// Draw Harmony Search overlay — best harmony and HM positions
+	if ss.ShowHSO && ss.HSOOn && ss.HSO != nil {
+		drawHSOOverlay(a, ss)
+	}
+
+	// Draw Bat Algorithm overlay — echolocation pulse rings and best bat marker
+	if ss.ShowBat && ss.BatOn && ss.Bat != nil {
+		drawBatOverlay(a, ss)
+	}
+
+	// Draw Harris Hawks Optimization overlay — hunting phase indicators and prey marker
+	if ss.ShowHHO && ss.HHOOn && ss.HHO != nil {
+		drawHHOOverlay(a, ss)
+	}
+
+	// Draw Salp Swarm Algorithm overlay — chain links and food source
+	if ss.ShowSSA && ss.SSAOn && ss.SSA != nil {
+		drawSSAOverlay(a, ss)
+	}
+
+	// Draw Gravitational Search Algorithm overlay — mass rings and force vectors
+	if ss.ShowGSA && ss.GSAOn && ss.GSA != nil {
+		drawGSAOverlay(a, ss)
+	}
+
+	// Draw Flower Pollination Algorithm overlay — pollination types and global best
+	if ss.ShowFPA && ss.FPAOn && ss.FPA != nil {
+		drawFPAOverlay(a, ss)
+	}
+
+	// Draw Simulated Annealing overlay — temperature halos and target lines
+	if ss.ShowSA && ss.SAOn && ss.SA != nil {
+		drawSAOverlay(a, ss)
+	}
+
+	// Draw Aquila Optimizer overlay — hunting phases and prey marker
+	if ss.ShowAO && ss.AOOn && ss.AO != nil {
+		drawAOOverlay(a, ss)
+	}
+
+	// Draw Sine Cosine Algorithm overlay — sine/cosine phase indicators
+	if ss.ShowSCA && ss.SCAOn && ss.SCA != nil {
+		drawSCAOverlay(a, ss)
+	}
+
+	// Draw Dragonfly Algorithm overlay — roles, step vectors, food/enemy
+	if ss.ShowDA && ss.DAOn && ss.DA != nil {
+		drawDAOverlay(a, ss)
+	}
+
+	// Draw TLBO overlay — teacher/learner phases and peer links
+	if ss.ShowTLBO && ss.TLBOOn && ss.TLBO != nil {
+		drawTLBOOverlay(a, ss)
+	}
+
+	// Draw Equilibrium Optimizer overlay — phases and pool positions
+	if ss.ShowEO && ss.EOOn && ss.EO != nil {
+		drawEOOverlay(a, ss)
+	}
+
+	// Draw Jaya overlay — best/worst markers and fitness gradient
+	if ss.ShowJaya && ss.JayaOn && ss.Jaya != nil {
+		drawJayaOverlay(a, ss)
+	}
+
 	// Draw message wave rings
 	if ss.ShowMsgWaves {
 		for _, w := range ss.MsgWaves {
@@ -406,6 +514,21 @@ func (r *Renderer) DrawSwarmMode(screen *ebiten.Image, s *simulation.Simulation,
 	// Swarm center of mass overlay (before bots)
 	if ss.ShowSwarmCenter {
 		drawSwarmCenterOverlay(a, ss)
+	}
+
+	// Voronoi territory overlay (before bots)
+	if ss.ShowVoronoi {
+		drawVoronoiOverlay(a, ss)
+	}
+
+	// Velocity flow field overlay (before bots)
+	if ss.ShowFlowField {
+		drawFlowField(a, ss)
+	}
+
+	// Fitness gradient field overlay (before bots)
+	if ss.ShowFitnessGradient {
+		drawFitnessGradientField(a, ss)
 	}
 
 	// Draw bots
@@ -603,15 +726,19 @@ func (r *Renderer) DrawSwarmMode(screen *ebiten.Image, s *simulation.Simulation,
 
 	// --- HUD elements (drawn directly to screen, NOT zoomed) ---
 
-	// Delivery legend
-	if ss.DeliveryOn {
+	// Track which right-side panels are active to avoid overlaps.
+	botInfoVisible := !ss.DashboardOn && ss.SelectedBot >= 0 && ss.SelectedBot < len(ss.Bots)
+	comparisonVisible := !ss.DashboardOn && ss.CompareBot >= 0 && ss.CompareBot < len(ss.Bots) && botInfoVisible
+
+	// Delivery legend — hide when a right-side panel would overlap it.
+	if ss.DeliveryOn && !botInfoVisible && !ss.DashboardOn {
 		drawDeliveryLegend(screen, ss, sw)
 	}
 
-	// Selected bot info overlay / comparison panel
-	if ss.CompareBot >= 0 && ss.CompareBot < len(ss.Bots) && ss.SelectedBot >= 0 && ss.SelectedBot < len(ss.Bots) {
+	// Selected bot info overlay / comparison panel — skip when dashboard is open.
+	if comparisonVisible {
 		drawBotComparisonPanel(screen, ss)
-	} else if ss.SelectedBot >= 0 && ss.SelectedBot < len(ss.Bots) {
+	} else if botInfoVisible {
 		drawSelectedBotInfo(screen, ss)
 	}
 
@@ -640,7 +767,7 @@ func (r *Renderer) DrawSwarmMode(screen *ebiten.Image, s *simulation.Simulation,
 	// Follow-cam HUD indicator
 	if ss.FollowCamBot >= 0 && ss.FollowCamBot < len(ss.Bots) {
 		label := cachedFollowCam(upd, ss.FollowCamBot)
-		printColoredAt(screen, label, 500, 855, color.RGBA{0, 255, 255, 220})
+		printColoredAt(screen, label, 420, 838, color.RGBA{0, 255, 255, 220})
 	}
 
 	// Evolution HUD + fitness graph
@@ -763,6 +890,28 @@ func (r *Renderer) DrawSwarmMode(screen *ebiten.Image, s *simulation.Simulation,
 	// Statistics dashboard
 	if ss.DashboardOn && ss.StatsTracker != nil {
 		DrawDashboard(screen, ss, sw-260, 55, 250, sh-70)
+	}
+
+	// Convergence graph for swarm algorithms (auto-shows when algorithm is active)
+	if ss.SwarmAlgoOn && ss.SwarmAlgo != nil && len(ss.SwarmAlgo.ConvergenceHistory) >= 2 {
+		drawConvergenceGraph(screen, ss)
+		drawSearchTrajectory(screen, ss)
+		drawFitnessHistogram(screen, ss)
+	}
+
+	// Algorithm performance scoreboard (shows when 2+ algorithms have been tested)
+	if len(ss.AlgoScoreboard) >= 1 {
+		drawAlgoScoreboard(screen, ss)
+	}
+
+	// Algorithm radar chart (shows when 2+ algorithms have been tested and toggled on)
+	if ss.ShowAlgoRadar && len(ss.AlgoScoreboard) >= 2 {
+		drawAlgoRadarChart(screen, ss)
+	}
+
+	// Algorithm auto-tournament progress bar
+	if ss.AlgoTournamentOn {
+		drawAlgoTournamentProgress(screen, ss)
 	}
 
 	// Minimap
@@ -1824,9 +1973,13 @@ func drawSwarmFitnessGraph(screen *ebiten.Image, ss *swarm.SwarmState, gx, gy, g
 }
 
 // drawTeamsScoreboard renders the team score display at the top center of the arena.
+// When evolution or GP is active the scoreboard shifts down to avoid the fitness graph.
 func drawTeamsScoreboard(screen *ebiten.Image, ss *swarm.SwarmState, sw int) {
 	cx := sw/2 + 100 // offset right (editor panel on left)
 	y := 55
+	if ss.EvolutionOn || ss.GPEnabled {
+		y = 115 // below the fitness graph
+	}
 	w := 300
 	h := 30
 
@@ -2336,23 +2489,275 @@ func drawShepherdOverlay(a *ebiten.Image, ss *swarm.SwarmState) {
 	}
 }
 
-// drawPSOOverlay draws Gaussian fitness landscape peaks and global best marker.
-func drawPSOOverlay(a *ebiten.Image, ss *swarm.SwarmState) {
-	st := ss.PSO
-	// Draw peaks as translucent circles
-	for p := range st.PeakX {
-		radius := float32(st.PeakS[p])
-		intensity := uint8(st.PeakH[p] * 2)
-		vector.DrawFilledCircle(a, float32(st.PeakX[p]), float32(st.PeakY[p]),
-			radius, color.RGBA{0, intensity, 0, 40}, false)
-		vector.StrokeCircle(a, float32(st.PeakX[p]), float32(st.PeakY[p]),
-			radius*0.5, 1.5, color.RGBA{0, intensity, 0, 80}, false)
+// fitnessLandscapeHashKey computes a simple hash from the fitness function type
+// and (for Gaussian) the shared peak parameters.
+func fitnessLandscapeHashKey(sa *swarm.SwarmAlgorithmState) uint64 {
+	h := uint64(sa.FitnessFunc) * 1000003
+	h ^= uint64(len(sa.FitPeakX))
+	for i := range sa.FitPeakX {
+		h ^= math.Float64bits(sa.FitPeakX[i]) * 31
+		h ^= math.Float64bits(sa.FitPeakY[i]) * 37
+		h ^= math.Float64bits(sa.FitPeakH[i]) * 41
+		h ^= math.Float64bits(sa.FitPeakS[i]) * 43
 	}
-	// Draw global best marker
-	vector.DrawFilledCircle(a, float32(st.GlobalX), float32(st.GlobalY), 8,
-		color.RGBA{255, 255, 0, 200}, false)
-	vector.StrokeCircle(a, float32(st.GlobalX), float32(st.GlobalY), 12,
-		2, color.RGBA{255, 255, 0, 120}, false)
+	return h
+}
+
+// landscapeColor maps a normalized fitness value (0-1) to a color using a
+// blue → cyan → green → yellow → red gradient.
+func landscapeColor(t float64, alpha uint8) color.RGBA {
+	if t < 0 {
+		t = 0
+	}
+	if t > 1 {
+		t = 1
+	}
+	var r, g, b float64
+	switch {
+	case t < 0.25:
+		s := t / 0.25
+		r, g, b = 0, s, 1 // blue → cyan
+	case t < 0.5:
+		s := (t - 0.25) / 0.25
+		r, g, b = 0, 1, 1-s // cyan → green
+	case t < 0.75:
+		s := (t - 0.5) / 0.25
+		r, g, b = s, 1, 0 // green → yellow
+	default:
+		s := (t - 0.75) / 0.25
+		r, g, b = 1, 1-s, 0 // yellow → red
+	}
+	return color.RGBA{uint8(r * 255), uint8(g * 255), uint8(b * 255), alpha}
+}
+
+// contourSegment represents a single line segment of a contour line,
+// in arena pixel coordinates.
+type contourSegment struct {
+	x0, y0, x1, y1 float32
+	level          int // contour level index (0=lowest, numLevels-1=highest)
+}
+
+// buildFitnessLandscape generates a heatmap image from the shared Gaussian
+// fitness landscape. Computed at 1/4 resolution for performance and cached
+// until peaks change. Also computes iso-fitness contour lines via marching
+// squares.
+func (r *Renderer) buildFitnessLandscape(sa *swarm.SwarmAlgorithmState, arenaW, arenaH int) *ebiten.Image {
+	const step = 4 // sample every 4 pixels
+	imgW := arenaW / step
+	imgH := arenaH / step
+
+	// Find min/max fitness for normalization
+	minF, maxF := math.MaxFloat64, -math.MaxFloat64
+	values := make([]float64, imgW*imgH)
+	for iy := 0; iy < imgH; iy++ {
+		wy := float64(iy*step) + float64(step)/2
+		for ix := 0; ix < imgW; ix++ {
+			wx := float64(ix*step) + float64(step)/2
+			f := swarm.EvaluateFitnessLandscape(sa, wx, wy)
+			values[iy*imgW+ix] = f
+			if f < minF {
+				minF = f
+			}
+			if f > maxF {
+				maxF = f
+			}
+		}
+	}
+
+	// Build RGBA image
+	rgba := image.NewRGBA(image.Rect(0, 0, imgW, imgH))
+	rangeF := maxF - minF
+	if rangeF < 1e-9 {
+		rangeF = 1
+	}
+	for iy := 0; iy < imgH; iy++ {
+		for ix := 0; ix < imgW; ix++ {
+			t := (values[iy*imgW+ix] - minF) / rangeF
+			c := landscapeColor(t, 100)
+			off := (iy*imgW + ix) * 4
+			rgba.Pix[off+0] = c.R
+			rgba.Pix[off+1] = c.G
+			rgba.Pix[off+2] = c.B
+			rgba.Pix[off+3] = c.A
+		}
+	}
+
+	// Compute contour lines via marching squares
+	const numContourLevels = 8
+	r.psoContourSegs = r.psoContourSegs[:0]
+	r.psoContourW = imgW
+	r.psoContourH = imgH
+	for li := 1; li <= numContourLevels; li++ {
+		frac := float64(li) / float64(numContourLevels+1) // e.g. 1/9, 2/9, ..., 8/9
+		level := minF + frac*rangeF
+		marchingSquaresContour(&r.psoContourSegs, values, imgW, imgH, level, li-1, float32(step))
+	}
+
+	img := ebiten.NewImageFromImage(rgba)
+	return img
+}
+
+// marchingSquaresContour extracts iso-value contour line segments from a 2D
+// scalar field using the marching squares algorithm. Results are appended to
+// segs. Coordinates are scaled by pixelStep to convert from grid cells to
+// arena pixels.
+func marchingSquaresContour(segs *[]contourSegment, values []float64, w, h int, level float64, levelIdx int, pixelStep float32) {
+	for iy := 0; iy < h-1; iy++ {
+		for ix := 0; ix < w-1; ix++ {
+			// Four corners: NW, NE, SE, SW
+			nw := values[iy*w+ix]
+			ne := values[iy*w+ix+1]
+			se := values[(iy+1)*w+ix+1]
+			sw := values[(iy+1)*w+ix]
+
+			// 4-bit case index
+			ci := 0
+			if nw >= level {
+				ci |= 1
+			}
+			if ne >= level {
+				ci |= 2
+			}
+			if se >= level {
+				ci |= 4
+			}
+			if sw >= level {
+				ci |= 8
+			}
+			if ci == 0 || ci == 15 {
+				continue
+			}
+
+			// Linear interpolation along an edge
+			lerpT := func(a, b float64) float32 {
+				d := b - a
+				if d > -1e-10 && d < 1e-10 {
+					return 0.5
+				}
+				t := (level - a) / d
+				if t < 0 {
+					t = 0
+				} else if t > 1 {
+					t = 1
+				}
+				return float32(t)
+			}
+
+			fx := float32(ix) * pixelStep
+			fy := float32(iy) * pixelStep
+
+			// Edge crossing points (in arena pixel coords)
+			northX := fx + lerpT(nw, ne)*pixelStep
+			northY := fy
+			eastX := fx + pixelStep
+			eastY := fy + lerpT(ne, se)*pixelStep
+			southX := fx + lerpT(sw, se)*pixelStep
+			southY := fy + pixelStep
+			westX := fx
+			westY := fy + lerpT(nw, sw)*pixelStep
+
+			addSeg := func(ax, ay, bx, by float32) {
+				*segs = append(*segs, contourSegment{ax, ay, bx, by, levelIdx})
+			}
+
+			switch ci {
+			case 1, 14: // NW
+				addSeg(northX, northY, westX, westY)
+			case 2, 13: // NE
+				addSeg(northX, northY, eastX, eastY)
+			case 3, 12: // NW+NE → west-east
+				addSeg(westX, westY, eastX, eastY)
+			case 4, 11: // SE → east-south
+				addSeg(eastX, eastY, southX, southY)
+			case 5: // NW+SE (saddle) → two segments
+				addSeg(northX, northY, westX, westY)
+				addSeg(eastX, eastY, southX, southY)
+			case 6, 9: // NE+SE or NW+SW → north-south
+				addSeg(northX, northY, southX, southY)
+			case 7, 8: // three corners or SW → west-south
+				addSeg(westX, westY, southX, southY)
+			case 10: // NE+SW (saddle) → two segments
+				addSeg(northX, northY, eastX, eastY)
+				addSeg(westX, westY, southX, southY)
+			}
+		}
+	}
+}
+
+// drawFitnessLandscapeOverlay draws the shared Gaussian fitness landscape as a
+// color heatmap with peak markers. Works for any algorithm using the shared
+// fitness landscape (not just PSO).
+func (r *Renderer) drawFitnessLandscapeOverlay(a *ebiten.Image, ss *swarm.SwarmState) {
+	sa := ss.SwarmAlgo
+
+	// Rebuild cached heatmap if peaks changed
+	h := fitnessLandscapeHashKey(sa)
+	if r.psoLandscapeImg == nil || r.psoLandscapeHash != h {
+		arenaW := int(ss.ArenaW)
+		arenaH := int(ss.ArenaH)
+		r.psoLandscapeImg = r.buildFitnessLandscape(sa, arenaW, arenaH)
+		r.psoLandscapeHash = h
+	}
+
+	// Draw scaled heatmap (4x upscale)
+	op := &ebiten.DrawImageOptions{}
+	op.GeoM.Scale(4, 4)
+	a.DrawImage(r.psoLandscapeImg, op)
+
+	// Draw contour lines on top of the heatmap
+	if len(r.psoContourSegs) > 0 {
+		for _, seg := range r.psoContourSegs {
+			// Major contour levels (every other one) are brighter and thicker
+			major := seg.level%2 == 1
+			var alpha uint8
+			var width float32
+			if major {
+				alpha = 160
+				width = 1.5
+			} else {
+				alpha = 90
+				width = 0.8
+			}
+			col := color.RGBA{255, 255, 255, alpha}
+			vector.StrokeLine(a, seg.x0, seg.y0, seg.x1, seg.y1, width, col, false)
+		}
+	}
+
+	// Draw peak center crosshairs (only for Gaussian peaks)
+	if sa.FitnessFunc == swarm.FitGaussian {
+		for p := range sa.FitPeakX {
+			px, py := float32(sa.FitPeakX[p]), float32(sa.FitPeakY[p])
+			arm := float32(8)
+			crossCol := color.RGBA{255, 255, 255, 140}
+			vector.StrokeLine(a, px-arm, py, px+arm, py, 1.5, crossCol, false)
+			vector.StrokeLine(a, px, py-arm, px, py+arm, 1.5, crossCol, false)
+		}
+	}
+
+	// Draw global best marker if PSO is active (PSO tracks global best position)
+	if ss.PSO != nil && ss.PSOOn {
+		st := ss.PSO
+		vector.DrawFilledCircle(a, float32(st.GlobalX), float32(st.GlobalY), 8,
+			color.RGBA{255, 255, 0, 200}, false)
+		vector.StrokeCircle(a, float32(st.GlobalX), float32(st.GlobalY), 12,
+			2, color.RGBA{255, 255, 0, 120}, false)
+	}
+
+	// Legend in top-left corner of arena
+	algoName := swarm.SwarmAlgorithmName(sa.ActiveAlgo)
+	fitName := swarm.FitnessLandscapeName(sa.FitnessFunc)
+	legendY := 10
+	printColoredAt(a, fitName+" ("+algoName+")", 10, legendY, color.RGBA{255, 255, 255, 200})
+	legendY += 14
+	printColoredAt(a, "Low", 10, legendY, color.RGBA{0, 0, 255, 200})
+	printColoredAt(a, " -> ", 28, legendY, color.RGBA{200, 200, 200, 180})
+	printColoredAt(a, "High", 50, legendY, color.RGBA{255, 0, 0, 200})
+	legendY += 14
+	printColoredAt(a, "Shift+F: Cycle function", 10, legendY, color.RGBA{180, 180, 180, 160})
+	if sa.DynamicLandscape {
+		legendY += 14
+		printColoredAt(a, "DYNAMIC (Ctrl+D)", 10, legendY, color.RGBA{255, 180, 0, 220})
+	}
 }
 
 // drawMagneticOverlay draws magnetic chain links between bots.
@@ -2611,3 +3016,1714 @@ func drawACOOverlay(a *ebiten.Image, ss *swarm.SwarmState) {
 	}
 }
 
+// drawGWOOverlay visualizes the Grey Wolf Optimizer pack hierarchy.
+// Alpha (gold), beta (silver), delta (bronze) are drawn as larger circles.
+// Omega wolves get thin lines connecting them to the alpha leader.
+func drawGWOOverlay(a *ebiten.Image, ss *swarm.SwarmState) {
+	st := ss.GWO
+	if st == nil {
+		return
+	}
+
+	// Draw lines from omega wolves to alpha
+	if st.AlphaIdx >= 0 {
+		ax := float32(ss.Bots[st.AlphaIdx].X)
+		ay := float32(ss.Bots[st.AlphaIdx].Y)
+		for i := range ss.Bots {
+			if st.Rank[i] == 3 { // omega
+				bx := float32(ss.Bots[i].X)
+				by := float32(ss.Bots[i].Y)
+				dx := ax - bx
+				dy := ay - by
+				if dx*dx+dy*dy < 200*200 { // only draw if within 200px
+					vector.StrokeLine(a, bx, by, ax, ay, 0.5,
+						color.RGBA{255, 215, 0, 30}, false)
+				}
+			}
+		}
+	}
+
+	// Draw hierarchy rings around alpha/beta/delta
+	leaders := []struct {
+		idx int
+		r, g, b uint8
+		radius float32
+	}{
+		{st.AlphaIdx, 255, 215, 0, 12},  // gold
+		{st.BetaIdx, 192, 192, 192, 10},  // silver
+		{st.DeltaIdx, 205, 127, 50, 8},   // bronze
+	}
+	for _, l := range leaders {
+		if l.idx >= 0 && l.idx < len(ss.Bots) {
+			x := float32(ss.Bots[l.idx].X)
+			y := float32(ss.Bots[l.idx].Y)
+			vector.StrokeCircle(a, x, y, l.radius, 2,
+				color.RGBA{l.r, l.g, l.b, 180}, false)
+		}
+	}
+}
+
+// drawWOAOverlay visualizes the Whale Optimization Algorithm.
+// Shows the best whale with a large ring and phase-colored indicators per bot.
+func drawWOAOverlay(a *ebiten.Image, ss *swarm.SwarmState) {
+	st := ss.WOA
+	if st == nil {
+		return
+	}
+
+	// Draw ring around best whale (prey position)
+	if st.BestIdx >= 0 && st.BestIdx < len(ss.Bots) {
+		bx := float32(st.BestX)
+		by := float32(st.BestY)
+		vector.StrokeCircle(a, bx, by, 20, 2,
+			color.RGBA{0, 150, 255, 200}, false)
+		vector.StrokeCircle(a, bx, by, 30, 1,
+			color.RGBA{0, 100, 255, 100}, false)
+	}
+
+	// Draw phase indicators: encircle=blue dot, spiral=cyan arc, search=light blue
+	for i := range ss.Bots {
+		if i == st.BestIdx {
+			continue
+		}
+		x := float32(ss.Bots[i].X)
+		y := float32(ss.Bots[i].Y)
+		phase := st.Phase[i]
+		switch phase {
+		case 0: // encircle
+			vector.DrawFilledCircle(a, x, y-8, 2,
+				color.RGBA{0, 60, 180, 120}, false)
+		case 1: // spiral
+			vector.StrokeCircle(a, x, y, 6, 1,
+				color.RGBA{0, 200, 255, 100}, false)
+		case 2: // search
+			vector.DrawFilledCircle(a, x, y-8, 2,
+				color.RGBA{100, 150, 255, 100}, false)
+		}
+	}
+}
+
+// drawBFOOverlay visualizes Bacterial Foraging Optimization.
+// Shows health as colored rings and swim direction indicators.
+func drawBFOOverlay(a *ebiten.Image, ss *swarm.SwarmState) {
+	st := ss.BFO
+	if st == nil {
+		return
+	}
+
+	for i := range ss.Bots {
+		if i >= len(st.Health) {
+			break
+		}
+		x := float32(ss.Bots[i].X)
+		y := float32(ss.Bots[i].Y)
+
+		// Health ring: green (healthy) to red (unhealthy)
+		health := st.Health[i]
+		if health > 10 {
+			health = 10
+		}
+		g := uint8(math.Min(255, health*25))
+		r := uint8(math.Min(255, (10-health)*25))
+		vector.StrokeCircle(a, x, y, 7, 1.5,
+			color.RGBA{r, g, 50, 100}, false)
+
+		// Swim direction indicator (small line in swim direction)
+		if i < len(st.SwimDir) {
+			dir := st.SwimDir[i]
+			ex := x + float32(math.Cos(dir))*10
+			ey := y + float32(math.Sin(dir))*10
+			vector.StrokeLine(a, x, y, ex, ey, 1,
+				color.RGBA{r, g, 50, 80}, false)
+		}
+	}
+}
+
+// drawMFOOverlay visualizes Moth-Flame Optimization.
+// Draws flames as orange circles and lines from moths to their assigned flames.
+func drawMFOOverlay(a *ebiten.Image, ss *swarm.SwarmState) {
+	st := ss.MFO
+	if st == nil {
+		return
+	}
+
+	// Draw flames
+	for _, flame := range st.Flames {
+		fx := float32(flame.X)
+		fy := float32(flame.Y)
+		intensity := uint8(math.Min(255, flame.Intensity*255))
+		radius := float32(4 + flame.Fitness*6)
+		vector.DrawFilledCircle(a, fx, fy, radius,
+			color.RGBA{255, intensity, 0, uint8(math.Min(160, flame.Intensity*200))}, false)
+		vector.StrokeCircle(a, fx, fy, radius+3, 1,
+			color.RGBA{255, 200, 50, uint8(math.Min(80, flame.Intensity*100))}, false)
+	}
+
+	// Draw lines from moths to their flames
+	for i := range ss.Bots {
+		if i >= len(st.MothFlame) {
+			break
+		}
+		fi := st.MothFlame[i]
+		if fi < 0 || fi >= len(st.Flames) {
+			continue
+		}
+		mx := float32(ss.Bots[i].X)
+		my := float32(ss.Bots[i].Y)
+		fx := float32(st.Flames[fi].X)
+		fy := float32(st.Flames[fi].Y)
+		dx := fx - mx
+		dy := fy - my
+		if dx*dx+dy*dy < 150*150 { // only draw if close enough
+			vector.StrokeLine(a, mx, my, fx, fy, 0.5,
+				color.RGBA{255, 180, 30, 40}, false)
+		}
+	}
+}
+
+// drawCuckooOverlay visualizes the Cuckoo Search algorithm.
+// Draws the global best nest as a gold star and lines from nests to it.
+// Top 25% nests are highlighted with green rings.
+func drawCuckooOverlay(a *ebiten.Image, ss *swarm.SwarmState) {
+	st := ss.Cuckoo
+	if st == nil {
+		return
+	}
+
+	// Draw global best nest as a gold circle
+	if st.BestIdx >= 0 && st.BestIdx < len(ss.Bots) {
+		bx := float32(ss.Bots[st.BestIdx].X)
+		by := float32(ss.Bots[st.BestIdx].Y)
+		vector.DrawFilledCircle(a, bx, by, 8, color.RGBA{255, 215, 0, 180}, false)
+		vector.StrokeCircle(a, bx, by, 12, 1.5, color.RGBA{255, 255, 100, 120}, false)
+	}
+
+	// Draw lines from each nest to global best, and highlight top nests
+	for i := range ss.Bots {
+		if i == st.BestIdx {
+			continue
+		}
+		nx := float32(ss.Bots[i].X)
+		ny := float32(ss.Bots[i].Y)
+
+		// Top 25% nests get a green ring
+		if ss.Bots[i].CuckooBest == 1 {
+			vector.StrokeCircle(a, nx, ny, 7, 1,
+				color.RGBA{0, 200, 80, 100}, false)
+		}
+
+		// Line to global best (faint, only if within range)
+		if st.BestIdx >= 0 && st.BestIdx < len(ss.Bots) {
+			bx := float32(ss.Bots[st.BestIdx].X)
+			by := float32(ss.Bots[st.BestIdx].Y)
+			dx := bx - nx
+			dy := by - ny
+			if dx*dx+dy*dy < 200*200 {
+				vector.StrokeLine(a, nx, ny, bx, by, 0.5,
+					color.RGBA{180, 200, 50, 35}, false)
+			}
+		}
+	}
+}
+
+// drawDEOverlay visualizes the Differential Evolution algorithm.
+// Shows the best individual as a gold circle and draws lines from each bot
+// to its trial position (the mutant vector target).
+func drawDEOverlay(a *ebiten.Image, ss *swarm.SwarmState) {
+	st := ss.DE
+	if st == nil {
+		return
+	}
+
+	// Draw best individual as a gold circle.
+	if st.BestIdx >= 0 && st.BestIdx < len(ss.Bots) {
+		bx := float32(ss.Bots[st.BestIdx].X)
+		by := float32(ss.Bots[st.BestIdx].Y)
+		vector.DrawFilledCircle(a, bx, by, 8, color.RGBA{255, 200, 0, 180}, false)
+		vector.StrokeCircle(a, bx, by, 12, 1.5, color.RGBA{255, 255, 80, 120}, false)
+	}
+
+	// Draw trial position markers and lines for bots that are moving.
+	for i := range ss.Bots {
+		if i >= len(st.Moving) || !st.Moving[i] {
+			continue
+		}
+		bx := float32(ss.Bots[i].X)
+		by := float32(ss.Bots[i].Y)
+		tx := float32(st.TrialX[i])
+		ty := float32(st.TrialY[i])
+
+		// Small cross at trial position.
+		vector.StrokeLine(a, tx-3, ty, tx+3, ty, 1, color.RGBA{100, 255, 100, 100}, false)
+		vector.StrokeLine(a, tx, ty-3, tx, ty+3, 1, color.RGBA{100, 255, 100, 100}, false)
+
+		// Line from bot to trial.
+		vector.StrokeLine(a, bx, by, tx, ty, 0.5, color.RGBA{80, 200, 80, 40}, false)
+	}
+}
+
+// drawABCOverlay visualises the Artificial Bee Colony algorithm.
+// Draws the best food source as a gold circle and shows role-dependent
+// indicators: employed bees get small rings, scouts get white diamonds.
+func drawABCOverlay(a *ebiten.Image, ss *swarm.SwarmState) {
+	st := ss.ABC
+	if st == nil {
+		return
+	}
+
+	// Draw best food source as a gold circle.
+	if st.BestIdx >= 0 && st.BestIdx < len(ss.Bots) {
+		bx := float32(ss.Bots[st.BestIdx].X)
+		by := float32(ss.Bots[st.BestIdx].Y)
+		vector.DrawFilledCircle(a, bx, by, 8, color.RGBA{255, 200, 0, 180}, false)
+		vector.StrokeCircle(a, bx, by, 12, 1.5, color.RGBA{255, 220, 60, 120}, false)
+	}
+
+	// Draw role indicators and trial position lines.
+	for i := range ss.Bots {
+		if i >= len(st.Role) {
+			break
+		}
+		bx := float32(ss.Bots[i].X)
+		by := float32(ss.Bots[i].Y)
+		tx := float32(st.TrialX[i])
+		ty := float32(st.TrialY[i])
+
+		switch st.Role[i] {
+		case 0: // Employed — small yellow ring
+			vector.StrokeCircle(a, bx, by, 7, 1, color.RGBA{255, 200, 30, 80}, false)
+			vector.StrokeLine(a, bx, by, tx, ty, 0.5, color.RGBA{255, 200, 30, 30}, false)
+		case 1: // Onlooker — small orange ring
+			vector.StrokeCircle(a, bx, by, 7, 1, color.RGBA{255, 140, 0, 80}, false)
+		case 2: // Scout — white diamond marker
+			vector.StrokeLine(a, bx, by-6, bx+4, by, 1, color.RGBA{255, 255, 255, 120}, false)
+			vector.StrokeLine(a, bx+4, by, bx, by+6, 1, color.RGBA{255, 255, 255, 120}, false)
+			vector.StrokeLine(a, bx, by+6, bx-4, by, 1, color.RGBA{255, 255, 255, 120}, false)
+			vector.StrokeLine(a, bx-4, by, bx, by-6, 1, color.RGBA{255, 255, 255, 120}, false)
+		}
+	}
+}
+
+// drawHSOOverlay visualises the Harmony Search Optimization algorithm.
+// Draws Harmony Memory positions as cyan dots, the best harmony as a bright
+// cyan circle, and lines from each bot to its current target position.
+func drawHSOOverlay(a *ebiten.Image, ss *swarm.SwarmState) {
+	st := ss.HSO
+	if st == nil {
+		return
+	}
+
+	// Draw Harmony Memory entries as small cyan dots.
+	for _, h := range st.HM {
+		hx := float32(h.X)
+		hy := float32(h.Y)
+		vector.DrawFilledCircle(a, hx, hy, 3, color.RGBA{0, 200, 220, 100}, false)
+	}
+
+	// Draw best harmony as a bright cyan circle.
+	if st.BestIdx >= 0 && st.BestIdx < len(st.HM) {
+		bx := float32(st.BestX)
+		by := float32(st.BestY)
+		vector.DrawFilledCircle(a, bx, by, 8, color.RGBA{0, 220, 255, 180}, false)
+		vector.StrokeCircle(a, bx, by, 12, 1.5, color.RGBA{0, 200, 240, 120}, false)
+	}
+
+	// Draw lines from bots to their target positions.
+	for i := range ss.Bots {
+		if i >= len(st.TargetX) {
+			break
+		}
+		bx := float32(ss.Bots[i].X)
+		by := float32(ss.Bots[i].Y)
+		tx := float32(st.TargetX[i])
+		ty := float32(st.TargetY[i])
+
+		if st.Phase[i] == 0 {
+			// Improvising — line to target.
+			vector.StrokeLine(a, bx, by, tx, ty, 0.5, color.RGBA{0, 180, 200, 40}, false)
+		} else {
+			// Arrived — small ring.
+			vector.StrokeCircle(a, bx, by, 7, 1, color.RGBA{0, 255, 220, 80}, false)
+		}
+	}
+}
+
+// drawBatOverlay renders echolocation pulse rings proportional to loudness
+// and highlights the best bat with a bright cyan marker.
+func drawBatOverlay(a *ebiten.Image, ss *swarm.SwarmState) {
+	st := ss.Bat
+	if st == nil {
+		return
+	}
+
+	// Draw echolocation pulse rings for each bat — radius scales with loudness
+	for i := range ss.Bots {
+		if i >= len(st.Loud) {
+			break
+		}
+		bx := float32(ss.Bots[i].X)
+		by := float32(ss.Bots[i].Y)
+
+		// Pulse ring: louder bats emit larger sonar rings
+		radius := float32(st.Loud[i] * 30)
+		if radius < 3 {
+			radius = 3
+		}
+		alpha := uint8(st.Loud[i] * 120)
+		if alpha < 10 {
+			alpha = 10
+		}
+		vector.StrokeCircle(a, bx, by, radius, 0.8, color.RGBA{140, 60, 220, alpha}, false)
+
+		// Inner pulse dot — brighter for higher pulse rate
+		pulseAlpha := uint8(40)
+		if i < len(st.Pulse) {
+			pulseAlpha = uint8(st.Pulse[i] * 180)
+		}
+		if pulseAlpha < 20 {
+			pulseAlpha = 20
+		}
+		vector.DrawFilledCircle(a, bx, by, 2, color.RGBA{180, 80, 255, pulseAlpha}, false)
+	}
+
+	// Highlight global best bat
+	if st.BestIdx >= 0 && st.BestIdx < len(ss.Bots) {
+		bx := float32(st.BestX)
+		by := float32(st.BestY)
+		vector.DrawFilledCircle(a, bx, by, 8, color.RGBA{0, 255, 255, 180}, false)
+		vector.StrokeCircle(a, bx, by, 14, 1.5, color.RGBA{0, 200, 255, 100}, false)
+	}
+}
+
+// drawHHOOverlay visualizes the Harris Hawks Optimization algorithm.
+// Shows the rabbit (prey) with a gold marker, and phase-colored indicators
+// for each hawk: blue=explore, orange=soft besiege, red=hard besiege, purple=dive.
+func drawHHOOverlay(a *ebiten.Image, ss *swarm.SwarmState) {
+	st := ss.HHO
+	if st == nil {
+		return
+	}
+
+	// Phase colors for each hawk
+	phaseColors := [4]color.RGBA{
+		{80, 130, 200, 100},  // explore — blue
+		{255, 165, 0, 100},   // soft besiege — orange
+		{255, 50, 50, 100},   // hard besiege — red
+		{200, 50, 200, 100},  // rapid dive — purple
+	}
+
+	// Draw connection lines from hawks to rabbit
+	if st.BestIdx >= 0 && st.BestIdx < len(ss.Bots) {
+		rx := float32(st.BestX)
+		ry := float32(st.BestY)
+		for i := range ss.Bots {
+			if i == st.BestIdx || i >= len(st.Phase) {
+				continue
+			}
+			bx := float32(ss.Bots[i].X)
+			by := float32(ss.Bots[i].Y)
+			dx := rx - bx
+			dy := ry - by
+			if dx*dx+dy*dy < 250*250 {
+				p := st.Phase[i]
+				if p < 0 || p > 3 {
+					p = 0
+				}
+				c := phaseColors[p]
+				c.A = 40
+				vector.StrokeLine(a, bx, by, rx, ry, 0.5, c, false)
+			}
+		}
+	}
+
+	// Draw phase indicators for each hawk
+	for i := range ss.Bots {
+		if i == st.BestIdx || i >= len(st.Phase) {
+			continue
+		}
+		bx := float32(ss.Bots[i].X)
+		by := float32(ss.Bots[i].Y)
+		p := st.Phase[i]
+		if p < 0 || p > 3 {
+			p = 0
+		}
+		c := phaseColors[p]
+		vector.StrokeCircle(a, bx, by, 8, 1.2, c, false)
+	}
+
+	// Highlight rabbit (prey) with gold marker and crosshair
+	if st.BestIdx >= 0 && st.BestIdx < len(ss.Bots) {
+		rx := float32(st.BestX)
+		ry := float32(st.BestY)
+		vector.DrawFilledCircle(a, rx, ry, 6, color.RGBA{255, 215, 0, 200}, false)
+		vector.StrokeCircle(a, rx, ry, 14, 1.5, color.RGBA{255, 215, 0, 100}, false)
+		// Crosshair lines
+		vector.StrokeLine(a, rx-18, ry, rx-8, ry, 1, color.RGBA{255, 215, 0, 120}, false)
+		vector.StrokeLine(a, rx+8, ry, rx+18, ry, 1, color.RGBA{255, 215, 0, 120}, false)
+		vector.StrokeLine(a, rx, ry-18, rx, ry-8, 1, color.RGBA{255, 215, 0, 120}, false)
+		vector.StrokeLine(a, rx, ry+8, rx, ry+18, 1, color.RGBA{255, 215, 0, 120}, false)
+	}
+}
+
+// drawSSAOverlay visualizes the Salp Swarm Algorithm.
+// Shows chain links between leader→follower salps and food source marker.
+func drawSSAOverlay(a *ebiten.Image, ss *swarm.SwarmState) {
+	st := ss.SSA
+	if st == nil {
+		return
+	}
+
+	// Draw chain links from each follower to its predecessor
+	for i := range ss.Bots {
+		if i >= len(st.ChainIdx) {
+			continue
+		}
+		pred := st.ChainIdx[i]
+		if pred < 0 || pred >= len(ss.Bots) {
+			continue
+		}
+		bx := float32(ss.Bots[i].X)
+		by := float32(ss.Bots[i].Y)
+		px := float32(ss.Bots[pred].X)
+		py := float32(ss.Bots[pred].Y)
+		dx := px - bx
+		dy := py - by
+		if dx*dx+dy*dy < 200*200 {
+			c := color.RGBA{0, 180, 220, 40}
+			if i < len(st.Role) && st.Role[i] == 0 {
+				c = color.RGBA{0, 220, 255, 60} // leaders brighter
+			}
+			vector.StrokeLine(a, bx, by, px, py, 0.5, c, false)
+		}
+	}
+
+	// Role indicators: cyan ring for leaders, blue dot for followers
+	for i := range ss.Bots {
+		if i >= len(st.Role) {
+			continue
+		}
+		bx := float32(ss.Bots[i].X)
+		by := float32(ss.Bots[i].Y)
+		if st.Role[i] == 0 { // leader
+			vector.StrokeCircle(a, bx, by, 8, 1.2, color.RGBA{0, 220, 255, 120}, false)
+		} else { // follower
+			vector.DrawFilledCircle(a, bx, by-8, 2, color.RGBA{50, 100, 200, 100}, false)
+		}
+	}
+
+	// Food source marker (best fitness position)
+	fx := float32(st.FoodX)
+	fy := float32(st.FoodY)
+	vector.DrawFilledCircle(a, fx, fy, 6, color.RGBA{255, 215, 0, 200}, false)
+	vector.StrokeCircle(a, fx, fy, 14, 1.5, color.RGBA{255, 215, 0, 100}, false)
+}
+
+// drawGSAOverlay visualizes the Gravitational Search Algorithm.
+// Shows mass-proportional rings and gravitational force vectors.
+func drawGSAOverlay(a *ebiten.Image, ss *swarm.SwarmState) {
+	st := ss.GSA
+	if st == nil {
+		return
+	}
+
+	// Draw mass-proportional rings around each agent
+	for i := range ss.Bots {
+		if i >= len(st.Mass) {
+			continue
+		}
+		bx := float32(ss.Bots[i].X)
+		by := float32(ss.Bots[i].Y)
+		m := st.Mass[i]
+		radius := float32(4 + m*10) // 4-14px based on mass
+		alpha := uint8(40 + m*160)
+		vector.StrokeCircle(a, bx, by, radius, 1, color.RGBA{180, 100, 255, alpha}, false)
+	}
+
+	// Draw acceleration vectors
+	for i := range ss.Bots {
+		if i >= len(st.AccX) {
+			continue
+		}
+		bx := float32(ss.Bots[i].X)
+		by := float32(ss.Bots[i].Y)
+		ax := float32(st.AccX[i]) * 8
+		ay := float32(st.AccY[i]) * 8
+		if ax*ax+ay*ay > 1 {
+			vector.StrokeLine(a, bx, by, bx+ax, by+ay, 1,
+				color.RGBA{180, 100, 255, 80}, false)
+		}
+	}
+
+	// Highlight heaviest agent (best)
+	if st.BestIdx >= 0 && st.BestIdx < len(ss.Bots) {
+		hx := float32(st.BestX)
+		hy := float32(st.BestY)
+		vector.DrawFilledCircle(a, hx, hy, 5, color.RGBA{255, 200, 50, 200}, false)
+		vector.StrokeCircle(a, hx, hy, 18, 2, color.RGBA{255, 200, 50, 120}, false)
+	}
+}
+
+// drawFPAOverlay visualizes the Flower Pollination Algorithm.
+// Shows global/local pollination type per flower and global best marker.
+func drawFPAOverlay(a *ebiten.Image, ss *swarm.SwarmState) {
+	st := ss.FPA
+	if st == nil {
+		return
+	}
+
+	// Draw pollination type indicators
+	for i := range ss.Bots {
+		bx := float32(ss.Bots[i].X)
+		by := float32(ss.Bots[i].Y)
+
+		if i < len(st.IsGlobal) && st.IsGlobal[i] {
+			// Global pollination: small butterfly symbol (magenta ring)
+			vector.StrokeCircle(a, bx, by, 7, 1.2, color.RGBA{255, 100, 200, 100}, false)
+		} else {
+			// Local pollination: small green dot
+			vector.DrawFilledCircle(a, bx, by-7, 2, color.RGBA{100, 220, 80, 100}, false)
+		}
+
+		// Draw line to personal best (if close enough)
+		if i < len(st.BestX) {
+			px := float32(st.BestX[i])
+			py := float32(st.BestY[i])
+			dx := px - bx
+			dy := py - by
+			if dx*dx+dy*dy > 4 && dx*dx+dy*dy < 150*150 {
+				vector.StrokeLine(a, bx, by, px, py, 0.5,
+					color.RGBA{100, 220, 80, 30}, false)
+			}
+		}
+	}
+
+	// Global best flower marker
+	gx := float32(st.GlobalBestX)
+	gy := float32(st.GlobalBestY)
+	vector.DrawFilledCircle(a, gx, gy, 6, color.RGBA{255, 100, 200, 200}, false)
+	vector.StrokeCircle(a, gx, gy, 14, 1.5, color.RGBA{255, 100, 200, 100}, false)
+	vector.StrokeCircle(a, gx, gy, 22, 1, color.RGBA{255, 100, 200, 50}, false)
+}
+
+// drawSAOverlay visualizes Simulated Annealing.
+// Shows temperature as color halos and lines to perturbation targets.
+func drawSAOverlay(a *ebiten.Image, ss *swarm.SwarmState) {
+	st := ss.SA
+	if st == nil {
+		return
+	}
+
+	// Draw temperature halos and target lines
+	for i := range ss.Bots {
+		if i >= len(st.Temp) {
+			continue
+		}
+		bx := float32(ss.Bots[i].X)
+		by := float32(ss.Bots[i].Y)
+
+		// Temperature halo: hot=red, cold=blue
+		tRatio := st.Temp[i] / st.InitialTemp
+		if tRatio > 1 {
+			tRatio = 1
+		}
+		r := uint8(255 * tRatio)
+		b := uint8(255 * (1 - tRatio))
+		radius := float32(5 + tRatio*10) // larger halo when hot
+		vector.StrokeCircle(a, bx, by, radius, 1, color.RGBA{r, 40, b, 80}, false)
+
+		// Draw line to perturbation target if moving
+		if i < len(st.Moving) && st.Moving[i] && i < len(st.TargetX) {
+			tx := float32(st.TargetX[i])
+			ty := float32(st.TargetY[i])
+			lineCol := color.RGBA{255, 165, 0, 50} // orange
+			if i < len(st.Accepted) && !st.Accepted[i] {
+				lineCol = color.RGBA{255, 50, 50, 50} // red = rejected
+			}
+			vector.StrokeLine(a, bx, by, tx, ty, 0.5, lineCol, false)
+		}
+	}
+
+	// Highlight global best with gold marker
+	if st.GlobalBestIdx >= 0 && st.GlobalBestIdx < len(ss.Bots) {
+		gx := float32(ss.Bots[st.GlobalBestIdx].X)
+		gy := float32(ss.Bots[st.GlobalBestIdx].Y)
+		vector.DrawFilledCircle(a, gx, gy, 5, color.RGBA{255, 215, 0, 200}, false)
+		vector.StrokeCircle(a, gx, gy, 16, 2, color.RGBA{255, 215, 0, 120}, false)
+	}
+}
+
+// drawAOOverlay visualizes the Aquila Optimizer.
+// Shows four hunting phases as colored rings and prey marker.
+func drawAOOverlay(a *ebiten.Image, ss *swarm.SwarmState) {
+	st := ss.AO
+	if st == nil {
+		return
+	}
+
+	// Phase colors: 0=sky blue (high soar), 1=green (contour), 2=orange (low flight), 3=red (grab)
+	phaseColors := [4]color.RGBA{
+		{100, 180, 255, 100}, // high soar — sky blue
+		{80, 220, 120, 100},  // contour flight — green
+		{255, 165, 50, 100},  // low flight — orange
+		{255, 60, 60, 100},   // walk & grab — red
+	}
+
+	for i := range ss.Bots {
+		if i >= len(st.Phase) {
+			continue
+		}
+		bx := float32(ss.Bots[i].X)
+		by := float32(ss.Bots[i].Y)
+		p := st.Phase[i]
+		if p < 0 || p > 3 {
+			p = 0
+		}
+		c := phaseColors[p]
+		radius := float32(6 + (3-p)*2) // larger ring = exploration phases
+		vector.StrokeCircle(a, bx, by, radius, 1.2, c, false)
+
+		// Draw line to prey (best) for grab phase
+		if p == 3 && st.BestIdx >= 0 && st.BestIdx < len(ss.Bots) {
+			px := float32(st.BestX)
+			py := float32(st.BestY)
+			vector.StrokeLine(a, bx, by, px, py, 0.5, color.RGBA{255, 60, 60, 40}, false)
+		}
+	}
+
+	// Prey marker (global best)
+	if st.BestIdx >= 0 {
+		px := float32(st.BestX)
+		py := float32(st.BestY)
+		vector.DrawFilledCircle(a, px, py, 5, color.RGBA{255, 215, 0, 200}, false)
+		vector.StrokeCircle(a, px, py, 14, 1.5, color.RGBA{255, 215, 0, 100}, false)
+		// Crosshair
+		vector.StrokeLine(a, px-10, py, px+10, py, 0.8, color.RGBA{255, 215, 0, 80}, false)
+		vector.StrokeLine(a, px, py-10, px, py+10, 0.8, color.RGBA{255, 215, 0, 80}, false)
+	}
+}
+
+// drawSCAOverlay visualizes the Sine Cosine Algorithm.
+// Shows sine/cosine phase per bot and oscillation arcs toward global best.
+func drawSCAOverlay(a *ebiten.Image, ss *swarm.SwarmState) {
+	st := ss.SCA
+	if st == nil {
+		return
+	}
+
+	for i := range ss.Bots {
+		if i >= len(st.Phase) {
+			continue
+		}
+		bx := float32(ss.Bots[i].X)
+		by := float32(ss.Bots[i].Y)
+
+		if st.Phase[i] == 0 {
+			// Sine phase (exploration): cyan ring
+			vector.StrokeCircle(a, bx, by, 7, 1.2, color.RGBA{0, 220, 255, 100}, false)
+		} else {
+			// Cosine phase (exploitation): magenta dot
+			vector.DrawFilledCircle(a, bx, by-7, 2.5, color.RGBA{255, 80, 220, 120}, false)
+		}
+
+		// Draw line to global best (short range only)
+		dx := float32(st.BestX) - bx
+		dy := float32(st.BestY) - by
+		if dx*dx+dy*dy > 4 && dx*dx+dy*dy < 180*180 {
+			c := color.RGBA{0, 220, 255, 25}
+			if st.Phase[i] == 1 {
+				c = color.RGBA{255, 80, 220, 25}
+			}
+			vector.StrokeLine(a, bx, by, float32(st.BestX), float32(st.BestY), 0.5, c, false)
+		}
+	}
+
+	// Global best marker
+	if st.BestIdx >= 0 {
+		gx := float32(st.BestX)
+		gy := float32(st.BestY)
+		vector.DrawFilledCircle(a, gx, gy, 6, color.RGBA{255, 200, 50, 200}, false)
+		vector.StrokeCircle(a, gx, gy, 14, 1.5, color.RGBA{255, 200, 50, 100}, false)
+	}
+}
+
+// drawDAOverlay visualizes the Dragonfly Algorithm.
+// Shows role indicators (static/dynamic/levy), step vectors, and food/enemy markers.
+func drawDAOverlay(a *ebiten.Image, ss *swarm.SwarmState) {
+	st := ss.DA
+	if st == nil {
+		return
+	}
+
+	// Role colors: 0=green (static/feeding), 1=blue (dynamic/migratory), 2=magenta (levy)
+	roleColors := [3]color.RGBA{
+		{80, 220, 100, 100},  // static — green
+		{80, 140, 255, 100},  // dynamic — blue
+		{220, 80, 255, 100},  // levy flight — magenta
+	}
+
+	for i := range ss.Bots {
+		bx := float32(ss.Bots[i].X)
+		by := float32(ss.Bots[i].Y)
+
+		// Role indicator
+		r := 0
+		if i < len(st.Role) {
+			r = st.Role[i]
+		}
+		if r < 0 || r > 2 {
+			r = 0
+		}
+		c := roleColors[r]
+		vector.StrokeCircle(a, bx, by, 7, 1, c, false)
+
+		// Draw step vector
+		if i < len(st.StepX) && i < len(st.StepY) {
+			sx := float32(st.StepX[i]) * 5
+			sy := float32(st.StepY[i]) * 5
+			if sx*sx+sy*sy > 2 {
+				vector.StrokeLine(a, bx, by, bx+sx, by+sy, 0.8, color.RGBA{c.R, c.G, c.B, 60}, false)
+			}
+		}
+	}
+
+	// Food source (best) — gold
+	if st.BestIdx >= 0 {
+		fx := float32(st.BestX)
+		fy := float32(st.BestY)
+		vector.DrawFilledCircle(a, fx, fy, 6, color.RGBA{255, 215, 0, 200}, false)
+		vector.StrokeCircle(a, fx, fy, 14, 1.5, color.RGBA{255, 215, 0, 100}, false)
+	}
+
+	// Enemy (worst) — red X
+	if st.WorstIdx >= 0 {
+		ex := float32(st.WorstX)
+		ey := float32(st.WorstY)
+		vector.StrokeLine(a, ex-6, ey-6, ex+6, ey+6, 1.5, color.RGBA{255, 60, 60, 160}, false)
+		vector.StrokeLine(a, ex-6, ey+6, ex+6, ey-6, 1.5, color.RGBA{255, 60, 60, 160}, false)
+	}
+}
+
+// drawTLBOOverlay visualizes Teaching-Learning-Based Optimization.
+// Shows teacher/learner phases, peer links, and class mean position.
+func drawTLBOOverlay(a *ebiten.Image, ss *swarm.SwarmState) {
+	st := ss.TLBO
+	if st == nil {
+		return
+	}
+
+	for i := range ss.Bots {
+		if i >= len(st.Phase) {
+			continue
+		}
+		bx := float32(ss.Bots[i].X)
+		by := float32(ss.Bots[i].Y)
+
+		if st.Phase[i] == 0 {
+			// Teacher phase: green ring (learning from best)
+			vector.StrokeCircle(a, bx, by, 7, 1, color.RGBA{80, 220, 100, 90}, false)
+		} else {
+			// Learner phase: blue ring (peer interaction)
+			vector.StrokeCircle(a, bx, by, 7, 1, color.RGBA{80, 140, 255, 90}, false)
+		}
+
+		// Draw line to peer in learner phase
+		if st.Phase[i] == 1 && i < len(st.PeerIdx) {
+			pi := st.PeerIdx[i]
+			if pi >= 0 && pi < len(ss.Bots) {
+				px := float32(ss.Bots[pi].X)
+				py := float32(ss.Bots[pi].Y)
+				dx := px - bx
+				dy := py - by
+				if dx*dx+dy*dy < 200*200 {
+					vector.StrokeLine(a, bx, by, px, py, 0.5, color.RGBA{80, 140, 255, 30}, false)
+				}
+			}
+		}
+	}
+
+	// Class mean position — white diamond
+	mx := float32(st.MeanX)
+	my := float32(st.MeanY)
+	vector.StrokeLine(a, mx, my-6, mx+6, my, 1, color.RGBA{200, 200, 220, 120}, false)
+	vector.StrokeLine(a, mx+6, my, mx, my+6, 1, color.RGBA{200, 200, 220, 120}, false)
+	vector.StrokeLine(a, mx, my+6, mx-6, my, 1, color.RGBA{200, 200, 220, 120}, false)
+	vector.StrokeLine(a, mx-6, my, mx, my-6, 1, color.RGBA{200, 200, 220, 120}, false)
+
+	// Teacher (best) — gold marker
+	if st.BestIdx >= 0 && st.BestIdx < len(ss.Bots) {
+		tx := float32(st.BestX)
+		ty := float32(st.BestY)
+		vector.DrawFilledCircle(a, tx, ty, 6, color.RGBA{255, 215, 0, 200}, false)
+		vector.StrokeCircle(a, tx, ty, 14, 2, color.RGBA{255, 215, 0, 120}, false)
+	}
+}
+
+// drawEOOverlay visualizes the Equilibrium Optimizer.
+// Shows exploration/exploitation phase, equilibrium pool positions, and personal best lines.
+func drawEOOverlay(a *ebiten.Image, ss *swarm.SwarmState) {
+	st := ss.EO
+	if st == nil {
+		return
+	}
+
+	for i := range ss.Bots {
+		if i >= len(st.Phase) {
+			continue
+		}
+		bx := float32(ss.Bots[i].X)
+		by := float32(ss.Bots[i].Y)
+
+		if st.Phase[i] == 0 {
+			// Exploration: violet ring
+			vector.StrokeCircle(a, bx, by, 7, 1, color.RGBA{160, 80, 255, 90}, false)
+		} else {
+			// Exploitation: teal ring
+			vector.StrokeCircle(a, bx, by, 7, 1, color.RGBA{0, 200, 180, 90}, false)
+		}
+
+		// Line to personal best
+		if i < len(st.PersonalX) && i < len(st.PersonalY) {
+			px := float32(st.PersonalX[i])
+			py := float32(st.PersonalY[i])
+			dx := px - bx
+			dy := py - by
+			if dx*dx+dy*dy > 4 && dx*dx+dy*dy < 120*120 {
+				vector.StrokeLine(a, bx, by, px, py, 0.4, color.RGBA{160, 80, 255, 25}, false)
+			}
+		}
+	}
+
+	// Equilibrium pool positions — cyan diamonds
+	for k := 0; k < len(st.PoolX) && k < len(st.PoolY); k++ {
+		if st.PoolF[k] <= -1e17 {
+			continue // uninitialized
+		}
+		px := float32(st.PoolX[k])
+		py := float32(st.PoolY[k])
+		sz := float32(5)
+		vector.StrokeLine(a, px, py-sz, px+sz, py, 1, color.RGBA{0, 220, 220, 150}, false)
+		vector.StrokeLine(a, px+sz, py, px, py+sz, 1, color.RGBA{0, 220, 220, 150}, false)
+		vector.StrokeLine(a, px, py+sz, px-sz, py, 1, color.RGBA{0, 220, 220, 150}, false)
+		vector.StrokeLine(a, px-sz, py, px, py-sz, 1, color.RGBA{0, 220, 220, 150}, false)
+	}
+
+	// Global best — gold marker
+	if st.BestIdx >= 0 && st.BestIdx < len(ss.Bots) {
+		gx := float32(ss.Bots[st.BestIdx].X)
+		gy := float32(ss.Bots[st.BestIdx].Y)
+		vector.DrawFilledCircle(a, gx, gy, 5, color.RGBA{255, 215, 0, 200}, false)
+		vector.StrokeCircle(a, gx, gy, 16, 2, color.RGBA{255, 215, 0, 120}, false)
+	}
+}
+
+// drawJayaOverlay visualizes the Jaya Algorithm.
+// Shows attraction toward best (green) and repulsion from worst (red).
+func drawJayaOverlay(a *ebiten.Image, ss *swarm.SwarmState) {
+	st := ss.Jaya
+	if st == nil {
+		return
+	}
+
+	for i := range ss.Bots {
+		if i >= len(st.Fitness) {
+			continue
+		}
+		bx := float32(ss.Bots[i].X)
+		by := float32(ss.Bots[i].Y)
+
+		// Color by relative fitness (red=near worst, green=near best)
+		fRange := st.BestF - st.WorstF
+		var ratio float64
+		if fRange > 1e-9 {
+			ratio = (st.Fitness[i] - st.WorstF) / fRange
+		}
+		if ratio < 0 {
+			ratio = 0
+		}
+		if ratio > 1 {
+			ratio = 1
+		}
+		r := uint8(200 * (1 - ratio))
+		g := uint8(200 * ratio)
+		vector.StrokeCircle(a, bx, by, 7, 1, color.RGBA{r, g, 40, 90}, false)
+
+		// Short line toward personal best
+		if i < len(st.PersonalBestX) {
+			px := float32(st.PersonalBestX[i])
+			py := float32(st.PersonalBestY[i])
+			dx := px - bx
+			dy := py - by
+			if dx*dx+dy*dy > 4 && dx*dx+dy*dy < 120*120 {
+				vector.StrokeLine(a, bx, by, px, py, 0.4, color.RGBA{80, 200, 80, 25}, false)
+			}
+		}
+	}
+
+	// Best position — gold
+	if st.BestIdx >= 0 {
+		bx := float32(st.BestX)
+		by := float32(st.BestY)
+		vector.DrawFilledCircle(a, bx, by, 6, color.RGBA{255, 215, 0, 200}, false)
+		vector.StrokeCircle(a, bx, by, 14, 1.5, color.RGBA{255, 215, 0, 100}, false)
+	}
+
+	// Worst position — red X
+	if st.WorstIdx >= 0 {
+		wx := float32(st.WorstX)
+		wy := float32(st.WorstY)
+		vector.StrokeLine(a, wx-6, wy-6, wx+6, wy+6, 1.5, color.RGBA{255, 60, 60, 160}, false)
+		vector.StrokeLine(a, wx-6, wy+6, wx+6, wy-6, 1.5, color.RGBA{255, 60, 60, 160}, false)
+	}
+}
+
+// drawConvergenceGraph renders a real-time convergence chart for the active
+// swarm algorithm. Positioned in the bottom-left of the arena viewport area,
+// it shows three lines: green = best fitness, yellow = average fitness,
+// cyan = population diversity (spatial spread, independently scaled 0-100).
+func drawConvergenceGraph(screen *ebiten.Image, ss *swarm.SwarmState) {
+	sa := ss.SwarmAlgo
+	if sa == nil || len(sa.ConvergenceHistory) < 2 {
+		return
+	}
+
+	// Graph dimensions and position (bottom-left of arena area)
+	const gw = 220
+	const gh = 100
+	gx := 420 // just right of editor panel (350px + margin)
+	gy := int(ss.ArenaH) + 50 - gh - 10
+
+	// Background
+	vector.DrawFilledRect(screen, float32(gx), float32(gy), gw, gh,
+		color.RGBA{10, 10, 20, 220}, false)
+	vector.StrokeRect(screen, float32(gx), float32(gy), gw, gh, 1,
+		color.RGBA{60, 80, 120, 150}, false)
+
+	// Title
+	algoName := swarm.SwarmAlgorithmName(sa.ActiveAlgo)
+	printColoredAt(screen, algoName+" Konvergenz", gx+3, gy+2, color.RGBA{136, 204, 255, 220})
+
+	// Determine visible window (last N samples)
+	best := sa.ConvergenceHistory
+	avg := sa.ConvergenceAvg
+	div := sa.ConvergenceDiversity
+	expl := sa.ConvergenceExploration
+	n := len(best)
+	maxPts := gw - 10 // one pixel per sample
+	start := 0
+	if n > maxPts {
+		start = n - maxPts
+	}
+	pts := n - start
+
+	// Find min/max for fitness scaling (include archived curves for unified range)
+	minV := best[start]
+	maxV := best[start]
+	for i := start; i < n; i++ {
+		if best[i] < minV {
+			minV = best[i]
+		}
+		if best[i] > maxV {
+			maxV = best[i]
+		}
+		if i < len(avg) {
+			if avg[i] < minV {
+				minV = avg[i]
+			}
+			if avg[i] > maxV {
+				maxV = avg[i]
+			}
+		}
+	}
+	// Extend range to include archived convergence curves.
+	for _, arch := range ss.ConvergenceArchive {
+		if sa.ActiveAlgo == arch.Algo && sa.FitnessFunc == arch.FitnessFunc {
+			continue
+		}
+		for _, v := range arch.BestHistory {
+			if v < minV {
+				minV = v
+			}
+			if v > maxV {
+				maxV = v
+			}
+		}
+	}
+	if maxV <= minV {
+		maxV = minV + 1
+	}
+
+	// Chart area (inset from borders)
+	chartX := float32(gx + 5)
+	chartY := float32(gy + 14)
+	chartW := float32(gw - 10)
+	chartH := float32(gh - 20)
+
+	// Axis labels
+	printColoredAt(screen, fmt.Sprintf("%.0f", maxV), gx+3, gy+14, color.RGBA{70, 70, 90, 150})
+	printColoredAt(screen, fmt.Sprintf("%.0f", minV), gx+3, gy+gh-lineH-2, color.RGBA{70, 70, 90, 150})
+
+	// Draw archived convergence curves from previously tested algorithms.
+	// Each archived curve is drawn as a thin semi-transparent line with a
+	// distinct color so users can visually compare convergence trajectories.
+	archiveColors := []color.RGBA{
+		{255, 120, 80, 100},  // orange
+		{180, 80, 255, 100},  // purple
+		{80, 255, 180, 100},  // mint
+		{255, 255, 80, 100},  // yellow
+		{80, 180, 255, 100},  // sky blue
+		{255, 80, 180, 100},  // pink
+		{180, 255, 80, 100},  // lime
+		{80, 255, 255, 100},  // teal
+	}
+	for ai, arch := range ss.ConvergenceArchive {
+		if sa.ActiveAlgo == arch.Algo && sa.FitnessFunc == arch.FitnessFunc {
+			continue
+		}
+		ah := arch.BestHistory
+		an := len(ah)
+		if an < 2 {
+			continue
+		}
+		aStart := 0
+		if an > maxPts {
+			aStart = an - maxPts
+		}
+		aPts := an - aStart
+		ac := archiveColors[ai%len(archiveColors)]
+		for i := 1; i < aPts; i++ {
+			x0 := chartX + float32(i-1)/float32(aPts-1)*chartW
+			x1 := chartX + float32(i)/float32(aPts-1)*chartW
+			v0 := ah[aStart+i-1]
+			v1 := ah[aStart+i]
+			y0 := chartY + chartH - float32((v0-minV)/(maxV-minV))*chartH
+			y1 := chartY + chartH - float32((v1-minV)/(maxV-minV))*chartH
+			vector.StrokeLine(screen, x0, y0, x1, y1, 1, ac, false)
+		}
+	}
+
+	// Draw exploration ratio line (magenta, behind everything, independently scaled 0-100)
+	if len(expl) >= n {
+		for i := 1; i < pts; i++ {
+			e0 := expl[start+i-1]
+			e1 := expl[start+i]
+			// Skip if algorithm does not report exploration ratio (-1)
+			if e0 < 0 || e1 < 0 {
+				continue
+			}
+			x0 := chartX + float32(i-1)/float32(pts-1)*chartW
+			x1 := chartX + float32(i)/float32(pts-1)*chartW
+			if e0 > 100 {
+				e0 = 100
+			}
+			if e1 > 100 {
+				e1 = 100
+			}
+			y0 := chartY + chartH - float32(e0/100)*chartH
+			y1 := chartY + chartH - float32(e1/100)*chartH
+			vector.StrokeLine(screen, x0, y0, x1, y1, 1, color.RGBA{220, 100, 220, 90}, false)
+		}
+	}
+
+	// Draw diversity line (cyan, behind average/best, independently scaled 0-100)
+	if len(div) >= n {
+		for i := 1; i < pts; i++ {
+			x0 := chartX + float32(i-1)/float32(pts-1)*chartW
+			x1 := chartX + float32(i)/float32(pts-1)*chartW
+			// Diversity is already 0-100, scale directly to chart height
+			d0 := div[start+i-1]
+			d1 := div[start+i]
+			if d0 > 100 {
+				d0 = 100
+			}
+			if d1 > 100 {
+				d1 = 100
+			}
+			y0 := chartY + chartH - float32(d0/100)*chartH
+			y1 := chartY + chartH - float32(d1/100)*chartH
+			vector.StrokeLine(screen, x0, y0, x1, y1, 1, color.RGBA{80, 200, 220, 100}, false)
+		}
+	}
+
+	// Draw average line (yellow, behind best)
+	if len(avg) >= n {
+		for i := 1; i < pts; i++ {
+			x0 := chartX + float32(i-1)/float32(pts-1)*chartW
+			x1 := chartX + float32(i)/float32(pts-1)*chartW
+			y0 := chartY + chartH - float32((avg[start+i-1]-minV)/(maxV-minV))*chartH
+			y1 := chartY + chartH - float32((avg[start+i]-minV)/(maxV-minV))*chartH
+			vector.StrokeLine(screen, x0, y0, x1, y1, 1, color.RGBA{220, 200, 50, 140}, false)
+		}
+	}
+
+	// Draw best line (green, on top)
+	for i := 1; i < pts; i++ {
+		x0 := chartX + float32(i-1)/float32(pts-1)*chartW
+		x1 := chartX + float32(i)/float32(pts-1)*chartW
+		y0 := chartY + chartH - float32((best[start+i-1]-minV)/(maxV-minV))*chartH
+		y1 := chartY + chartH - float32((best[start+i]-minV)/(maxV-minV))*chartH
+		vector.StrokeLine(screen, x0, y0, x1, y1, 1.5, color.RGBA{50, 220, 80, 200}, false)
+	}
+
+	// Stagnation warning bar: red overlay when stagnation is high
+	stagnPct := float32(sa.StagnationCount) / float32(swarm.StagnationThreshold)
+	if stagnPct > 1 {
+		stagnPct = 1
+	}
+	if stagnPct > 0.3 {
+		// Draw stagnation progress bar at bottom of chart
+		barY := chartY + chartH - 3
+		barW := chartW * stagnPct
+		alpha := uint8(40 + int(stagnPct*120))
+		vector.DrawFilledRect(screen, chartX, barY, barW, 3, color.RGBA{255, 60, 40, alpha}, false)
+	}
+
+	// Legend
+	ly := gy + gh + 2
+	vector.DrawFilledRect(screen, float32(gx+3), float32(ly+2), 8, 2, color.RGBA{50, 220, 80, 200}, false)
+	printColoredAt(screen, "Best", gx+14, ly, color.RGBA{50, 220, 80, 180})
+	vector.DrawFilledRect(screen, float32(gx+50), float32(ly+2), 8, 2, color.RGBA{220, 200, 50, 140}, false)
+	printColoredAt(screen, "Avg", gx+61, ly, color.RGBA{220, 200, 50, 140})
+	vector.DrawFilledRect(screen, float32(gx+90), float32(ly+2), 8, 2, color.RGBA{80, 200, 220, 140}, false)
+	printColoredAt(screen, "Div", gx+101, ly, color.RGBA{80, 200, 220, 140})
+	// Show Expl legend only if algorithm reports exploration ratio
+	hasExpl := len(expl) > 0 && expl[len(expl)-1] >= 0
+	if hasExpl {
+		vector.DrawFilledRect(screen, float32(gx+125), float32(ly+2), 8, 2, color.RGBA{220, 100, 220, 140}, false)
+		printColoredAt(screen, "Expl", gx+136, ly, color.RGBA{220, 100, 220, 140})
+	}
+
+	// Current values
+	curDiv := ""
+	if len(div) > 0 {
+		curDiv = fmt.Sprintf(" D:%.0f%%", div[len(div)-1])
+	}
+	curExpl := ""
+	if hasExpl {
+		curExpl = fmt.Sprintf(" E:%.0f%%", expl[len(expl)-1])
+	}
+	printColoredAt(screen, fmt.Sprintf("Best:%.1f%s%s", best[n-1], curDiv, curExpl), gx+3, ly+lineH, color.RGBA{160, 180, 200, 180})
+
+	// Statistics line: iteration count, stagnation, perturbations
+	ly += 2 * lineH
+	iterStr := fmt.Sprintf("Iter:%d", sa.TotalIterations)
+	stagnStr := ""
+	if sa.StagnationCount > 0 {
+		stagnStr = fmt.Sprintf(" Stagn:%d/%d", sa.StagnationCount, swarm.StagnationThreshold)
+	}
+	pertStr := ""
+	if sa.PerturbationCount > 0 {
+		pertStr = fmt.Sprintf(" Perturb:%d", sa.PerturbationCount)
+	}
+
+	stagnCol := color.RGBA{130, 140, 160, 180}
+	if stagnPct > 0.7 {
+		stagnCol = color.RGBA{255, 120, 60, 220}
+	}
+	printColoredAt(screen, iterStr+stagnStr+pertStr, gx+3, ly, stagnCol)
+
+	// Archived curve legend: show abbreviation + color swatch for each archived algo.
+	archiveDrawn := 0
+	for ai, arch := range ss.ConvergenceArchive {
+		if sa.ActiveAlgo == arch.Algo && sa.FitnessFunc == arch.FitnessFunc {
+			continue
+		}
+		if len(arch.BestHistory) < 2 {
+			continue
+		}
+		ac := archiveColors[ai%len(archiveColors)]
+		acLabel := ac
+		acLabel.A = 180
+		lx := gx + 3 + archiveDrawn*45
+		ly2 := ly + lineH
+		vector.DrawFilledRect(screen, float32(lx), float32(ly2+2), 8, 2, ac, false)
+		printColoredAt(screen, swarm.SwarmAlgorithmAbbrev(arch.Algo), lx+11, ly2, acLabel)
+		archiveDrawn++
+	}
+}
+
+// drawSearchTrajectory renders a small inset showing the X,Y path of the
+// global best solution through the search space over time. Earlier positions
+// are drawn in blue, transitioning to red for recent positions. A yellow
+// marker highlights the current best. Positioned to the right of the
+// convergence graph.
+func drawSearchTrajectory(screen *ebiten.Image, ss *swarm.SwarmState) {
+	sa := ss.SwarmAlgo
+	if sa == nil || len(sa.TrajectoryX) < 2 {
+		return
+	}
+
+	// Panel dimensions and position (right of convergence graph)
+	const tw = 100
+	const th = 100
+	tx := 420 + 220 + 5 // gx + gw + gap
+	ty := int(ss.ArenaH) + 50 - th - 10
+
+	// Background
+	vector.DrawFilledRect(screen, float32(tx), float32(ty), tw, th,
+		color.RGBA{10, 10, 20, 220}, false)
+	vector.StrokeRect(screen, float32(tx), float32(ty), tw, th, 1,
+		color.RGBA{60, 80, 120, 150}, false)
+
+	// Title
+	printColoredAt(screen, "Trajektorie", tx+3, ty+2, color.RGBA{136, 204, 255, 220})
+
+	// Chart inset
+	chartX := float32(tx + 5)
+	chartY := float32(ty + 14)
+	chartW := float32(tw - 10)
+	chartH := float32(th - 18)
+
+	// Map arena coordinates [0, ArenaW/H] to chart area
+	aw := float32(ss.ArenaW)
+	ah := float32(ss.ArenaH)
+	if aw < 1 {
+		aw = 800
+	}
+	if ah < 1 {
+		ah = 800
+	}
+
+	mapX := func(wx float64) float32 { return chartX + float32(wx)/aw*chartW }
+	mapY := func(wy float64) float32 { return chartY + float32(wy)/ah*chartH }
+
+	// Draw trajectory polyline with color gradient (blue→red)
+	n := len(sa.TrajectoryX)
+	for i := 1; i < n; i++ {
+		x0, y0 := sa.TrajectoryX[i-1], sa.TrajectoryY[i-1]
+		x1, y1 := sa.TrajectoryX[i], sa.TrajectoryY[i]
+		// Skip invalid sentinel values
+		if x0 < 0 || y0 < 0 || x1 < 0 || y1 < 0 {
+			continue
+		}
+		// Color interpolation: blue (early) → red (recent)
+		t := float32(i) / float32(n)
+		r := uint8(60 + t*195)
+		g := uint8(60 * (1 - t))
+		b := uint8(220 * (1 - t))
+		a := uint8(80 + t*140)
+		c := color.RGBA{r, g, b, a}
+		vector.StrokeLine(screen, mapX(x0), mapY(y0), mapX(x1), mapY(y1), 1, c, false)
+	}
+
+	// Current best position marker (yellow dot)
+	lastX, lastY := sa.TrajectoryX[n-1], sa.TrajectoryY[n-1]
+	if lastX >= 0 && lastY >= 0 {
+		cx, cy := mapX(lastX), mapY(lastY)
+		vector.DrawFilledCircle(screen, cx, cy, 3, color.RGBA{255, 220, 50, 240}, false)
+	}
+
+	// Start position marker (small blue dot)
+	for i := 0; i < n; i++ {
+		if sa.TrajectoryX[i] >= 0 && sa.TrajectoryY[i] >= 0 {
+			sx, sy := mapX(sa.TrajectoryX[i]), mapY(sa.TrajectoryY[i])
+			vector.DrawFilledCircle(screen, sx, sy, 2, color.RGBA{80, 120, 255, 180}, false)
+			break
+		}
+	}
+}
+
+// drawFitnessHistogram renders a small histogram showing the distribution of
+// per-bot fitness values for the active optimisation algorithm. 10 bins are
+// used, with bar height proportional to the count in each bin. A colour
+// gradient from red (low fitness) to green (high fitness) makes the
+// distribution shape immediately visible. Positioned right of the trajectory
+// plot.
+func drawFitnessHistogram(screen *ebiten.Image, ss *swarm.SwarmState) {
+	vals := swarm.GetAlgoFitnessValues(ss)
+	if len(vals) < 2 {
+		return
+	}
+
+	// Panel dimensions and position (right of trajectory plot)
+	const hw = 100
+	const hh = 100
+	hx := 420 + 220 + 5 + 100 + 5 // convergence + gap + trajectory + gap = 750
+	hy := int(ss.ArenaH) + 50 - hh - 10
+
+	// Background
+	vector.DrawFilledRect(screen, float32(hx), float32(hy), hw, hh,
+		color.RGBA{10, 10, 20, 220}, false)
+	vector.StrokeRect(screen, float32(hx), float32(hy), hw, hh, 1,
+		color.RGBA{60, 80, 120, 150}, false)
+
+	// Title
+	printColoredAt(screen, "Fitness-Vertlg", hx+3, hy+2, color.RGBA{136, 204, 255, 220})
+
+	// Compute min/max
+	minV, maxV := vals[0], vals[0]
+	for _, v := range vals[1:] {
+		if v < minV {
+			minV = v
+		}
+		if v > maxV {
+			maxV = v
+		}
+	}
+	if maxV <= minV {
+		maxV = minV + 1
+	}
+	rangeV := maxV - minV
+
+	// Bin into 10 buckets
+	const numBins = 10
+	var bins [numBins]int
+	for _, v := range vals {
+		idx := int((v - minV) / rangeV * float64(numBins))
+		if idx >= numBins {
+			idx = numBins - 1
+		}
+		if idx < 0 {
+			idx = 0
+		}
+		bins[idx]++
+	}
+
+	// Find max bin count for scaling
+	maxBin := 1
+	for _, c := range bins {
+		if c > maxBin {
+			maxBin = c
+		}
+	}
+
+	// Chart area (inset)
+	chartX := float32(hx + 5)
+	chartY := float32(hy + 14)
+	chartW := float32(hw - 10)
+	chartH := float32(hh - 24)
+	barW := chartW / float32(numBins)
+
+	// Draw bars with red→green gradient
+	for i := 0; i < numBins; i++ {
+		t := float32(i) / float32(numBins-1)
+		barH := float32(bins[i]) / float32(maxBin) * chartH
+		bx := chartX + float32(i)*barW
+		by := chartY + chartH - barH
+
+		// Color: red (low fitness) → yellow (mid) → green (high fitness)
+		var r, g, b uint8
+		if t < 0.5 {
+			r = 220
+			g = uint8(200 * t * 2)
+			b = 40
+		} else {
+			r = uint8(220 * (1 - t) * 2)
+			g = 200
+			b = 40
+		}
+		col := color.RGBA{r, g, b, 200}
+		if barH > 0.5 {
+			vector.DrawFilledRect(screen, bx+0.5, by, barW-1, barH, col, false)
+		}
+	}
+
+	// Axis labels (min/max fitness)
+	printColoredAt(screen, fmt.Sprintf("%.0f", minV), hx+3, hy+hh-lineH, color.RGBA{100, 100, 120, 160})
+	printColoredAt(screen, fmt.Sprintf("%.0f", maxV), hx+hw-30, hy+hh-lineH, color.RGBA{100, 100, 120, 160})
+}
+
+// drawAlgoScoreboard renders a compact ranking of algorithms that have been
+// tested on the current fitness landscape. Positioned below the convergence
+// graph (or at the same location if no graph is visible). Sorted by best
+// fitness descending so the top performer is first.
+func drawAlgoScoreboard(screen *ebiten.Image, ss *swarm.SwarmState) {
+	board := ss.AlgoScoreboard
+	if len(board) == 0 {
+		return
+	}
+
+	// Sort by best fitness descending
+	sorted := make([]swarm.AlgoPerformanceRecord, len(board))
+	copy(sorted, board)
+	sort.Slice(sorted, func(i, j int) bool {
+		return sorted[i].BestFitness > sorted[j].BestFitness
+	})
+
+	// Position: right of histogram panel (convergence + trajectory + histogram + gaps)
+	const sbW = 200
+	sbX := 420 + 220 + 5 + 100 + 5 + 100 + 5 // gx + convW + gap + trajW + gap + histW + gap = 855
+	sbY := int(ss.ArenaH) + 50 - 100 - 10      // same top as convergence graph
+
+	// Background
+	rowH := lineH + 2
+	headerH := lineH + 4
+	sbH := headerH + len(sorted)*rowH + 4
+	vector.DrawFilledRect(screen, float32(sbX), float32(sbY), float32(sbW), float32(sbH),
+		color.RGBA{10, 10, 20, 220}, false)
+	vector.StrokeRect(screen, float32(sbX), float32(sbY), float32(sbW), float32(sbH), 1,
+		color.RGBA{60, 80, 120, 150}, false)
+
+	// Title
+	printColoredAt(screen, "Algorithmus-Ranking", sbX+3, sbY+2, color.RGBA{136, 204, 255, 220})
+
+	// Column headers
+	y := sbY + headerH
+	printColoredAt(screen, "#", sbX+3, y, color.RGBA{100, 100, 120, 160})
+	printColoredAt(screen, "Algorithmus", sbX+16, y, color.RGBA{100, 100, 120, 160})
+	printColoredAt(screen, "Fitness", sbX+130, y, color.RGBA{100, 100, 120, 160})
+	y += rowH
+
+	// Rows
+	maxEntries := 8 // limit visible entries
+	if len(sorted) < maxEntries {
+		maxEntries = len(sorted)
+	}
+	for rank, rec := range sorted[:maxEntries] {
+		// Rank color: gold/silver/bronze for top 3
+		var rankCol color.RGBA
+		switch rank {
+		case 0:
+			rankCol = color.RGBA{255, 215, 0, 220} // gold
+		case 1:
+			rankCol = color.RGBA{200, 200, 210, 200} // silver
+		case 2:
+			rankCol = color.RGBA{205, 127, 50, 200} // bronze
+		default:
+			rankCol = color.RGBA{140, 150, 170, 180}
+		}
+
+		name := swarm.SwarmAlgorithmName(rec.Algo)
+		// Truncate long names
+		if len(name) > 16 {
+			name = name[:15] + "."
+		}
+
+		printColoredAt(screen, fmt.Sprintf("%d", rank+1), sbX+3, y, rankCol)
+		printColoredAt(screen, name, sbX+16, y, rankCol)
+		printColoredAt(screen, fmt.Sprintf("%.1f", rec.BestFitness), sbX+130, y, rankCol)
+		y += rowH
+	}
+}
+
+// drawAlgoTournamentProgress renders a compact progress bar showing which
+// algorithm is currently being benchmarked and overall tournament progress.
+func drawAlgoTournamentProgress(screen *ebiten.Image, ss *swarm.SwarmState) {
+	const barW = 300
+	const barH = 28
+	barX := float32(250)
+	barY := float32(5)
+
+	// Background
+	vector.DrawFilledRect(screen, barX, barY, barW, barH, color.RGBA{10, 15, 30, 230}, false)
+	vector.StrokeRect(screen, barX, barY, barW, barH, 1, color.RGBA{80, 140, 255, 180}, false)
+
+	// Progress fraction: completed algorithms + partial progress of current one
+	total := float32(ss.AlgoTournamentTotal)
+	if total < 1 {
+		total = 1
+	}
+	tickFrac := 1.0 - float32(ss.AlgoTournamentTicks)/float32(swarm.AlgoTournamentTicksPerAlgo)
+	progress := (float32(ss.AlgoTournamentDone) + tickFrac) / total
+
+	// Progress bar fill
+	fillW := (barW - 4) * progress
+	fillCol := color.RGBA{40, 180, 80, 200}
+	vector.DrawFilledRect(screen, barX+2, barY+2, fillW, barH-4, fillCol, false)
+
+	// Text: "AUTO-TURNIER: PSO (3/20)"
+	algoName := swarm.SwarmAlgorithmAbbrev(ss.AlgoTournamentCur)
+	label := fmt.Sprintf("AUTO-TURNIER: %s (%d/%d)", algoName, ss.AlgoTournamentDone+1, ss.AlgoTournamentTotal)
+	printColoredAt(screen, label, int(barX)+6, int(barY)+4, color.RGBA{220, 230, 255, 255})
+
+	// Sub-line: ticks remaining for current algo
+	tickPct := int(tickFrac * 100)
+	sub := fmt.Sprintf("%d%%", tickPct)
+	printColoredAt(screen, sub, int(barX)+barW-35, int(barY)+4, color.RGBA{160, 180, 200, 200})
+}
+
+// drawAlgoRadarChart renders a radar (spider) chart comparing algorithm
+// performance across 4 axes: Best Fitness, Convergence Speed, Avg Fitness,
+// and Final Diversity. Each algorithm is drawn as a colored polygon.
+// Toggled with Ctrl+=. Requires at least 2 entries in AlgoScoreboard.
+func drawAlgoRadarChart(screen *ebiten.Image, ss *swarm.SwarmState) {
+	board := ss.AlgoScoreboard
+	if len(board) < 2 {
+		return
+	}
+
+	// Sort by best fitness descending for consistent ordering
+	sorted := make([]swarm.AlgoPerformanceRecord, len(board))
+	copy(sorted, board)
+	sort.Slice(sorted, func(i, j int) bool {
+		return sorted[i].BestFitness > sorted[j].BestFitness
+	})
+
+	// Limit to top 6 algorithms for readability
+	maxAlgos := 6
+	if len(sorted) < maxAlgos {
+		maxAlgos = len(sorted)
+	}
+	sorted = sorted[:maxAlgos]
+
+	// Axes: BestFitness, ConvergenceSpeed (inverted: lower=better→higher value),
+	// AvgFitness, FinalDiversity
+	const numAxes = 4
+	axisLabels := [numAxes]string{"Beste Fitness", "Konv.-Speed", "Avg Fitness", "Diversitaet"}
+
+	// Find max values for normalisation
+	maxBest := 0.0
+	maxSpeed := 0.0
+	maxAvg := 0.0
+	maxDiv := 0.0
+	for _, r := range sorted {
+		if r.BestFitness > maxBest {
+			maxBest = r.BestFitness
+		}
+		if r.ConvergenceSpeed > maxSpeed {
+			maxSpeed = r.ConvergenceSpeed
+		}
+		if r.AvgFitness > maxAvg {
+			maxAvg = r.AvgFitness
+		}
+		if r.FinalDiversity > maxDiv {
+			maxDiv = r.FinalDiversity
+		}
+	}
+	if maxBest < 1 {
+		maxBest = 1
+	}
+	if maxSpeed < 1 {
+		maxSpeed = 1
+	}
+	if maxAvg < 1 {
+		maxAvg = 1
+	}
+	if maxDiv < 0.01 {
+		maxDiv = 0.01
+	}
+
+	// Chart geometry — position in upper-right of arena
+	cx := float32(ss.ArenaW) - 10 - 110 // center X
+	cy := float32(130)                   // center Y
+	radius := float32(90)
+
+	// Background circle
+	const bgAlpha = 200
+	vector.DrawFilledCircle(screen, cx, cy, radius+15, color.RGBA{10, 10, 25, bgAlpha}, false)
+	vector.StrokeCircle(screen, cx, cy, radius+15, 1, color.RGBA{60, 80, 120, 150}, false)
+
+	// Title
+	printColoredAt(screen, "Algorithmus-Radar", int(cx)-55, int(cy-radius)-25,
+		color.RGBA{136, 204, 255, 220})
+
+	// Draw axis lines and labels
+	for a := 0; a < numAxes; a++ {
+		angle := float64(a)*2*math.Pi/float64(numAxes) - math.Pi/2
+		ex := cx + radius*float32(math.Cos(angle))
+		ey := cy + radius*float32(math.Sin(angle))
+		vector.StrokeLine(screen, cx, cy, ex, ey, 1, color.RGBA{50, 60, 80, 180}, false)
+
+		// Label position (slightly past endpoint)
+		lx := cx + (radius+12)*float32(math.Cos(angle))
+		ly := cy + (radius+12)*float32(math.Sin(angle))
+		label := axisLabels[a]
+		// Center text approximately
+		labelOff := len(label) * charW / 2
+		printColoredAt(screen, label, int(lx)-labelOff, int(ly)-5,
+			color.RGBA{140, 160, 190, 200})
+	}
+
+	// Draw concentric guide rings at 25%, 50%, 75%
+	for _, frac := range []float32{0.25, 0.5, 0.75} {
+		r := radius * frac
+		vector.StrokeCircle(screen, cx, cy, r, 0.5, color.RGBA{40, 50, 70, 100}, false)
+	}
+
+	// Algorithm colors (distinct, semi-transparent for fill)
+	algoColors := []color.RGBA{
+		{255, 100, 80, 255},  // red-orange
+		{80, 180, 255, 255},  // sky blue
+		{120, 255, 120, 255}, // green
+		{255, 200, 60, 255},  // gold
+		{200, 120, 255, 255}, // purple
+		{255, 140, 200, 255}, // pink
+	}
+
+	// Draw polygon for each algorithm
+	for ai, rec := range sorted {
+		col := algoColors[ai%len(algoColors)]
+		fillCol := color.RGBA{col.R, col.G, col.B, 40}
+
+		// Normalise values to [0, 1]
+		vals := [numAxes]float64{
+			rec.BestFitness / maxBest,
+			1.0 - rec.ConvergenceSpeed/maxSpeed, // invert: lower speed = better
+			rec.AvgFitness / maxAvg,
+			rec.FinalDiversity / maxDiv,
+		}
+
+		// Compute polygon vertices
+		var verts [numAxes][2]float32
+		for a := 0; a < numAxes; a++ {
+			angle := float64(a)*2*math.Pi/float64(numAxes) - math.Pi/2
+			v := vals[a]
+			if v < 0 {
+				v = 0
+			}
+			if v > 1 {
+				v = 1
+			}
+			r := float32(v) * radius
+			verts[a] = [2]float32{
+				cx + r*float32(math.Cos(angle)),
+				cy + r*float32(math.Sin(angle)),
+			}
+		}
+
+		// Draw filled triangles (fan from center) for the polygon
+		for a := 0; a < numAxes; a++ {
+			next := (a + 1) % numAxes
+			drawTriangleFill(screen, cx, cy, verts[a][0], verts[a][1],
+				verts[next][0], verts[next][1], fillCol)
+		}
+
+		// Draw polygon outline
+		for a := 0; a < numAxes; a++ {
+			next := (a + 1) % numAxes
+			vector.StrokeLine(screen, verts[a][0], verts[a][1],
+				verts[next][0], verts[next][1], 1.5, col, false)
+		}
+
+		// Draw vertex dots
+		for a := 0; a < numAxes; a++ {
+			vector.DrawFilledCircle(screen, verts[a][0], verts[a][1], 2.5, col, false)
+		}
+	}
+
+	// Legend
+	ly := int(cy + radius + 20)
+	for ai, rec := range sorted {
+		col := algoColors[ai%len(algoColors)]
+		name := swarm.SwarmAlgorithmAbbrev(rec.Algo)
+		lx := int(cx) - 55 + (ai%3)*42
+		if ai >= 3 {
+			ly = int(cy+radius) + 20 + lineH + 2
+			lx = int(cx) - 55 + (ai%3)*42
+		}
+		// Color swatch
+		vector.DrawFilledRect(screen, float32(lx), float32(ly+1), 8, 8, col, false)
+		printColoredAt(screen, name, lx+10, ly, color.RGBA{180, 190, 210, 220})
+	}
+}
+
+// radarWhitePixel is a 1x1 white image used as source texture for DrawTriangles.
+var radarWhitePixel *ebiten.Image
+
+func getRadarWhitePixel() *ebiten.Image {
+	if radarWhitePixel == nil {
+		radarWhitePixel = ebiten.NewImage(1, 1)
+		radarWhitePixel.Fill(color.White)
+	}
+	return radarWhitePixel
+}
+
+// drawTriangleFill renders a filled triangle using ebiten's vertex-based rendering.
+func drawTriangleFill(screen *ebiten.Image, x0, y0, x1, y1, x2, y2 float32, col color.RGBA) {
+	vs := []ebiten.Vertex{
+		{DstX: x0, DstY: y0, SrcX: 0, SrcY: 0, ColorR: float32(col.R) / 255, ColorG: float32(col.G) / 255, ColorB: float32(col.B) / 255, ColorA: float32(col.A) / 255},
+		{DstX: x1, DstY: y1, SrcX: 0, SrcY: 0, ColorR: float32(col.R) / 255, ColorG: float32(col.G) / 255, ColorB: float32(col.B) / 255, ColorA: float32(col.A) / 255},
+		{DstX: x2, DstY: y2, SrcX: 0, SrcY: 0, ColorR: float32(col.R) / 255, ColorG: float32(col.G) / 255, ColorB: float32(col.B) / 255, ColorA: float32(col.A) / 255},
+	}
+	is := []uint16{0, 1, 2}
+	screen.DrawTriangles(vs, is, getRadarWhitePixel(), nil)
+}

@@ -137,6 +137,8 @@ func TickACO(ss *SwarmState) {
 }
 
 // ApplyACO steers bot along pheromone gradient (follow strongest trail).
+// It uses steerToward for smooth, rate-limited turning toward the
+// direction of highest pheromone concentration.
 func ApplyACO(bot *SwarmBot, ss *SwarmState, idx int) {
 	if ss.ACO == nil {
 		bot.Speed = SwarmBotSpeed
@@ -164,19 +166,7 @@ func ApplyACO(bot *SwarmBot, ss *SwarmState, idx int) {
 
 	if bestVal > 1.0 {
 		targetAngle := math.Atan2(bestDy, bestDx)
-		diff := targetAngle - bot.Angle
-		for diff > math.Pi {
-			diff -= 2 * math.Pi
-		}
-		for diff < -math.Pi {
-			diff += 2 * math.Pi
-		}
-		if diff > acoFollowStr {
-			diff = acoFollowStr
-		} else if diff < -acoFollowStr {
-			diff = -acoFollowStr
-		}
-		bot.Angle += diff
+		steerToward(bot, targetAngle, acoFollowStr)
 		bot.Speed = SwarmBotSpeed
 	} else {
 		// No trail: wander

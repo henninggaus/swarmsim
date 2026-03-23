@@ -129,8 +129,13 @@ func TickImmuneSwarm(ss *SwarmState) {
 	for i := range ss.Bots {
 		if st.IsPathogen[i] {
 			st.ActiveSignal = true
-			for j := range ss.Bots {
-				if st.IsAntibody[j] {
+			if ss.Hash != nil {
+				// O(n·k): query only nearby antibodies via spatial hash
+				nearIDs := ss.Hash.Query(ss.Bots[i].X, ss.Bots[i].Y, iswSignalRadius)
+				for _, j := range nearIDs {
+					if j >= len(st.IsAntibody) || !st.IsAntibody[j] {
+						continue
+					}
 					dx := ss.Bots[i].X - ss.Bots[j].X
 					dy := ss.Bots[i].Y - ss.Bots[j].Y
 					dist := math.Sqrt(dx*dx + dy*dy)
@@ -138,6 +143,19 @@ func TickImmuneSwarm(ss *SwarmState) {
 						st.AlertLevel[j] = math.Min(1.0, st.AlertLevel[j]+0.1)
 						st.SignalX[j] = ss.Bots[i].X
 						st.SignalY[j] = ss.Bots[i].Y
+					}
+				}
+			} else {
+				for j := range ss.Bots {
+					if st.IsAntibody[j] {
+						dx := ss.Bots[i].X - ss.Bots[j].X
+						dy := ss.Bots[i].Y - ss.Bots[j].Y
+						dist := math.Sqrt(dx*dx + dy*dy)
+						if dist < iswSignalRadius {
+							st.AlertLevel[j] = math.Min(1.0, st.AlertLevel[j]+0.1)
+							st.SignalX[j] = ss.Bots[i].X
+							st.SignalY[j] = ss.Bots[i].Y
+						}
 					}
 				}
 			}
@@ -150,7 +168,15 @@ func TickImmuneSwarm(ss *SwarmState) {
 		st.AlertLevel[i] *= 0.98
 	}
 
-	// Update sensor cache
+	// Collect pathogen indices once (O(n)) to avoid re-scanning per bot
+	var pathogenIdxs []int
+	for j := range ss.Bots {
+		if j < len(st.IsPathogen) && st.IsPathogen[j] {
+			pathogenIdxs = append(pathogenIdxs, j)
+		}
+	}
+
+	// Update sensor cache — O(n × p) where p = pathogen count (typically very small)
 	for i := range ss.Bots {
 		if i >= len(st.IsAntibody) {
 			break
@@ -166,8 +192,8 @@ func TickImmuneSwarm(ss *SwarmState) {
 
 		// Distance to nearest pathogen
 		nearestPath := 9999.0
-		for j := range ss.Bots {
-			if j == i || j >= len(st.IsPathogen) || !st.IsPathogen[j] {
+		for _, j := range pathogenIdxs {
+			if j == i {
 				continue
 			}
 			dx := ss.Bots[j].X - ss.Bots[i].X

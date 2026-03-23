@@ -75,6 +75,15 @@ type Renderer struct {
 
 	// FPS warning
 	LowFPSCounter int
+
+	// PSO fitness landscape heatmap cache
+	psoLandscapeImg  *ebiten.Image
+	psoLandscapeHash uint64 // hash of peak params to detect changes
+
+	// Contour line cache (computed alongside heatmap)
+	psoContourSegs []contourSegment // all contour line segments
+	psoContourW    int              // grid width used when computing contours
+	psoContourH    int              // grid height used when computing contours
 }
 
 // NewRenderer creates a new renderer with a particle system.
@@ -400,18 +409,42 @@ func (r *Renderer) drawRadii(screen *ebiten.Image, s *simulation.Simulation, sw,
 }
 
 func (r *Renderer) drawCommLines(screen *ebiten.Image, s *simulation.Simulation, sw, sh int) {
+	if s.Hash == nil || len(s.Bots) == 0 {
+		return
+	}
+
+	// Build ID→index map and find the max comm range across all bots.
+	idToIdx := make(map[int]int, len(s.Bots))
+	var maxCommR float64
+	for i, b := range s.Bots {
+		if b.IsAlive() {
+			idToIdx[b.ID()] = i
+			if cr := b.GetCommRange(); cr > maxCommR {
+				maxCommR = cr
+			}
+		}
+	}
+
+	// Each bot queries with the global max comm range to ensure we find all
+	// pairs where either bot's range covers the other. We only process
+	// neighbors with j > i to draw each line exactly once.
 	for i, a := range s.Bots {
 		if !a.IsAlive() {
 			continue
 		}
-		for j := i + 1; j < len(s.Bots); j++ {
-			b := s.Bots[j]
-			if !b.IsAlive() {
+		apos := a.Position()
+		commA := a.GetCommRange()
+
+		nearIDs := s.Hash.Query(apos.X, apos.Y, maxCommR)
+		for _, nid := range nearIDs {
+			j, ok := idToIdx[nid]
+			if !ok || j <= i {
 				continue
 			}
-			dist := a.Position().Dist(b.Position())
-			if dist < a.GetCommRange() || dist < b.GetCommRange() {
-				ax, ay := r.Camera.WorldToScreen(a.Position().X, a.Position().Y, sw, sh)
+			b := s.Bots[j]
+			dist := apos.Dist(b.Position())
+			if dist < commA || dist < b.GetCommRange() {
+				ax, ay := r.Camera.WorldToScreen(apos.X, apos.Y, sw, sh)
 				bx, by := r.Camera.WorldToScreen(b.Position().X, b.Position().Y, sw, sh)
 				vector.StrokeLine(screen, float32(ax), float32(ay), float32(bx), float32(by), 1.5, ColorCommLine, false)
 			}

@@ -2,6 +2,7 @@ package swarm
 
 import (
 	"math"
+	"sort"
 	"swarmsim/logger"
 )
 
@@ -48,6 +49,7 @@ func ClearOscillators(ss *SwarmState) {
 }
 
 // TickOscillators runs one step of the Kuramoto model.
+// Uses SpatialHash for O(n·k) neighbor lookup instead of brute-force O(n²).
 func TickOscillators(ss *SwarmState) {
 	os := ss.Oscillator
 	if os == nil {
@@ -62,6 +64,7 @@ func TickOscillators(ss *SwarmState) {
 	radiusSq := os.CoupleRange * os.CoupleRange
 	newPhases := make([]float64, n)
 	copy(newPhases, os.Phases)
+	useSpatial := ss.Hash != nil
 
 	for i := range ss.Bots {
 		// Natural frequency advancement
@@ -71,15 +74,32 @@ func TickOscillators(ss *SwarmState) {
 		coupling := 0.0
 		neighbors := 0
 
-		for j := range ss.Bots {
-			if i == j {
-				continue
+		if useSpatial {
+			// O(n·k): query only nearby bots via spatial hash
+			nearIDs := ss.Hash.Query(ss.Bots[i].X, ss.Bots[i].Y, os.CoupleRange)
+			for _, j := range nearIDs {
+				if j == i || j >= n {
+					continue
+				}
+				dx := ss.Bots[j].X - ss.Bots[i].X
+				dy := ss.Bots[j].Y - ss.Bots[i].Y
+				if dx*dx+dy*dy < radiusSq {
+					coupling += math.Sin(os.Phases[j] - os.Phases[i])
+					neighbors++
+				}
 			}
-			dx := ss.Bots[j].X - ss.Bots[i].X
-			dy := ss.Bots[j].Y - ss.Bots[i].Y
-			if dx*dx+dy*dy < radiusSq {
-				coupling += math.Sin(os.Phases[j] - os.Phases[i])
-				neighbors++
+		} else {
+			// Fallback: brute-force O(n²)
+			for j := range ss.Bots {
+				if i == j {
+					continue
+				}
+				dx := ss.Bots[j].X - ss.Bots[i].X
+				dy := ss.Bots[j].Y - ss.Bots[i].Y
+				if dx*dx+dy*dy < radiusSq {
+					coupling += math.Sin(os.Phases[j] - os.Phases[i])
+					neighbors++
+				}
 			}
 		}
 
@@ -150,33 +170,31 @@ func updateOscStats(os *OscillatorState) {
 	os.OrderParam = math.Sqrt(avgCos*avgCos + avgSin*avgSin)
 	os.MeanPhase = math.Atan2(avgSin, avgCos)
 
-	// Count sync groups: bots within pi/4 phase difference
-	visited := make([]bool, n)
-	groups := 0
-	for i := 0; i < n; i++ {
-		if visited[i] {
-			continue
+	// Count sync groups via sorted-phase sweep: O(n log n) instead of O(n²).
+	// Sort indices by phase, then sweep with a pi/4 window on the circular
+	// phase space. Connected components in phase form contiguous runs in
+	// the sorted order (with wrap-around at 2*pi handled separately).
+	indices := make([]int, n)
+	for i := range indices {
+		indices[i] = i
+	}
+	sort.Slice(indices, func(a, b int) bool {
+		return os.Phases[indices[a]] < os.Phases[indices[b]]
+	})
+
+	const threshold = math.Pi / 4
+	groups := 1 // at least one group
+	for k := 1; k < n; k++ {
+		gap := os.Phases[indices[k]] - os.Phases[indices[k-1]]
+		if gap >= threshold {
+			groups++
 		}
-		groups++
-		visited[i] = true
-		// BFS: find all bots close in phase
-		queue := []int{i}
-		for len(queue) > 0 {
-			curr := queue[0]
-			queue = queue[1:]
-			for j := 0; j < n; j++ {
-				if visited[j] {
-					continue
-				}
-				diff := math.Abs(os.Phases[curr] - os.Phases[j])
-				if diff > math.Pi {
-					diff = 2*math.Pi - diff
-				}
-				if diff < math.Pi/4 {
-					visited[j] = true
-					queue = append(queue, j)
-				}
-			}
+	}
+	// Check wrap-around: if first and last are within threshold, merge them
+	if groups > 1 {
+		wrapGap := (2*math.Pi - os.Phases[indices[n-1]]) + os.Phases[indices[0]]
+		if wrapGap < threshold {
+			groups--
 		}
 	}
 	os.SyncGroups = groups

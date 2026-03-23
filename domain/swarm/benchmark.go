@@ -257,26 +257,52 @@ func completeBenchmark(ss *SwarmState, bs *BenchmarkState, run *BenchmarkRun) {
 }
 
 // computeClusterScore evaluates how well bots have formed clusters.
+// Uses spatial hash when available for O(n·k) instead of O(n²).
 func computeClusterScore(ss *SwarmState) float64 {
 	if len(ss.Bots) == 0 {
 		return 0
 	}
 
-	// Simple: measure average distance to nearest neighbor
 	totalNN := 0.0
 	for i := range ss.Bots {
 		minDist := math.MaxFloat64
-		for j := range ss.Bots {
-			if i == j {
-				continue
-			}
-			dx := ss.Bots[i].X - ss.Bots[j].X
-			dy := ss.Bots[i].Y - ss.Bots[j].Y
-			d := dx*dx + dy*dy
-			if d < minDist {
-				minDist = d
+
+		if ss.Hash != nil {
+			// Expanding-radius search: try small radius first, widen if no neighbor found.
+			for _, radius := range []float64{50, 150, 400} {
+				candidates := ss.Hash.Query(ss.Bots[i].X, ss.Bots[i].Y, radius)
+				for _, j := range candidates {
+					if j == i || j < 0 || j >= len(ss.Bots) {
+						continue
+					}
+					dx := ss.Bots[i].X - ss.Bots[j].X
+					dy := ss.Bots[i].Y - ss.Bots[j].Y
+					d := dx*dx + dy*dy
+					if d < minDist {
+						minDist = d
+					}
+				}
+				if minDist < math.MaxFloat64 {
+					break
+				}
 			}
 		}
+
+		// Fallback: brute-force if hash unavailable or no neighbor found.
+		if minDist == math.MaxFloat64 {
+			for j := range ss.Bots {
+				if i == j {
+					continue
+				}
+				dx := ss.Bots[i].X - ss.Bots[j].X
+				dy := ss.Bots[i].Y - ss.Bots[j].Y
+				d := dx*dx + dy*dy
+				if d < minDist {
+					minDist = d
+				}
+			}
+		}
+
 		totalNN += math.Sqrt(minDist)
 	}
 	avgNN := totalNN / float64(len(ss.Bots))

@@ -156,6 +156,67 @@ const (
 	CondAmoebaPseudo                             // amoeba_pseudo (1 if in pseudopod)
 	CondACOTrail                                 // aco_trail (pheromone trail intensity 0-100)
 	CondACOGrad                                  // aco_grad (angle to strongest trail -180..180)
+	CondBFOHealth                                // bfo_health (accumulated nutrient health 0-100)
+	CondBFOSwimming                              // bfo_swimming (1=swimming, 0=tumbling)
+	CondBFONutrient                              // bfo_nutrient (nutrient at position 0-100)
+	CondGWORank                                  // gwo_rank (0=alpha, 1=beta, 2=delta, 3=omega)
+	CondGWOFitness                               // gwo_fitness (fitness 0-100)
+	CondGWOAlphaDist                             // gwo_alpha_dist (distance to alpha wolf)
+	CondWOAPhase                                 // woa_phase (0=encircle, 1=spiral, 2=search)
+	CondWOAFitness                               // woa_fitness (fitness 0-100)
+	CondWOABestDist                              // woa_best_dist (distance to best whale)
+	CondMFOFlame                                 // mfo_flame (assigned flame index, -1=none)
+	CondMFOFitness                               // mfo_fitness (fitness 0-100)
+	CondMFOFlameDist                             // mfo_flame_dist (distance to assigned flame)
+	CondCuckooFitness                            // cuckoo_fitness (nest fitness 0-100)
+	CondCuckooNestAge                            // cuckoo_nest_age (ticks since rebuild, 0-100)
+	CondCuckooBest                               // cuckoo_best (1 if top 25% nest)
+	CondDEFitness                                // de_fitness (fitness 0-100)
+	CondDEBestDist                               // de_best_dist (distance to best individual)
+	CondDEPhase                                  // de_phase (0=idle, 1=moving to trial)
+	CondABCFitness                               // abc_fitness (food source fitness * 100)
+	CondABCRole                                  // abc_role (0=employed, 1=onlooker, 2=scout)
+	CondABCBestDist                              // abc_best_dist (distance to best food source)
+	CondHSOFitness                               // hso_fitness (harmony fitness * 100)
+	CondHSOPhase                                 // hso_phase (0=improvising, 1=arrived)
+	CondHSOBestDist                              // hso_best_dist (distance to best harmony)
+	CondBatLoud                                  // bat_loud (loudness * 100, 0-100)
+	CondBatPulse                                 // bat_pulse (pulse rate * 100, 0-99)
+	CondBatFitness                               // bat_fitness (fitness value)
+	CondBatBestDist                              // bat_best_dist (distance to best bat)
+	CondSSARole                                  // ssa_role (0=leader, 1=follower)
+	CondSSAFitness                               // ssa_fitness (fitness * 100)
+	CondSSAFoodDist                              // ssa_food_dist (distance to food source)
+	CondGSAMass                                  // gsa_mass (normalised mass * 1000)
+	CondGSAForce                                 // gsa_force (acceleration magnitude * 100)
+	CondGSABestDist                              // gsa_best_dist (distance to heaviest agent)
+	CondFPAFitness                               // fpa_fitness (fitness 0-100)
+	CondFPAType                                  // fpa_type (0=global Lévy, 1=local)
+	CondFPABestDist                              // fpa_best_dist (distance to global best)
+	CondHHOPhase                                 // hho_phase (0=explore, 1=soft, 2=hard, 3=dive)
+	CondHHOFitness                               // hho_fitness (fitness 0-100)
+	CondHHOBestDist                              // hho_best_dist (distance to rabbit)
+	CondSAFitness                                // sa_fitness (fitness 0-100)
+	CondSATemp                                   // sa_temp (current temperature 0-100)
+	CondSABestDist                               // sa_best_dist (distance to globally best bot)
+	CondAOPhase                                  // ao_phase (0=high soar, 1=contour, 2=low flight, 3=walk&grab)
+	CondAOFitness                                // ao_fitness (fitness 0-100)
+	CondAOBestDist                               // ao_best_dist (distance to best eagle)
+	CondSCAFitness                               // sca_fitness (fitness 0-100)
+	CondSCAPhase                                 // sca_phase (0=sine, 1=cosine)
+	CondSCABestDist                              // sca_best_dist (distance to global best)
+	CondDAFitness                                // da_fitness (fitness 0-100)
+	CondDARole                                   // da_role (0=static, 1=dynamic, 2=lévy)
+	CondDAFoodDist                               // da_food_dist (distance to food source)
+	CondTLBOFitness                              // tlbo_fitness (fitness 0-100)
+	CondTLBOPhase                                // tlbo_phase (0=teacher, 1=learner)
+	CondTLBOTeacherDist                          // tlbo_teacher_dist (distance to teacher)
+	CondEOFitness                                // eo_fitness (fitness 0-100)
+	CondEOPhase                                  // eo_phase (0=exploration, 1=exploitation)
+	CondEOEquilDist                              // eo_equil_dist (distance to equilibrium pool best)
+	CondJayaFitness                              // jaya_fitness (fitness 0-100)
+	CondJayaBestDist                             // jaya_best_dist (distance to global best)
+	CondJayaWorstDist                            // jaya_worst_dist (distance to global worst)
 )
 
 // Condition represents a single boolean check in a rule.
@@ -254,6 +315,13 @@ const (
 	ActCrystal                                 // CRYSTAL (form hexagonal lattice)
 	ActAmoeba                                  // AMOEBA (amoeba-like collective locomotion)
 	ActACO                                     // ACO (follow ant colony pheromone trail)
+	ActBFO                                     // BFO (bacterial foraging chemotaxis swim/tumble)
+	ActGWO                                     // GWO (grey wolf pack hunting movement)
+	ActWOA                                     // WOA (whale bubble-net spiral/encircle)
+	ActMFO                                     // MFO (moth-flame spiral toward flame)
+	ActCuckoo                                  // CUCKOO (Lévy flight toward best nest)
+	ActDE                                      // DE (differential evolution — steer toward trial vector)
+	ActABC                                     // ABC (artificial bee colony — employed/onlooker/scout foraging)
 )
 
 // Action represents an action to execute when a rule matches.
@@ -546,6 +614,83 @@ var conditionNames = map[string]ConditionType{
 	"aco_trail":           CondACOTrail,
 	"aco_grad":            CondACOGrad,
 	"aco":                 CondACOTrail,
+	// Bacterial Foraging sensors
+	"bfo_health":          CondBFOHealth,
+	"bfo_swimming":        CondBFOSwimming,
+	"bfo_nutrient":        CondBFONutrient,
+	// Grey Wolf Optimizer sensors
+	"gwo_rank":            CondGWORank,
+	"gwo_fitness":         CondGWOFitness,
+	"gwo_alpha_dist":      CondGWOAlphaDist,
+	// Whale Optimization sensors
+	"woa_phase":           CondWOAPhase,
+	"woa_fitness":         CondWOAFitness,
+	"woa_best_dist":       CondWOABestDist,
+	// Moth-Flame Optimization sensors
+	"mfo_flame":           CondMFOFlame,
+	"mfo_fitness":         CondMFOFitness,
+	"mfo_flame_dist":      CondMFOFlameDist,
+	// Cuckoo Search sensors
+	"cuckoo_fitness":      CondCuckooFitness,
+	"cuckoo_nest_age":     CondCuckooNestAge,
+	"cuckoo_best":         CondCuckooBest,
+	// Differential Evolution sensors
+	"de_fitness":          CondDEFitness,
+	"de_best_dist":        CondDEBestDist,
+	"de_phase":            CondDEPhase,
+	// Artificial Bee Colony sensors
+	"abc_fitness":         CondABCFitness,
+	"abc_role":            CondABCRole,
+	"abc_best_dist":       CondABCBestDist,
+	// Harmony Search Optimization sensors
+	"hso_fitness":         CondHSOFitness,
+	"hso_phase":           CondHSOPhase,
+	"hso_best_dist":       CondHSOBestDist,
+	// Bat Algorithm sensors
+	"bat_loud":            CondBatLoud,
+	"bat_pulse":           CondBatPulse,
+	"bat_fitness":         CondBatFitness,
+	"bat_best_dist":       CondBatBestDist,
+	"ssa_role":             CondSSARole,
+	"ssa_fitness":          CondSSAFitness,
+	"ssa_food_dist":        CondSSAFoodDist,
+	// Gravitational Search Algorithm sensors
+	"gsa_mass":             CondGSAMass,
+	"gsa_force":            CondGSAForce,
+	"gsa_best_dist":        CondGSABestDist,
+	// Flower Pollination Algorithm sensors
+	"fpa_fitness":          CondFPAFitness,
+	"fpa_type":             CondFPAType,
+	"fpa_best_dist":        CondFPABestDist,
+	// Harris Hawks Optimization sensors
+	"hho_phase":            CondHHOPhase,
+	"hho_fitness":          CondHHOFitness,
+	"hho_best_dist":        CondHHOBestDist,
+	// Simulated Annealing sensors
+	"sa_fitness":           CondSAFitness,
+	"sa_temp":              CondSATemp,
+	"sa_best_dist":         CondSABestDist,
+	"ao_phase":             CondAOPhase,
+	"ao_fitness":           CondAOFitness,
+	"ao_best_dist":         CondAOBestDist,
+	// Sine Cosine Algorithm sensors
+	"sca_fitness":          CondSCAFitness,
+	"sca_phase":            CondSCAPhase,
+	"sca_best_dist":        CondSCABestDist,
+	// Dragonfly Algorithm sensors
+	"da_fitness":           CondDAFitness,
+	"da_role":              CondDARole,
+	"da_food_dist":         CondDAFoodDist,
+	// Teaching-Learning-Based Optimization sensors
+	"tlbo_fitness":         CondTLBOFitness,
+	"tlbo_phase":           CondTLBOPhase,
+	"tlbo_teacher_dist":    CondTLBOTeacherDist,
+	"eo_fitness":           CondEOFitness,
+	"eo_phase":             CondEOPhase,
+	"eo_equil_dist":        CondEOEquilDist,
+	"jaya_fitness":         CondJayaFitness,
+	"jaya_best_dist":       CondJayaBestDist,
+	"jaya_worst_dist":      CondJayaWorstDist,
 }
 
 // actionNames maps action name strings to (ActionType, paramCount).
@@ -716,6 +861,34 @@ var actionNames = map[string]struct {
 	// ACO actions
 	"ACO":                 {ActACO, 0},
 	"ANT_COLONY":          {ActACO, 0},
+	// Bacterial Foraging actions
+	"BFO":                 {ActBFO, 0},
+	"BACTERIAL":           {ActBFO, 0},
+	"FORAGE":              {ActBFO, 0},
+	// Grey Wolf Optimizer actions
+	"GWO":                 {ActGWO, 0},
+	"GREY_WOLF":           {ActGWO, 0},
+	"WOLF_HUNT":           {ActGWO, 0},
+	// Whale Optimization actions
+	"WOA":                 {ActWOA, 0},
+	"WHALE":               {ActWOA, 0},
+	"BUBBLE_NET":          {ActWOA, 0},
+	// Moth-Flame Optimization actions
+	"MFO":                 {ActMFO, 0},
+	"MOTH_FLAME":          {ActMFO, 0},
+	"MOTH":                {ActMFO, 0},
+	// Cuckoo Search actions
+	"CUCKOO":              {ActCuckoo, 0},
+	"CUCKOO_SEARCH":       {ActCuckoo, 0},
+	"LEVY_NEST":           {ActCuckoo, 0},
+	// Differential Evolution actions
+	"DE":                  {ActDE, 0},
+	"DIFF_EVOLVE":         {ActDE, 0},
+	"DIFFERENTIAL":        {ActDE, 0},
+	// Artificial Bee Colony actions
+	"ABC":                 {ActABC, 0},
+	"BEE_COLONY":          {ActABC, 0},
+	"HONEY_BEE":           {ActABC, 0},
 }
 
 // --- SwarmScript syntax highlighting support ---
@@ -959,6 +1132,11 @@ var highlightActions = map[string]bool{
 	"AMOEBA": true, "BLOB": true,
 	// ACO
 	"ACO": true, "ANT_COLONY": true,
+	// Metaheuristic optimizers
+	"BFO": true, "BACTERIAL": true, "FORAGE": true,
+	"GWO": true, "GREY_WOLF": true, "WOLF_HUNT": true,
+	"WOA": true, "WHALE": true, "BUBBLE_NET": true,
+	"MFO": true, "MOTH_FLAME": true, "MOTH": true,
 }
 
 // --- Reverse mapping functions (for block editor / serialization) ---
@@ -1240,6 +1418,128 @@ func ConditionTypeName(ct ConditionType) string {
 		return "aco_trail"
 	case CondACOGrad:
 		return "aco_grad"
+	case CondBFOHealth:
+		return "bfo_health"
+	case CondBFOSwimming:
+		return "bfo_swimming"
+	case CondBFONutrient:
+		return "bfo_nutrient"
+	case CondGWORank:
+		return "gwo_rank"
+	case CondGWOFitness:
+		return "gwo_fitness"
+	case CondGWOAlphaDist:
+		return "gwo_alpha_dist"
+	case CondWOAPhase:
+		return "woa_phase"
+	case CondWOAFitness:
+		return "woa_fitness"
+	case CondWOABestDist:
+		return "woa_best_dist"
+	case CondMFOFlame:
+		return "mfo_flame"
+	case CondMFOFitness:
+		return "mfo_fitness"
+	case CondMFOFlameDist:
+		return "mfo_flame_dist"
+	case CondCuckooFitness:
+		return "cuckoo_fitness"
+	case CondCuckooNestAge:
+		return "cuckoo_nest_age"
+	case CondCuckooBest:
+		return "cuckoo_best"
+	case CondDEFitness:
+		return "de_fitness"
+	case CondDEBestDist:
+		return "de_best_dist"
+	case CondDEPhase:
+		return "de_phase"
+	case CondABCFitness:
+		return "abc_fitness"
+	case CondABCRole:
+		return "abc_role"
+	case CondABCBestDist:
+		return "abc_best_dist"
+	case CondHSOFitness:
+		return "hso_fitness"
+	case CondHSOPhase:
+		return "hso_phase"
+	case CondHSOBestDist:
+		return "hso_best_dist"
+	case CondBatLoud:
+		return "bat_loud"
+	case CondBatPulse:
+		return "bat_pulse"
+	case CondBatFitness:
+		return "bat_fitness"
+	case CondBatBestDist:
+		return "bat_best_dist"
+	case CondSSARole:
+		return "ssa_role"
+	case CondSSAFitness:
+		return "ssa_fitness"
+	case CondSSAFoodDist:
+		return "ssa_food_dist"
+	case CondGSAMass:
+		return "gsa_mass"
+	case CondGSAForce:
+		return "gsa_force"
+	case CondGSABestDist:
+		return "gsa_best_dist"
+	case CondFPAFitness:
+		return "fpa_fitness"
+	case CondFPAType:
+		return "fpa_type"
+	case CondFPABestDist:
+		return "fpa_best_dist"
+	case CondHHOPhase:
+		return "hho_phase"
+	case CondHHOFitness:
+		return "hho_fitness"
+	case CondHHOBestDist:
+		return "hho_best_dist"
+	case CondSAFitness:
+		return "sa_fitness"
+	case CondSATemp:
+		return "sa_temp"
+	case CondSABestDist:
+		return "sa_best_dist"
+	case CondAOPhase:
+		return "ao_phase"
+	case CondAOFitness:
+		return "ao_fitness"
+	case CondAOBestDist:
+		return "ao_best_dist"
+	case CondSCAFitness:
+		return "sca_fitness"
+	case CondSCAPhase:
+		return "sca_phase"
+	case CondSCABestDist:
+		return "sca_best_dist"
+	case CondDAFitness:
+		return "da_fitness"
+	case CondDARole:
+		return "da_role"
+	case CondDAFoodDist:
+		return "da_food_dist"
+	case CondTLBOFitness:
+		return "tlbo_fitness"
+	case CondTLBOPhase:
+		return "tlbo_phase"
+	case CondTLBOTeacherDist:
+		return "tlbo_teacher_dist"
+	case CondEOFitness:
+		return "eo_fitness"
+	case CondEOPhase:
+		return "eo_phase"
+	case CondEOEquilDist:
+		return "eo_equil_dist"
+	case CondJayaFitness:
+		return "jaya_fitness"
+	case CondJayaBestDist:
+		return "jaya_best_dist"
+	case CondJayaWorstDist:
+		return "jaya_worst_dist"
 	}
 	return "unknown"
 }
@@ -1424,6 +1724,20 @@ func ActionTypeName(at ActionType) string {
 		return "AMOEBA"
 	case ActACO:
 		return "ACO"
+	case ActBFO:
+		return "BFO"
+	case ActGWO:
+		return "GWO"
+	case ActWOA:
+		return "WOA"
+	case ActMFO:
+		return "MFO"
+	case ActCuckoo:
+		return "CUCKOO"
+	case ActDE:
+		return "DE"
+	case ActABC:
+		return "ABC"
 	}
 	return "UNKNOWN"
 }
@@ -1465,6 +1779,8 @@ var SensorGrouped = [][]string{
 	{"-- Advanced --", "pso_fitness", "pso_best", "pso_global_dist", "pred_role", "prey_dist", "pred_catches", "mag_chain_len", "mag_linked", "mag_align", "div_group", "div_phase", "div_dist"},
 	{"-- Batch 5 --", "vform_pos", "vform_draft", "vform_leader", "brood_carrying", "brood_item_color", "brood_density", "brood_same_color", "jelly_phase", "jelly_expanding", "jelly_radius", "immune_role", "immune_alert", "immune_path_dist"},
 	{"-- Batch 6 --", "grav_mass", "grav_force", "grav_near_heavy", "crystal_neigh", "crystal_defect", "crystal_settled", "amoeba_dist", "amoeba_skin", "amoeba_pseudo", "aco_trail", "aco_grad"},
+	{"-- Metaheuristics --", "bfo_health", "bfo_swimming", "bfo_nutrient", "gwo_rank", "gwo_fitness", "gwo_alpha_dist", "woa_phase", "woa_fitness", "woa_best_dist", "mfo_flame", "mfo_fitness", "mfo_flame_dist"},
+	{"-- Metaheuristics 2 --", "cuckoo_fitness", "cuckoo_nest_age", "cuckoo_best", "de_fitness", "de_best_dist", "de_phase", "abc_fitness", "abc_role", "abc_best_dist", "hso_fitness", "hso_phase", "hso_best_dist", "bat_loud", "bat_pulse", "bat_fitness", "bat_best_dist", "ssa_role", "ssa_fitness", "ssa_food_dist", "gsa_mass", "gsa_force", "gsa_best_dist", "fpa_fitness", "fpa_type", "fpa_best_dist", "hho_phase", "hho_fitness", "hho_best_dist", "sa_fitness", "sa_temp", "sa_best_dist", "ao_phase", "ao_fitness", "ao_best_dist", "sca_fitness", "sca_phase", "sca_best_dist", "da_fitness", "da_role", "da_food_dist", "tlbo_fitness", "tlbo_phase", "tlbo_teacher_dist", "eo_fitness", "eo_phase", "eo_equil_dist", "jaya_fitness", "jaya_best_dist", "jaya_worst_dist"},
 }
 
 // ActionGrouped returns action names organized in groups for dropdown display.
@@ -1485,6 +1801,8 @@ var ActionGrouped = [][]string{
 	{"-- Advanced --", "PSO_MOVE", "PREDATOR", "MAGNETIC", "DIVIDE"},
 	{"-- Batch 5 --", "V_FORMATION", "BROOD_SORT", "JELLYFISH_PULSE", "IMMUNE"},
 	{"-- Batch 6 --", "GRAVITY", "CRYSTAL", "AMOEBA", "ACO"},
+	{"-- Metaheuristics --", "BFO", "GWO", "WOA", "MFO"},
+	{"-- Metaheuristics 2 --", "CUCKOO", "DE", "ABC", "HSO", "BAT", "SSA", "GSA"},
 }
 
 // wordPos tracks a word and its column position in a line.

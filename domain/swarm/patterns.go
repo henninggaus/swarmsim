@@ -148,6 +148,7 @@ func DetectPatterns(ss *SwarmState) PatternResult {
 	visited := make([]bool, n)
 	result.ClusterCount = 0
 	clusterThreshold := 60.0
+	clusterThreshSq := clusterThreshold * clusterThreshold
 	for i := range ss.Bots {
 		if visited[i] {
 			continue
@@ -159,15 +160,33 @@ func DetectPatterns(ss *SwarmState) PatternResult {
 		for len(queue) > 0 {
 			curr := queue[0]
 			queue = queue[1:]
-			for j := range ss.Bots {
-				if visited[j] {
-					continue
+			bx, by := ss.Bots[curr].X, ss.Bots[curr].Y
+			if ss.Hash != nil {
+				// Spatial hash: only check nearby bots — O(k) per BFS step
+				candidates := ss.Hash.Query(bx, by, clusterThreshold)
+				for _, j := range candidates {
+					if visited[j] || j < 0 || j >= n {
+						continue
+					}
+					dx := bx - ss.Bots[j].X
+					dy := by - ss.Bots[j].Y
+					if dx*dx+dy*dy < clusterThreshSq {
+						visited[j] = true
+						queue = append(queue, j)
+					}
 				}
-				dx := ss.Bots[curr].X - ss.Bots[j].X
-				dy := ss.Bots[curr].Y - ss.Bots[j].Y
-				if dx*dx+dy*dy < clusterThreshold*clusterThreshold {
-					visited[j] = true
-					queue = append(queue, j)
+			} else {
+				// Fallback: brute-force O(n) per BFS step
+				for j := range ss.Bots {
+					if visited[j] {
+						continue
+					}
+					dx := bx - ss.Bots[j].X
+					dy := by - ss.Bots[j].Y
+					if dx*dx+dy*dy < clusterThreshSq {
+						visited[j] = true
+						queue = append(queue, j)
+					}
 				}
 			}
 		}

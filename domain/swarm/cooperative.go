@@ -60,6 +60,16 @@ func RunCooperativeLearning(rng *rand.Rand, ss *SwarmState) {
 		return
 	}
 
+	// Use SpatialHash for O(n·k) neighbor queries when available
+	useSpatial := ss.Hash != nil
+	if useSpatial {
+		ss.Hash.Clear()
+		for i := 0; i < n; i++ {
+			ss.Hash.Insert(i, ss.Bots[i].X, ss.Bots[i].Y)
+		}
+	}
+	teachRangeSq := cfg.TeachRange * cfg.TeachRange
+
 	for i := 0; i < n; i++ {
 		if rng.Float64() >= cfg.TeachRate {
 			continue
@@ -70,19 +80,39 @@ func RunCooperativeLearning(rng *rand.Rand, ss *SwarmState) {
 
 		// Find nearest bot within range
 		bestJ := -1
-		bestDist := math.MaxFloat64
-		for j := 0; j < n; j++ {
-			if j == i {
-				continue
+		bestDistSq := teachRangeSq
+
+		if useSpatial {
+			nearIDs := ss.Hash.Query(teacher.X, teacher.Y, cfg.TeachRange)
+			for _, j := range nearIDs {
+				if j == i || j >= n {
+					continue
+				}
+				dx := ss.Bots[j].X - teacher.X
+				dy := ss.Bots[j].Y - teacher.Y
+				dSq := dx*dx + dy*dy
+				if dSq < bestDistSq {
+					learnerFit := EvaluateGPFitness(&ss.Bots[j])
+					if teacherFit-learnerFit >= cfg.MinFitGap {
+						bestJ = j
+						bestDistSq = dSq
+					}
+				}
 			}
-			dx := ss.Bots[j].X - teacher.X
-			dy := ss.Bots[j].Y - teacher.Y
-			dist := math.Sqrt(dx*dx + dy*dy)
-			if dist < cfg.TeachRange && dist < bestDist {
-				learnerFit := EvaluateGPFitness(&ss.Bots[j])
-				if teacherFit-learnerFit >= cfg.MinFitGap {
-					bestJ = j
-					bestDist = dist
+		} else {
+			for j := 0; j < n; j++ {
+				if j == i {
+					continue
+				}
+				dx := ss.Bots[j].X - teacher.X
+				dy := ss.Bots[j].Y - teacher.Y
+				dSq := dx*dx + dy*dy
+				if dSq < bestDistSq {
+					learnerFit := EvaluateGPFitness(&ss.Bots[j])
+					if teacherFit-learnerFit >= cfg.MinFitGap {
+						bestJ = j
+						bestDistSq = dSq
+					}
 				}
 			}
 		}

@@ -116,6 +116,16 @@ func TickGravity(ss *SwarmState) {
 		}
 	}
 
+	// Build heavy-body index for O(n·k) nearest-heavy-body lookup.
+	// Only bots with mass >= 80% of gravMassMax qualify as "heavy".
+	heavyThreshold := gravMassMax * 0.8
+	var heavyIdx []int
+	for j := 0; j < len(ss.Bots) && j < len(st.Mass); j++ {
+		if st.Mass[j] >= heavyThreshold {
+			heavyIdx = append(heavyIdx, j)
+		}
+	}
+
 	// Update sensor cache
 	for i := range ss.Bots {
 		if i >= len(st.Mass) {
@@ -127,10 +137,10 @@ func TickGravity(ss *SwarmState) {
 		forceMag := math.Sqrt(st.ForceX[i]*st.ForceX[i] + st.ForceY[i]*st.ForceY[i])
 		ss.Bots[i].GravForce = int(math.Min(100, forceMag*200))
 
-		// Nearest heavy body distance
+		// Nearest heavy body distance — iterate only heavy bodies (typically ~10% of population)
 		nearHeavy := 9999.0
-		for j := range ss.Bots {
-			if j == i || j >= len(st.Mass) || st.Mass[j] < gravMassMax*0.8 {
+		for _, j := range heavyIdx {
+			if j == i {
 				continue
 			}
 			dx := ss.Bots[j].X - ss.Bots[i].X
@@ -157,20 +167,8 @@ func ApplyGravity(bot *SwarmBot, ss *SwarmState, idx int) {
 
 	if forceMag > 0.01 {
 		targetAngle := math.Atan2(fy, fx)
-		diff := targetAngle - bot.Angle
-		for diff > math.Pi {
-			diff -= 2 * math.Pi
-		}
-		for diff < -math.Pi {
-			diff += 2 * math.Pi
-		}
 		steerRate := math.Min(0.15, forceMag*0.5)
-		if diff > steerRate {
-			diff = steerRate
-		} else if diff < -steerRate {
-			diff = -steerRate
-		}
-		bot.Angle += diff
+		steerToward(bot, targetAngle, steerRate)
 	}
 
 	// Heavier bots move slower

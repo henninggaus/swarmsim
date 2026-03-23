@@ -141,39 +141,70 @@ func TickImmune(ss *SwarmState) {
 		is.Cells[i].AnomalyScore = 0
 	}
 
+	useSpatial := ss.Hash != nil
+
 	for i := range ss.Bots {
 		if !is.Cells[i].IsDetector {
 			continue
 		}
 		is.Cells[i].DetectorAge++
 
-		for j := range ss.Bots {
-			if i == j {
-				continue
+		if useSpatial {
+			// O(n·k): query only nearby bots via spatial hash
+			nearIDs := ss.Hash.Query(ss.Bots[i].X, ss.Bots[i].Y, is.DetectionRange)
+			for _, j := range nearIDs {
+				if j == i || j >= n {
+					continue
+				}
+				dx := ss.Bots[i].X - ss.Bots[j].X
+				dy := ss.Bots[i].Y - ss.Bots[j].Y
+				if dx*dx+dy*dy > rangeSq {
+					continue
+				}
+
+				sig := botSignature(&is.Cells[j])
+				score := 0.0
+				for k := 0; k < 4; k++ {
+					z := math.Abs(sig[k]-meanSig[k]) / stdSig[k]
+					score += z
+				}
+				score /= 4.0
+
+				is.Cells[j].AnomalyScore = math.Max(is.Cells[j].AnomalyScore, score)
+
+				if score > is.Threshold {
+					is.Cells[j].IsAnomalous = true
+					is.AnomalyCount++
+					storeThreatPattern(is, sig, ss.Tick)
+				}
 			}
-			dx := ss.Bots[i].X - ss.Bots[j].X
-			dy := ss.Bots[i].Y - ss.Bots[j].Y
-			if dx*dx+dy*dy > rangeSq {
-				continue
-			}
+		} else {
+			// Fallback: brute-force O(n²)
+			for j := range ss.Bots {
+				if i == j {
+					continue
+				}
+				dx := ss.Bots[i].X - ss.Bots[j].X
+				dy := ss.Bots[i].Y - ss.Bots[j].Y
+				if dx*dx+dy*dy > rangeSq {
+					continue
+				}
 
-			// Compute anomaly score (Mahalanobis-like distance)
-			sig := botSignature(&is.Cells[j])
-			score := 0.0
-			for k := 0; k < 4; k++ {
-				z := math.Abs(sig[k]-meanSig[k]) / stdSig[k]
-				score += z
-			}
-			score /= 4.0
+				sig := botSignature(&is.Cells[j])
+				score := 0.0
+				for k := 0; k < 4; k++ {
+					z := math.Abs(sig[k]-meanSig[k]) / stdSig[k]
+					score += z
+				}
+				score /= 4.0
 
-			is.Cells[j].AnomalyScore = math.Max(is.Cells[j].AnomalyScore, score)
+				is.Cells[j].AnomalyScore = math.Max(is.Cells[j].AnomalyScore, score)
 
-			if score > is.Threshold {
-				is.Cells[j].IsAnomalous = true
-				is.AnomalyCount++
-
-				// Store threat pattern
-				storeThreatPattern(is, sig, ss.Tick)
+				if score > is.Threshold {
+					is.Cells[j].IsAnomalous = true
+					is.AnomalyCount++
+					storeThreatPattern(is, sig, ss.Tick)
+				}
 			}
 		}
 	}

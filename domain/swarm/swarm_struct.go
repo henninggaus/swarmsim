@@ -257,6 +257,107 @@ type SwarmBot struct {
 	ACOTrail int // pheromone trail intensity at position (0-100)
 	ACOGrad  int // angle to strongest trail gradient (-180..180)
 
+	// Grey Wolf Optimizer sensor cache
+	GWORank     int // 0=alpha, 1=beta, 2=delta, 3=omega
+	GWOFitness  int // fitness * 100 (0-100)
+	GWOAlphaDist int // distance to alpha wolf
+
+	// Whale Optimization Algorithm sensor cache
+	WOAPhase    int // 0=encircle, 1=spiral, 2=search
+	WOAFitness  int // fitness * 100 (0-100)
+	WOABestDist int // distance to best whale
+
+	// Bacterial Foraging Optimization sensor cache
+	BFOHealth   int // accumulated nutrient health (0-100)
+	BFOSwimming int // 1=swimming, 0=tumbling
+	BFONutrient int // nutrient value at current position (0-100)
+
+	// Moth-Flame Optimization sensor cache
+	MFOFlame     int // assigned flame index (-1=none)
+	MFOFitness   int // fitness * 100 (0-100)
+	MFOFlameDist int // distance to assigned flame
+
+	// Cuckoo Search sensor cache
+	CuckooFitness int // nest fitness (0-100)
+	CuckooNestAge int // ticks since last rebuild (0-100 capped)
+	CuckooBest    int // 1 if in top 25% nests, 0 otherwise
+
+	// Differential Evolution sensor cache
+	DEFitness  int // current fitness * 100 (0-100)
+	DEBestDist int // distance to best individual
+	DEPhase    int // 0=idle, 1=moving toward trial position
+
+	// Artificial Bee Colony sensor cache
+	ABCFitness  int // food source fitness * 100
+	ABCRole     int // 0=employed, 1=onlooker, 2=scout
+	ABCBestDist int // distance to best food source
+
+	// Harmony Search Optimization sensor cache
+	HSOFitness  int // harmony fitness * 100
+	HSOPhase    int // 0=improvising (moving), 1=arrived (evaluating)
+	HSOBestDist int // distance to best harmony position
+
+	// Bat Algorithm sensor cache
+	BatLoud     int // loudness * 100 (0-100, decreases as bat converges)
+	BatPulse    int // pulse rate * 100 (0-99, increases as bat converges)
+	BatFitness  int // fitness value
+	BatBestDist int // distance to best bat
+
+	// Salp Swarm Algorithm sensor cache
+	SSARole     int // 0=leader, 1=follower
+	SSAFitness  int // fitness * 100 (0-100)
+	SSAFoodDist int // distance to food source (global best)
+
+	// Gravitational Search Algorithm sensor cache
+	GSAMass     int // normalised mass * 1000
+	GSAForce    int // acceleration magnitude * 100
+	GSABestDist int // distance to heaviest agent
+
+	// Flower Pollination Algorithm sensor cache
+	FPAFitness  int // fitness value (0-100)
+	FPAType     int // 0=global (Lévy flight), 1=local pollination
+	FPABestDist int // distance to global best flower
+
+	// Harris Hawks Optimization sensor cache
+	HHOPhase    int // 0=explore, 1=soft besiege, 2=hard besiege, 3=rapid dive
+	HHOFitness  int // fitness value (0-100)
+	HHOBestDist int // distance to rabbit (best hawk)
+
+	// Simulated Annealing sensor cache
+	SAFitness  int // current fitness * 100 (0-100)
+	SATemp     int // current temperature (0-100)
+	SABestDist int // distance to globally best bot
+
+	// Aquila Optimizer sensor cache
+	AOPhase    int // 0=high soar, 1=contour, 2=low flight, 3=walk&grab
+	AOFitness  int // fitness value (0-100)
+	AOBestDist int // distance to best eagle (prey)
+
+	// Sine Cosine Algorithm sensor cache
+	SCAFitness  int // current fitness * 100 (0-100)
+	SCAPhase    int // 0=sine (exploration), 1=cosine (exploitation)
+	SCABestDist int // distance to global best position
+
+	// Dragonfly Algorithm sensor cache
+	DAFitness  int // current fitness * 100 (0-100)
+	DARole     int // 0=static/feeding, 1=dynamic/migratory, 2=lévy flight
+	DAFoodDist int // distance to food source (global best)
+
+	// TLBO sensor cache
+	TLBOFitness    int // current fitness * 100 (0-100)
+	TLBOPhase      int // 0=teacher phase, 1=learner phase
+	TLBOTeacherDist int // distance to teacher (global best)
+
+	// Equilibrium Optimizer sensor cache
+	EOFitness   int // current fitness * 100 (0-100)
+	EOPhase     int // 0=exploration, 1=exploitation
+	EOEquilDist int // distance to equilibrium pool best
+
+	// Jaya Algorithm sensor cache
+	JayaFitness   int // current fitness * 100 (0-100)
+	JayaBestDist  int // distance to global best
+	JayaWorstDist int // distance to global worst
+
 	// Brake mechanics
 	BrakeTimer int // >0 = braking (speed ramps down over 3 ticks)
 
@@ -781,6 +882,23 @@ type SwarmState struct {
 	SwarmAlgo   *SwarmAlgorithmState
 	SwarmAlgoOn bool
 
+	// Algorithm performance scoreboard — survives algorithm switches so users
+	// can compare how different algorithms performed on the same landscape.
+	AlgoScoreboard []AlgoPerformanceRecord
+
+	// Convergence curve archive — stores best-fitness convergence curves of
+	// previously tested algorithms for visual overlay comparison in the graph.
+	ConvergenceArchive []ConvergenceArchiveEntry
+
+	// Auto-Tournament — automatically benchmarks all optimization algorithms
+	// on the current fitness landscape and fills the scoreboard.
+	AlgoTournamentOn    bool                 // true while algo tournament is running
+	AlgoTournamentQueue []SwarmAlgorithmType // remaining algorithms to test
+	AlgoTournamentCur   SwarmAlgorithmType   // currently running algorithm
+	AlgoTournamentTicks int                  // ticks remaining for current algorithm
+	AlgoTournamentTotal int                  // total algorithms to test (for progress)
+	AlgoTournamentDone  int                  // algorithms completed so far
+
 	// Transfer learning between scenarios
 	Transfer *TransferState
 
@@ -1030,6 +1148,118 @@ type SwarmState struct {
 	ACO   *ACOState
 	ACOOn bool
 	ShowACO bool
+
+	// Grey Wolf Optimizer
+	GWO   *GWOState
+	GWOOn bool
+	ShowGWO bool
+
+	// Whale Optimization Algorithm
+	WOA   *WOAState
+	WOAOn bool
+	ShowWOA bool
+
+	// Bacterial Foraging Optimization
+	BFO   *BFOState
+	BFOOn bool
+	ShowBFO bool
+
+	// Moth-Flame Optimization
+	MFO   *MFOState
+	MFOOn bool
+	ShowMFO bool
+
+	// Cuckoo Search
+	Cuckoo   *CuckooState
+	CuckooOn bool
+	ShowCuckoo bool
+
+	// Differential Evolution
+	DE   *DEState
+	DEOn bool
+	ShowDE bool
+
+	// Artificial Bee Colony
+	ABC   *ABCState
+	ABCOn bool
+	ShowABC bool
+
+	// Harmony Search Optimization
+	HSO   *HSOState
+	HSOOn bool
+	ShowHSO bool
+
+	// Bat Algorithm
+	Bat   *BatState
+	BatOn bool
+	ShowBat bool
+
+	// Salp Swarm Algorithm
+	SSA   *SSAState
+	SSAOn bool
+	ShowSSA bool
+
+	// Gravitational Search Algorithm
+	GSA   *GSAState
+	GSAOn bool
+	ShowGSA bool
+
+	// Flower Pollination Algorithm
+	FPA   *FPAState
+	FPAOn bool
+	ShowFPA bool
+
+	// Harris Hawks Optimization
+	HHO   *HHOState
+	HHOOn bool
+	ShowHHO bool
+
+	// Simulated Annealing
+	SA   *SAState
+	SAOn bool
+	ShowSA bool
+
+	// Aquila Optimizer
+	AO     *AOState
+	AOOn   bool
+	ShowAO bool
+
+	// Sine Cosine Algorithm
+	SCA     *SCAState
+	SCAOn   bool
+	ShowSCA bool
+
+	// Dragonfly Algorithm
+	DA     *DAState
+	DAOn   bool
+	ShowDA bool
+
+	// Teaching-Learning-Based Optimization
+	TLBO     *TLBOState
+	TLBOOn   bool
+	ShowTLBO bool
+
+	// Equilibrium Optimizer
+	EO     *EOState
+	EOOn   bool
+	ShowEO bool
+
+	// Jaya Algorithm
+	Jaya     *JayaState
+	JayaOn   bool
+	ShowJaya bool
+
+	// Velocity flow field overlay (Ctrl+5)
+	ShowFlowField bool
+
+	// Algorithm performance radar chart overlay (Ctrl+=)
+	ShowAlgoRadar bool
+
+	// Fitness gradient field overlay (Ctrl+G)
+	ShowFitnessGradient bool
+
+	// Voronoi territory overlay (Ctrl+V)
+	ShowVoronoi bool
 
 	// Block editor
 	BlockEditorActive bool

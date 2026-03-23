@@ -118,6 +118,15 @@ func TickPredatorPrey(ss *SwarmState) {
 		return
 	}
 
+	// Rebuild spatial hash for O(n·k) neighbor lookups (also ensures
+	// correctness in unit tests where the main sim loop doesn't run).
+	if ss.Hash != nil {
+		ss.Hash.Clear()
+		for i := range ss.Bots {
+			ss.Hash.Insert(i, ss.Bots[i].X, ss.Bots[i].Y)
+		}
+	}
+
 	// Update cooldowns
 	for i := range pp.Cooldowns {
 		if pp.Cooldowns[i] > 0 {
@@ -125,36 +134,59 @@ func TickPredatorPrey(ss *SwarmState) {
 		}
 	}
 
-	// Predators try to catch prey
+	// Predators try to catch prey.
+	// Uses SpatialHash for O(n·k) neighbor lookup instead of brute-force O(n²).
 	for i := 0; i < n; i++ {
 		if pp.Roles[i] != RolePredator || pp.Cooldowns[i] > 0 {
 			continue
 		}
 
-		for j := 0; j < n; j++ {
-			if pp.Roles[j] != RolePrey {
-				continue
+		caught := false
+		if ss.Hash != nil {
+			// Copy query results since Hash.Query reuses its buffer
+			nearIDs := ss.Hash.Query(ss.Bots[i].X, ss.Bots[i].Y, pp.CatchRadius)
+			for _, j := range nearIDs {
+				if j == i || j < 0 || j >= n || j >= len(pp.Roles) {
+					continue
+				}
+				if pp.Roles[j] != RolePrey {
+					continue
+				}
+				dx := ss.Bots[i].X - ss.Bots[j].X
+				dy := ss.Bots[i].Y - ss.Bots[j].Y
+				if dx*dx+dy*dy < pp.CatchRadius*pp.CatchRadius {
+					pp.CatchCount[i]++
+					pp.TotalCatches++
+					pp.Cooldowns[i] = pp.CatchCooldown
+					margin := 30.0
+					ss.Bots[j].X = margin + ss.Rng.Float64()*(ss.ArenaW-2*margin)
+					ss.Bots[j].Y = margin + ss.Rng.Float64()*(ss.ArenaH-2*margin)
+					ss.Bots[j].Angle = ss.Rng.Float64() * 2 * math.Pi
+					ss.Bots[j].BlinkTimer = 10
+					caught = true
+					break
+				}
 			}
-
-			dx := ss.Bots[i].X - ss.Bots[j].X
-			dy := ss.Bots[i].Y - ss.Bots[j].Y
-			dist := math.Sqrt(dx*dx + dy*dy)
-
-			if dist < pp.CatchRadius {
-				// Catch!
-				pp.CatchCount[i]++
-				pp.TotalCatches++
-				pp.Cooldowns[i] = pp.CatchCooldown
-
-				// Respawn prey at random location
-				margin := 30.0
-				ss.Bots[j].X = margin + ss.Rng.Float64()*(ss.ArenaW-2*margin)
-				ss.Bots[j].Y = margin + ss.Rng.Float64()*(ss.ArenaH-2*margin)
-				ss.Bots[j].Angle = ss.Rng.Float64() * 2 * math.Pi
-
-				// Flash effect
-				ss.Bots[j].BlinkTimer = 10
-				break // one catch per tick per predator
+		}
+		if !caught && ss.Hash == nil {
+			// Fallback: brute-force O(n²)
+			for j := 0; j < n; j++ {
+				if pp.Roles[j] != RolePrey {
+					continue
+				}
+				dx := ss.Bots[i].X - ss.Bots[j].X
+				dy := ss.Bots[i].Y - ss.Bots[j].Y
+				if dx*dx+dy*dy < pp.CatchRadius*pp.CatchRadius {
+					pp.CatchCount[i]++
+					pp.TotalCatches++
+					pp.Cooldowns[i] = pp.CatchCooldown
+					margin := 30.0
+					ss.Bots[j].X = margin + ss.Rng.Float64()*(ss.ArenaW-2*margin)
+					ss.Bots[j].Y = margin + ss.Rng.Float64()*(ss.ArenaH-2*margin)
+					ss.Bots[j].Angle = ss.Rng.Float64() * 2 * math.Pi
+					ss.Bots[j].BlinkTimer = 10
+					break
+				}
 			}
 		}
 	}
@@ -355,37 +387,65 @@ func BuildPredatorPreyInputs(bot *SwarmBot, ss *SwarmState, botIdx int) [NeuroIn
 
 	role := pp.Roles[botIdx]
 
-	// Find nearest opponent
+	// Find nearest opponent and nearest ally.
+	// Uses SpatialHash for O(n·k) neighbor lookup instead of brute-force O(n²).
 	nearestDist := 999.0
 	nearestAngle := 0.0
 	opponentCount := 0
-	for j := range ss.Bots {
-		if j == botIdx || pp.Roles[j] == role {
-			continue
-		}
-		dx := ss.Bots[j].X - bot.X
-		dy := ss.Bots[j].Y - bot.Y
-		d := math.Sqrt(dx*dx + dy*dy)
-		if d < SwarmSensorRange && d < nearestDist {
-			nearestDist = d
-			nearestAngle = math.Atan2(dy, dx) - bot.Angle
-		}
-		if d < SwarmSensorRange {
-			opponentCount++
-		}
-	}
-
-	// Find nearest ally
 	nearestAllyDist := 999.0
-	for j := range ss.Bots {
-		if j == botIdx || pp.Roles[j] != role {
-			continue
+	sensorRangeSq := SwarmSensorRange * SwarmSensorRange
+
+	if ss.Hash != nil {
+		nearIDs := ss.Hash.Query(bot.X, bot.Y, SwarmSensorRange)
+		for _, j := range nearIDs {
+			if j == botIdx || j < 0 || j >= len(ss.Bots) || j >= len(pp.Roles) {
+				continue
+			}
+			dx := ss.Bots[j].X - bot.X
+			dy := ss.Bots[j].Y - bot.Y
+			dSq := dx*dx + dy*dy
+			if dSq >= sensorRangeSq {
+				continue
+			}
+			d := math.Sqrt(dSq)
+			if pp.Roles[j] != role {
+				// Opponent
+				opponentCount++
+				if d < nearestDist {
+					nearestDist = d
+					nearestAngle = math.Atan2(dy, dx) - bot.Angle
+				}
+			} else {
+				// Ally
+				if d < nearestAllyDist {
+					nearestAllyDist = d
+				}
+			}
 		}
-		dx := ss.Bots[j].X - bot.X
-		dy := ss.Bots[j].Y - bot.Y
-		d := math.Sqrt(dx*dx + dy*dy)
-		if d < SwarmSensorRange && d < nearestAllyDist {
-			nearestAllyDist = d
+	} else {
+		// Fallback: brute-force O(n²)
+		for j := range ss.Bots {
+			if j == botIdx {
+				continue
+			}
+			dx := ss.Bots[j].X - bot.X
+			dy := ss.Bots[j].Y - bot.Y
+			dSq := dx*dx + dy*dy
+			if dSq >= sensorRangeSq {
+				continue
+			}
+			d := math.Sqrt(dSq)
+			if pp.Roles[j] != role {
+				opponentCount++
+				if d < nearestDist {
+					nearestDist = d
+					nearestAngle = math.Atan2(dy, dx) - bot.Angle
+				}
+			} else {
+				if d < nearestAllyDist {
+					nearestAllyDist = d
+				}
+			}
 		}
 	}
 

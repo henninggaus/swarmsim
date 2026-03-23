@@ -105,24 +105,50 @@ func TickLanguage(ss *SwarmState) {
 		ls.SymbolFreq[symbol]++
 	}
 
+	// Rebuild spatial hash (cheap O(n) insurance for standalone/test invocations).
+	if ss.Hash != nil {
+		ss.Hash.Clear()
+		for i := range ss.Bots {
+			ss.Hash.Insert(i, ss.Bots[i].X, ss.Bots[i].Y)
+		}
+	}
+
 	// Phase 2: Each bot receives symbols from neighbors and reacts
 	for i := range ss.Bots {
 		bot := &ss.Bots[i]
 		vocab := &ls.Vocabs[i]
 
 		// Find nearest broadcasting neighbor
-		bestDist := vocab.BroadcastRange
+		bestDistSq := vocab.BroadcastRange * vocab.BroadcastRange
 		bestSymbol := -1
-		for j := range ss.Bots {
-			if i == j {
-				continue
+		if ss.Hash != nil {
+			// Spatial hash: only check nearby bots — O(k) per bot
+			candidates := ss.Hash.Query(bot.X, bot.Y, vocab.BroadcastRange)
+			for _, j := range candidates {
+				if j == i || j < 0 || j >= n {
+					continue
+				}
+				dx := ss.Bots[j].X - bot.X
+				dy := ss.Bots[j].Y - bot.Y
+				dSq := dx*dx + dy*dy
+				if dSq < bestDistSq {
+					bestDistSq = dSq
+					bestSymbol = ls.Vocabs[j].CurrentSymbol
+				}
 			}
-			dx := ss.Bots[j].X - bot.X
-			dy := ss.Bots[j].Y - bot.Y
-			dist := math.Sqrt(dx*dx + dy*dy)
-			if dist < bestDist {
-				bestDist = dist
-				bestSymbol = ls.Vocabs[j].CurrentSymbol
+		} else {
+			// Fallback: brute-force O(n) per bot
+			for j := range ss.Bots {
+				if i == j {
+					continue
+				}
+				dx := ss.Bots[j].X - bot.X
+				dy := ss.Bots[j].Y - bot.Y
+				dSq := dx*dx + dy*dy
+				if dSq < bestDistSq {
+					bestDistSq = dSq
+					bestSymbol = ls.Vocabs[j].CurrentSymbol
+				}
 			}
 		}
 

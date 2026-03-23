@@ -133,6 +133,14 @@ func detectImmuneThreats(ss *SwarmState, ai *AdaptiveImmuneState) {
 		return
 	}
 
+	// Rebuild spatial hash for this tick (cheap O(n) insurance for standalone/test invocations).
+	if ss.Hash != nil {
+		ss.Hash.Clear()
+		for i := range ss.Bots {
+			ss.Hash.Insert(i, ss.Bots[i].X, ss.Bots[i].Y)
+		}
+	}
+
 	// Detect "threats": areas with sudden speed changes or clustering anomalies
 	for i := range ss.Bots {
 		if ai.BotRoles[i].Role != ImmuneBCell {
@@ -145,16 +153,34 @@ func detectImmuneThreats(ss *SwarmState, ai *AdaptiveImmuneState) {
 		anomalyScore := 0.0
 		neighbors := 0
 		avgNeighSpeed := 0.0
+		detRadSq := ai.DetectionRadius * ai.DetectionRadius
 
-		for j := range ss.Bots {
-			if i == j {
-				continue
+		if ss.Hash != nil {
+			// Spatial hash: only check nearby bots — O(k) per B-cell
+			candidates := ss.Hash.Query(bot.X, bot.Y, ai.DetectionRadius)
+			for _, j := range candidates {
+				if j == i || j < 0 || j >= len(ss.Bots) {
+					continue
+				}
+				dx := ss.Bots[j].X - bot.X
+				dy := ss.Bots[j].Y - bot.Y
+				if dx*dx+dy*dy < detRadSq {
+					avgNeighSpeed += ss.Bots[j].Speed
+					neighbors++
+				}
 			}
-			dx := ss.Bots[j].X - bot.X
-			dy := ss.Bots[j].Y - bot.Y
-			if dx*dx+dy*dy < ai.DetectionRadius*ai.DetectionRadius {
-				avgNeighSpeed += ss.Bots[j].Speed
-				neighbors++
+		} else {
+			// Fallback: brute-force O(n) per B-cell
+			for j := range ss.Bots {
+				if i == j {
+					continue
+				}
+				dx := ss.Bots[j].X - bot.X
+				dy := ss.Bots[j].Y - bot.Y
+				if dx*dx+dy*dy < detRadSq {
+					avgNeighSpeed += ss.Bots[j].Speed
+					neighbors++
+				}
 			}
 		}
 

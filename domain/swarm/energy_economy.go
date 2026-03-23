@@ -2,6 +2,7 @@ package swarm
 
 import (
 	"math"
+	"sort"
 	"swarmsim/logger"
 )
 
@@ -184,6 +185,15 @@ func tickTrading(ss *SwarmState, ee *EnergyEconomyState) {
 	rangeSq := ee.TradeRange * ee.TradeRange
 	n := len(ss.Bots)
 
+	// Use SpatialHash for O(n·k) neighbor queries when available
+	useSpatial := ss.Hash != nil
+	if useSpatial {
+		ss.Hash.Clear()
+		for i := 0; i < n; i++ {
+			ss.Hash.Insert(i, ss.Bots[i].X, ss.Bots[i].Y)
+		}
+	}
+
 	for i := 0; i < n; i++ {
 		wi := &ee.Wallets[i]
 
@@ -199,29 +209,55 @@ func tickTrading(ss *SwarmState, ee *EnergyEconomyState) {
 		bestJ := -1
 		bestDist := rangeSq
 
-		for j := 0; j < n; j++ {
-			if i == j {
-				continue
-			}
-			dx := ss.Bots[i].X - ss.Bots[j].X
-			dy := ss.Bots[i].Y - ss.Bots[j].Y
-			dSq := dx*dx + dy*dy
-			if dSq >= bestDist {
-				continue
-			}
-
-			wj := &ee.Wallets[j]
-			// Altruists give to poor, traders give to those with less
-			switch wi.Role {
-			case EconAltruist:
-				if wj.Energy < wi.Energy*0.5 {
-					bestJ = j
-					bestDist = dSq
+		if useSpatial {
+			nearIDs := ss.Hash.Query(ss.Bots[i].X, ss.Bots[i].Y, ee.TradeRange)
+			for _, j := range nearIDs {
+				if j == i || j >= n {
+					continue
 				}
-			case EconTrader:
-				if wj.Energy < wi.Energy*0.8 {
-					bestJ = j
-					bestDist = dSq
+				dx := ss.Bots[i].X - ss.Bots[j].X
+				dy := ss.Bots[i].Y - ss.Bots[j].Y
+				dSq := dx*dx + dy*dy
+				if dSq >= bestDist {
+					continue
+				}
+				wj := &ee.Wallets[j]
+				switch wi.Role {
+				case EconAltruist:
+					if wj.Energy < wi.Energy*0.5 {
+						bestJ = j
+						bestDist = dSq
+					}
+				case EconTrader:
+					if wj.Energy < wi.Energy*0.8 {
+						bestJ = j
+						bestDist = dSq
+					}
+				}
+			}
+		} else {
+			for j := 0; j < n; j++ {
+				if i == j {
+					continue
+				}
+				dx := ss.Bots[i].X - ss.Bots[j].X
+				dy := ss.Bots[i].Y - ss.Bots[j].Y
+				dSq := dx*dx + dy*dy
+				if dSq >= bestDist {
+					continue
+				}
+				wj := &ee.Wallets[j]
+				switch wi.Role {
+				case EconAltruist:
+					if wj.Energy < wi.Energy*0.5 {
+						bestJ = j
+						bestDist = dSq
+					}
+				case EconTrader:
+					if wj.Energy < wi.Energy*0.8 {
+						bestJ = j
+						bestDist = dSq
+					}
 				}
 			}
 		}
@@ -293,20 +329,26 @@ func updateEconomyStats(ee *EnergyEconomyState) {
 		ee.Inflation = (total - prevWealth) / prevWealth
 	}
 
-	// Gini coefficient
+	// Gini coefficient — O(n log n) via sorted formula instead of O(n²) pairwise
 	mean := total / float64(n)
 	if mean <= 0 {
 		ee.GiniCoeff = 0
 		return
 	}
 
-	sumDiff := 0.0
+	// Gini = (2 * sum(i * y_i)) / (n * sum(y_i)) - (n+1)/n
+	// where y_i are sorted in ascending order, i is 1-based rank
+	sorted := make([]float64, n)
 	for i := range ee.Wallets {
-		for j := range ee.Wallets {
-			sumDiff += math.Abs(ee.Wallets[i].Energy - ee.Wallets[j].Energy)
-		}
+		sorted[i] = ee.Wallets[i].Energy
 	}
-	ee.GiniCoeff = sumDiff / (2 * float64(n) * float64(n) * mean)
+	sort.Float64s(sorted)
+
+	rankSum := 0.0
+	for i, v := range sorted {
+		rankSum += float64(i+1) * v // 1-based rank
+	}
+	ee.GiniCoeff = (2*rankSum)/(float64(n)*total) - float64(n+1)/float64(n)
 }
 
 // EconomyGini returns the current Gini coefficient.

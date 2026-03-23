@@ -71,6 +71,7 @@ func TickMorphogenesis(ss *SwarmState) {
 	}
 
 	radiusSq := ms.CoupleRadius * ms.CoupleRadius
+	useSpatial := ss.Hash != nil
 
 	// Compute diffusion from neighbors
 	newA := make([]float64, n)
@@ -86,18 +87,38 @@ func TickMorphogenesis(ss *SwarmState) {
 		sumA, sumI := 0.0, 0.0
 		neighbors := 0
 
-		for j := range ss.Bots {
-			if i == j {
-				continue
+		if useSpatial {
+			// O(n·k): query only nearby bots via spatial hash
+			nearIDs := ss.Hash.Query(ss.Bots[i].X, ss.Bots[i].Y, ms.CoupleRadius)
+			for _, j := range nearIDs {
+				if j == i || j >= n {
+					continue
+				}
+				dx := ss.Bots[j].X - ss.Bots[i].X
+				dy := ss.Bots[j].Y - ss.Bots[i].Y
+				distSq := dx*dx + dy*dy
+				if distSq < radiusSq {
+					weight := 1.0 - math.Sqrt(distSq)/ms.CoupleRadius
+					sumA += ms.Activator[j] * weight
+					sumI += ms.Inhibitor[j] * weight
+					neighbors++
+				}
 			}
-			dx := ss.Bots[j].X - ss.Bots[i].X
-			dy := ss.Bots[j].Y - ss.Bots[i].Y
-			distSq := dx*dx + dy*dy
-			if distSq < radiusSq {
-				weight := 1.0 - math.Sqrt(distSq)/ms.CoupleRadius
-				sumA += ms.Activator[j] * weight
-				sumI += ms.Inhibitor[j] * weight
-				neighbors++
+		} else {
+			// Fallback: brute-force O(n²)
+			for j := range ss.Bots {
+				if i == j {
+					continue
+				}
+				dx := ss.Bots[j].X - ss.Bots[i].X
+				dy := ss.Bots[j].Y - ss.Bots[i].Y
+				distSq := dx*dx + dy*dy
+				if distSq < radiusSq {
+					weight := 1.0 - math.Sqrt(distSq)/ms.CoupleRadius
+					sumA += ms.Activator[j] * weight
+					sumI += ms.Inhibitor[j] * weight
+					neighbors++
+				}
 			}
 		}
 

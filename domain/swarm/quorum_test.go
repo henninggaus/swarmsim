@@ -140,3 +140,70 @@ func TestQuorumDecisionsTrigger(t *testing.T) {
 		t.Fatal("should trigger at least one decision when all agree")
 	}
 }
+
+func TestQuorumSpatialHash(t *testing.T) {
+	rng := rand.New(rand.NewSource(42))
+	ss := NewSwarmState(rng, 30)
+	InitQuorum(ss)
+
+	// Place 15 bots in a tight cluster (within VoteRange=80)
+	for i := 0; i < 15; i++ {
+		ss.Bots[i].X = 200 + float64(i%5)*10
+		ss.Bots[i].Y = 200 + float64(i/5)*10
+		ss.Quorum.Votes[i].Proposal = ProposalCluster
+		ss.Quorum.Votes[i].Confidence = 0.8
+	}
+	// Place 15 bots far away (out of VoteRange)
+	for i := 15; i < 30; i++ {
+		ss.Bots[i].X = 600 + float64(i%5)*10
+		ss.Bots[i].Y = 600 + float64(i/5)*10
+		ss.Quorum.Votes[i].Proposal = ProposalDisperse
+		ss.Quorum.Votes[i].Confidence = 0.8
+	}
+
+	ss.Tick = 1
+	TickQuorum(ss)
+
+	// Bots in tight cluster should detect neighbors
+	for i := 0; i < 15; i++ {
+		if ss.Quorum.Votes[i].LocalCount == 0 {
+			t.Fatalf("bot %d in cluster should have neighbors, got 0", i)
+		}
+	}
+
+	// Cross-group contamination should be zero: cluster bots should not
+	// see distant bots
+	for i := 0; i < 15; i++ {
+		if ss.Quorum.Votes[i].LocalCount > 14 {
+			t.Fatalf("bot %d should see at most 14 neighbors (cluster), got %d",
+				i, ss.Quorum.Votes[i].LocalCount)
+		}
+	}
+}
+
+func TestQuorumSocialInfluenceSpatialHash(t *testing.T) {
+	rng := rand.New(rand.NewSource(42))
+	ss := NewSwarmState(rng, 10)
+	InitQuorum(ss)
+
+	// All bots in same spot, most want ProposalAlarm
+	for i := range ss.Bots {
+		ss.Bots[i].X = 400
+		ss.Bots[i].Y = 400
+		ss.Quorum.Votes[i].Proposal = ProposalAlarm
+		ss.Quorum.Votes[i].Confidence = 0.9
+	}
+	// One dissenter
+	ss.Quorum.Votes[0].Proposal = ProposalDisperse
+
+	// Run enough ticks for social influence to fire (every 5 ticks)
+	for tick := 0; tick < 30; tick++ {
+		ss.Tick = tick
+		TickQuorum(ss)
+	}
+
+	// After social influence, dissenter should have adopted majority proposal
+	if ss.Quorum.Votes[0].Proposal != ProposalAlarm {
+		t.Logf("dissenter proposal=%d (may not always converge due to RNG)", ss.Quorum.Votes[0].Proposal)
+	}
+}

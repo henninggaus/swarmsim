@@ -196,6 +196,23 @@ func TickEcosystem(ss *SwarmState) {
 	}
 
 	// Phase 3: Predators hunt herbivores
+	// Use SpatialHash for O(n·k) neighbor queries when available
+	useSpatial := ss.Hash != nil
+	if useSpatial {
+		ss.Hash.Clear()
+		for i := 0; i < n; i++ {
+			ss.Hash.Insert(i, ss.Bots[i].X, ss.Bots[i].Y)
+		}
+	}
+
+	// Build herbivore lookup set for O(1) membership check
+	herbSet := make(map[int]struct{}, len(eco.Herbivores))
+	for _, hi := range eco.Herbivores {
+		if hi < n && eco.EcoAlive[hi] {
+			herbSet[hi] = struct{}{}
+		}
+	}
+
 	huntRangeSq := eco.HuntRange * eco.HuntRange
 	for _, pi := range eco.Predators {
 		if pi >= n || !eco.EcoAlive[pi] {
@@ -206,16 +223,36 @@ func TickEcosystem(ss *SwarmState) {
 		// Find nearest alive herbivore
 		bestDist := huntRangeSq
 		bestH := -1
-		for _, hi := range eco.Herbivores {
-			if hi >= n || !eco.EcoAlive[hi] {
-				continue
+
+		if useSpatial {
+			nearIDs := ss.Hash.Query(predBot.X, predBot.Y, eco.HuntRange)
+			for _, hi := range nearIDs {
+				if hi >= n || !eco.EcoAlive[hi] {
+					continue
+				}
+				if _, ok := herbSet[hi]; !ok {
+					continue
+				}
+				dx := predBot.X - ss.Bots[hi].X
+				dy := predBot.Y - ss.Bots[hi].Y
+				dSq := dx*dx + dy*dy
+				if dSq < bestDist {
+					bestDist = dSq
+					bestH = hi
+				}
 			}
-			dx := predBot.X - ss.Bots[hi].X
-			dy := predBot.Y - ss.Bots[hi].Y
-			dSq := dx*dx + dy*dy
-			if dSq < bestDist {
-				bestDist = dSq
-				bestH = hi
+		} else {
+			for _, hi := range eco.Herbivores {
+				if hi >= n || !eco.EcoAlive[hi] {
+					continue
+				}
+				dx := predBot.X - ss.Bots[hi].X
+				dy := predBot.Y - ss.Bots[hi].Y
+				dSq := dx*dx + dy*dy
+				if dSq < bestDist {
+					bestDist = dSq
+					bestH = hi
+				}
 			}
 		}
 

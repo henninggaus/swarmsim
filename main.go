@@ -494,8 +494,8 @@ func (g *Game) handleInput() {
 		}
 	}
 
-	// R: spawn resource
-	if inpututil.IsKeyJustPressed(ebiten.KeyR) {
+	// R: spawn resource (only without Shift, Shift+R = MFO overlay)
+	if inpututil.IsKeyJustPressed(ebiten.KeyR) && !ebiten.IsKeyPressed(ebiten.KeyShift) {
 		g.sim.SpawnResourceAt(wx, wy)
 	}
 
@@ -1043,11 +1043,49 @@ func (g *Game) handleSwarmInput() {
 
 	// Shift+P key: PSO fitness landscape overlay
 	if inpututil.IsKeyJustPressed(ebiten.KeyP) && ebiten.IsKeyPressed(ebiten.KeyShift) && !ed.Focused && !ss.BotCountEdit {
-		if !ss.PSOOn {
-			swarm.InitPSO(ss)
+		// If no algorithm is active, start PSO as default.
+		if !ss.SwarmAlgoOn {
+			swarm.InitSwarmAlgorithm(ss, swarm.AlgoPSO)
 		}
 		ss.ShowPSO = !ss.ShowPSO
-		logger.Info("SWARM", "PSO-Overlay: %v", ss.ShowPSO)
+		logger.Info("SWARM", "Fitness-Landscape-Overlay: %v", ss.ShowPSO)
+	}
+
+	// Shift+F key: Cycle fitness landscape function
+	if inpututil.IsKeyJustPressed(ebiten.KeyF) && ebiten.IsKeyPressed(ebiten.KeyShift) && !ed.Focused && !ss.BotCountEdit {
+		if ss.SwarmAlgo != nil {
+			algo := ss.SwarmAlgo.ActiveAlgo
+			nextFit := (ss.SwarmAlgo.FitnessFunc + 1) % swarm.FitCount
+			// Re-init the algorithm so personal bests are recalculated on new surface
+			swarm.InitSwarmAlgorithm(ss, algo)
+			ss.SwarmAlgo.FitnessFunc = nextFit
+			// Old scoreboard entries are invalid on a different landscape
+			swarm.ClearAlgoScoreboard(ss)
+			logger.Info("SWARM", "Fitness-Funktion: %s", swarm.FitnessLandscapeName(nextFit))
+		}
+	}
+
+	// Ctrl+T key: Auto-Tournament — benchmark all optimization algorithms
+	if inpututil.IsKeyJustPressed(ebiten.KeyT) && ebiten.IsKeyPressed(ebiten.KeyControl) && !ed.Focused && !ss.BotCountEdit {
+		swarm.StartAlgoTournament(ss)
+		if ss.AlgoTournamentOn {
+			ss.ShowPSO = true // show heatmap during tournament
+			logger.Info("SWARM", "Algo-Tournament gestartet (%d Algorithmen)", ss.AlgoTournamentTotal)
+		} else {
+			logger.Info("SWARM", "Algo-Tournament abgebrochen")
+		}
+	}
+
+	// Ctrl+D key: Toggle dynamic fitness landscape (Gaussian peaks drift)
+	if inpututil.IsKeyJustPressed(ebiten.KeyD) && ebiten.IsKeyPressed(ebiten.KeyControl) && !ed.Focused && !ss.BotCountEdit {
+		if ss.SwarmAlgo != nil {
+			ss.SwarmAlgo.DynamicLandscape = !ss.SwarmAlgo.DynamicLandscape
+			if ss.SwarmAlgo.DynamicLandscape {
+				logger.Info("SWARM", "Dynamische Fitness-Landschaft EIN (Peaks bewegen sich)")
+			} else {
+				logger.Info("SWARM", "Dynamische Fitness-Landschaft AUS")
+			}
+		}
 	}
 
 	// Shift+G key: Magnetic chain overlay
@@ -1140,6 +1178,210 @@ func (g *Game) handleSwarmInput() {
 		logger.Info("SWARM", "ACO-Overlay: %v", ss.ShowACO)
 	}
 
+	// 6 key: Grey Wolf Optimizer overlay
+	if inpututil.IsKeyJustPressed(ebiten.Key6) && !ed.Focused && !ss.BotCountEdit {
+		if !ss.GWOOn {
+			swarm.InitGWO(ss)
+		}
+		ss.ShowGWO = !ss.ShowGWO
+		logger.Info("SWARM", "GWO-Overlay: %v", ss.ShowGWO)
+	}
+
+	// Shift+X key: Whale Optimization Algorithm overlay
+	if inpututil.IsKeyJustPressed(ebiten.KeyX) && ebiten.IsKeyPressed(ebiten.KeyShift) && !ed.Focused && !ss.BotCountEdit {
+		if !ss.WOAOn {
+			swarm.InitWOA(ss)
+		}
+		ss.ShowWOA = !ss.ShowWOA
+		logger.Info("SWARM", "WOA-Overlay: %v", ss.ShowWOA)
+	}
+
+	// Shift+Z key: Bacterial Foraging Optimization overlay
+	if inpututil.IsKeyJustPressed(ebiten.KeyZ) && ebiten.IsKeyPressed(ebiten.KeyShift) && !ed.Focused && !ss.BotCountEdit {
+		if !ss.BFOOn {
+			swarm.InitBFO(ss)
+		}
+		ss.ShowBFO = !ss.ShowBFO
+		logger.Info("SWARM", "BFO-Overlay: %v", ss.ShowBFO)
+	}
+
+	// Shift+R key: Moth-Flame Optimization overlay
+	if inpututil.IsKeyJustPressed(ebiten.KeyR) && ebiten.IsKeyPressed(ebiten.KeyShift) && !ed.Focused && !ss.BotCountEdit {
+		if !ss.MFOOn {
+			swarm.InitMFO(ss)
+		}
+		ss.ShowMFO = !ss.ShowMFO
+		logger.Info("SWARM", "MFO-Overlay: %v", ss.ShowMFO)
+	}
+
+	// Shift+Q key: Cuckoo Search overlay
+	if inpututil.IsKeyJustPressed(ebiten.KeyQ) && ebiten.IsKeyPressed(ebiten.KeyShift) && !ed.Focused && !ss.BotCountEdit {
+		if !ss.CuckooOn {
+			swarm.InitCuckoo(ss)
+		}
+		ss.ShowCuckoo = !ss.ShowCuckoo
+		logger.Info("SWARM", "Cuckoo-Overlay: %v", ss.ShowCuckoo)
+	}
+
+	// Shift+D key: Differential Evolution overlay
+	if inpututil.IsKeyJustPressed(ebiten.KeyD) && ebiten.IsKeyPressed(ebiten.KeyShift) && !ed.Focused && !ss.BotCountEdit {
+		if !ss.DEOn {
+			swarm.InitDE(ss)
+		}
+		ss.ShowDE = !ss.ShowDE
+		logger.Info("SWARM", "DE-Overlay: %v", ss.ShowDE)
+	}
+
+	// Shift+B key: Artificial Bee Colony overlay
+	if inpututil.IsKeyJustPressed(ebiten.KeyB) && ebiten.IsKeyPressed(ebiten.KeyShift) && !ed.Focused && !ss.BotCountEdit {
+		if !ss.ABCOn {
+			swarm.InitABC(ss)
+		}
+		ss.ShowABC = !ss.ShowABC
+		logger.Info("SWARM", "ABC-Overlay: %v", ss.ShowABC)
+	}
+
+	// Shift+J key: Harmony Search overlay
+	if inpututil.IsKeyJustPressed(ebiten.KeyJ) && ebiten.IsKeyPressed(ebiten.KeyShift) && !ed.Focused && !ss.BotCountEdit {
+		if !ss.HSOOn {
+			swarm.InitHSO(ss)
+		}
+		ss.ShowHSO = !ss.ShowHSO
+		logger.Info("SWARM", "HSO-Overlay: %v", ss.ShowHSO)
+	}
+
+	// Shift+Y key: Bat Algorithm overlay
+	if inpututil.IsKeyJustPressed(ebiten.KeyY) && ebiten.IsKeyPressed(ebiten.KeyShift) && !ed.Focused && !ss.BotCountEdit {
+		if !ss.BatOn {
+			swarm.InitBat(ss)
+		}
+		ss.ShowBat = !ss.ShowBat
+		logger.Info("SWARM", "Bat-Overlay: %v", ss.ShowBat)
+	}
+
+	// Shift+A key: Harris Hawks Optimization overlay
+	if inpututil.IsKeyJustPressed(ebiten.KeyA) && ebiten.IsKeyPressed(ebiten.KeyShift) && !ed.Focused && !ss.BotCountEdit {
+		if !ss.HHOOn {
+			swarm.InitHHO(ss)
+		}
+		ss.ShowHHO = !ss.ShowHHO
+		logger.Info("SWARM", "HHO-Overlay: %v", ss.ShowHHO)
+	}
+
+	// Ctrl+1 key: Salp Swarm Algorithm overlay
+	if inpututil.IsKeyJustPressed(ebiten.Key1) && ebiten.IsKeyPressed(ebiten.KeyControl) && !ed.Focused && !ss.BotCountEdit {
+		if !ss.SSAOn {
+			swarm.InitSSA(ss)
+		}
+		ss.ShowSSA = !ss.ShowSSA
+		logger.Info("SWARM", "SSA-Overlay: %v", ss.ShowSSA)
+	}
+
+	// Ctrl+2 key: Gravitational Search Algorithm overlay
+	if inpututil.IsKeyJustPressed(ebiten.Key2) && ebiten.IsKeyPressed(ebiten.KeyControl) && !ed.Focused && !ss.BotCountEdit {
+		if !ss.GSAOn {
+			swarm.InitGSA(ss)
+		}
+		ss.ShowGSA = !ss.ShowGSA
+		logger.Info("SWARM", "GSA-Overlay: %v", ss.ShowGSA)
+	}
+
+	// Ctrl+3 key: Flower Pollination Algorithm overlay
+	if inpututil.IsKeyJustPressed(ebiten.Key3) && ebiten.IsKeyPressed(ebiten.KeyControl) && !ed.Focused && !ss.BotCountEdit {
+		if !ss.FPAOn {
+			swarm.InitFPA(ss)
+		}
+		ss.ShowFPA = !ss.ShowFPA
+		logger.Info("SWARM", "FPA-Overlay: %v", ss.ShowFPA)
+	}
+
+	// Ctrl+4 key: Simulated Annealing overlay
+	if inpututil.IsKeyJustPressed(ebiten.Key4) && ebiten.IsKeyPressed(ebiten.KeyControl) && !ed.Focused && !ss.BotCountEdit {
+		if !ss.SAOn {
+			swarm.InitSA(ss)
+		}
+		ss.ShowSA = !ss.ShowSA
+		logger.Info("SWARM", "SA-Overlay: %v", ss.ShowSA)
+	}
+
+	// Ctrl+5 key: Velocity flow field overlay
+	if inpututil.IsKeyJustPressed(ebiten.Key5) && ebiten.IsKeyPressed(ebiten.KeyControl) && !ed.Focused && !ss.BotCountEdit {
+		ss.ShowFlowField = !ss.ShowFlowField
+		logger.Info("SWARM", "Flow-Field: %v", ss.ShowFlowField)
+	}
+
+	// Ctrl+6 key: Aquila Optimizer overlay
+	if inpututil.IsKeyJustPressed(ebiten.Key6) && ebiten.IsKeyPressed(ebiten.KeyControl) && !ed.Focused && !ss.BotCountEdit {
+		if !ss.AOOn {
+			swarm.InitAO(ss)
+		}
+		ss.ShowAO = !ss.ShowAO
+		logger.Info("SWARM", "AO-Overlay: %v", ss.ShowAO)
+	}
+
+	// Ctrl+7 key: Sine Cosine Algorithm overlay
+	if inpututil.IsKeyJustPressed(ebiten.Key7) && ebiten.IsKeyPressed(ebiten.KeyControl) && !ed.Focused && !ss.BotCountEdit {
+		if !ss.SCAOn {
+			swarm.InitSCA(ss)
+		}
+		ss.ShowSCA = !ss.ShowSCA
+		logger.Info("SWARM", "SCA-Overlay: %v", ss.ShowSCA)
+	}
+
+	// Ctrl+8 key: Dragonfly Algorithm overlay
+	if inpututil.IsKeyJustPressed(ebiten.Key8) && ebiten.IsKeyPressed(ebiten.KeyControl) && !ed.Focused && !ss.BotCountEdit {
+		if !ss.DAOn {
+			swarm.InitDA(ss)
+		}
+		ss.ShowDA = !ss.ShowDA
+		logger.Info("SWARM", "DA-Overlay: %v", ss.ShowDA)
+	}
+
+	// Ctrl+9 key: TLBO overlay
+	if inpututil.IsKeyJustPressed(ebiten.Key9) && ebiten.IsKeyPressed(ebiten.KeyControl) && !ed.Focused && !ss.BotCountEdit {
+		if !ss.TLBOOn {
+			swarm.InitTLBO(ss)
+		}
+		ss.ShowTLBO = !ss.ShowTLBO
+		logger.Info("SWARM", "TLBO-Overlay: %v", ss.ShowTLBO)
+	}
+
+	// Ctrl+0 key: Equilibrium Optimizer overlay
+	if inpututil.IsKeyJustPressed(ebiten.Key0) && ebiten.IsKeyPressed(ebiten.KeyControl) && !ed.Focused && !ss.BotCountEdit {
+		if !ss.EOOn {
+			swarm.InitEO(ss)
+		}
+		ss.ShowEO = !ss.ShowEO
+		logger.Info("SWARM", "EO-Overlay: %v", ss.ShowEO)
+	}
+
+	// Ctrl+Minus key: Jaya Algorithm overlay
+	if inpututil.IsKeyJustPressed(ebiten.KeyMinus) && ebiten.IsKeyPressed(ebiten.KeyControl) && !ed.Focused && !ss.BotCountEdit {
+		if !ss.JayaOn {
+			swarm.InitJaya(ss)
+		}
+		ss.ShowJaya = !ss.ShowJaya
+		logger.Info("SWARM", "Jaya-Overlay: %v", ss.ShowJaya)
+	}
+
+	// Ctrl+= : Algorithm performance radar chart
+	if inpututil.IsKeyJustPressed(ebiten.KeyEqual) && ebiten.IsKeyPressed(ebiten.KeyControl) && !ed.Focused && !ss.BotCountEdit {
+		ss.ShowAlgoRadar = !ss.ShowAlgoRadar
+		logger.Info("SWARM", "Algorithmus-Radar: %v", ss.ShowAlgoRadar)
+	}
+
+	// Ctrl+G : Fitness gradient field overlay
+	if inpututil.IsKeyJustPressed(ebiten.KeyG) && ebiten.IsKeyPressed(ebiten.KeyControl) && !ed.Focused && !ss.BotCountEdit {
+		ss.ShowFitnessGradient = !ss.ShowFitnessGradient
+		logger.Info("SWARM", "Fitness-Gradient: %v", ss.ShowFitnessGradient)
+	}
+
+	// Ctrl+V : Voronoi territory overlay
+	if inpututil.IsKeyJustPressed(ebiten.KeyV) && ebiten.IsKeyPressed(ebiten.KeyControl) && !ed.Focused && !ss.BotCountEdit {
+		ss.ShowVoronoi = !ss.ShowVoronoi
+		logger.Info("SWARM", "Voronoi-Overlay: %v", ss.ShowVoronoi)
+	}
+
 	// C key: Shift+C = swarm center overlay, plain C = challenge/routes
 	if inpututil.IsKeyJustPressed(ebiten.KeyC) && !ed.Focused && !ss.BotCountEdit {
 		if ebiten.IsKeyPressed(ebiten.KeyShift) {
@@ -1200,7 +1442,7 @@ func (g *Game) handleSwarmInput() {
 	}
 
 	// Z key: toggle replay mode
-	if inpututil.IsKeyJustPressed(ebiten.KeyZ) && !ed.Focused && !ss.BotCountEdit {
+	if inpututil.IsKeyJustPressed(ebiten.KeyZ) && !ebiten.IsKeyPressed(ebiten.KeyShift) && !ed.Focused && !ss.BotCountEdit {
 		if !g.replayMode {
 			if ss.ReplayBuf != nil && ss.ReplayBuf.Count > 0 {
 				g.replayMode = true
@@ -1340,7 +1582,7 @@ func (g *Game) handleSwarmInput() {
 	}
 
 	// X key: export stats as CSV to clipboard
-	if inpututil.IsKeyJustPressed(ebiten.KeyX) && !ed.Focused && !ss.BotCountEdit {
+	if inpututil.IsKeyJustPressed(ebiten.KeyX) && !ebiten.IsKeyPressed(ebiten.KeyShift) && !ed.Focused && !ss.BotCountEdit {
 		csv := g.buildStatsCSV()
 		if csv != "" {
 			render.ClipboardWrite(csv)

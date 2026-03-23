@@ -103,7 +103,7 @@ func (r *Renderer) drawSwarmMinimap(screen *ebiten.Image, ss *swarm.SwarmState) 
 	arenaOffY := float32(50.0)
 
 	mx := arenaOffX + float32(ss.ArenaW) - minimapW - 5
-	my := arenaOffY + float32(ss.ArenaH) - minimapH - 5
+	my := arenaOffY + float32(ss.ArenaH) - minimapH - 35 // raised to avoid bottom HUD bars
 
 	drawMinimapFrame(screen, mx, my)
 
