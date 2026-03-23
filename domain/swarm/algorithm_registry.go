@@ -301,6 +301,10 @@ var algoRegistry = map[SwarmAlgorithmType]algoHandler{
 			if ss.HSO != nil { return ss.HSO.BestF }
 			return 0
 		},
+		avgFitnessVals: func(ss *SwarmState) []float64 {
+			if ss.HSO != nil { return ss.HSO.Fitness }
+			return nil
+		},
 		bestPos: func(ss *SwarmState) (float64, float64, bool) {
 			if ss.HSO != nil { return ss.HSO.BestX, ss.HSO.BestY, true }
 			return 0, 0, false

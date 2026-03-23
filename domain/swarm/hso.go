@@ -51,6 +51,9 @@ type HSOState struct {
 	TargetY []float64
 	Phase   []int // 0=improvising (moving to new target), 1=arrived (evaluating)
 
+	// Per-bot fitness values (used for avgFitnessVals reporting).
+	Fitness []float64
+
 	// Global tracking.
 	BestIdx int     // index of best harmony in HM
 	BestF   float64 // best fitness found
@@ -67,6 +70,7 @@ func InitHSO(ss *SwarmState) {
 		TargetX: make([]float64, n),
 		TargetY: make([]float64, n),
 		Phase:   make([]int, n),
+		Fitness: make([]float64, n),
 		BestF:   -1e9,
 		BestIdx: -1,
 	}
@@ -129,6 +133,7 @@ func TickHSO(ss *SwarmState) {
 		st.TargetX = append(st.TargetX, ss.Bots[len(st.TargetX)].X)
 		st.TargetY = append(st.TargetY, ss.Bots[len(st.TargetY)].Y)
 		st.Phase = append(st.Phase, 0)
+		st.Fitness = append(st.Fitness, 0)
 	}
 
 	margin := SwarmEdgeMargin
@@ -218,9 +223,12 @@ func TickHSO(ss *SwarmState) {
 		}
 	}
 
-	// Update sensor cache for all bots.
+	// Update sensor cache and per-bot fitness for all bots.
 	for i := range ss.Bots {
 		f := hsoFitness(&ss.Bots[i], ss)
+		if i < len(st.Fitness) {
+			st.Fitness[i] = f
+		}
 		ss.Bots[i].HSOFitness = int(f * 100)
 		if i < len(st.Phase) {
 			ss.Bots[i].HSOPhase = st.Phase[i]

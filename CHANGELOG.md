@@ -110,6 +110,8 @@ All notable changes to SwarmSim are documented in this file.
 
 - **Bat Algorithm (Yang 2010)** — Echolocation-basierte Metaheuristik: Frequenz-Tuning steuert Schrittweite, Pulsrate steigt bei Konvergenz, Lautstaerke sinkt bei Annaeherung ans Optimum. 4 SwarmScript-Sensoren (bat_loud, bat_pulse, bat_fitness, bat_best_dist), Sonar-Ring-Overlay (Shift+Y), LED-Visualisierung (Rot=Lautstaerke, Blau=Pulsrate, Cyan=Bester). 3 Unit-Tests.
 
+- **Harmony Search (HSO) AvgFitness-Fix** — HSO zeigte im Benchmark Avg=0.00 auf allen 7 Landschaften, weil im Algorithm-Registry der `avgFitnessVals`-Callback fehlte. `GetAlgoAvgFitness()` konnte keine Per-Bot-Fitnesswerte abrufen und gab immer 0 zurueck. Fix: (1) Neues `Fitness []float64`-Feld in HSOState fuer Per-Bot-Fitnesswerte. (2) Initialisierung in InitHSO und dynamisches Wachstum bei Bot-Zuwachs. (3) Population der Fitness-Werte in TickHSO (Sensor-Cache-Schleife). (4) Registrierung von `avgFitnessVals` im Algorithm-Registry (algorithm_registry.go). Vorher: Avg=0.00 auf allen Landschaften. Nachher: Gaussian Peaks Avg=24.91, Rastrigin Avg=93.75, Ackley Avg=90.45, Rosenbrock Avg=97.62, Schwefel Avg=56.46, Griewank Avg=98.19, Levy Avg=96.90. go build, go vet fehlerfrei, alle Tests gruen.
+
 ## Batch 5 — Tiefere Biologie & Emergenz
 
 - **Kollektives Unterbewusstsein** — Offline-Strategie-Replay und Rekombination bei niedriger Aktivitaet
