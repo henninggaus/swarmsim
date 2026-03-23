@@ -84,6 +84,9 @@ type Game struct {
 	replayMode     bool
 	replayIdx      int // current snapshot index in replay buffer
 	replayWasPause bool // was sim paused before entering replay?
+
+	// Telemetry (enabled with --telemetry flag)
+	telemetryWriter *swarm.TelemetryWriter
 }
 
 // NewGame creates a new game instance.
@@ -281,6 +284,11 @@ func (g *Game) Update() (retErr error) {
 				ss.SwarmCamY = center
 			}
 		}
+	}
+
+	// Attach telemetry writer to SwarmState when swarm mode starts
+	if g.telemetryWriter != nil && g.sim.SwarmMode && g.sim.SwarmState != nil && g.sim.SwarmState.Telemetry == nil {
+		g.sim.SwarmState.Telemetry = g.telemetryWriter
 	}
 
 	// Single-step mode: force exactly one tick
@@ -3255,6 +3263,18 @@ func main() {
 		}
 	}()
 
+	// Parse CLI flags
+	telemetryEnabled := false
+	for _, arg := range os.Args[1:] {
+		switch arg {
+		case "--benchmark":
+			runBenchmark()
+			return
+		case "--telemetry":
+			telemetryEnabled = true
+		}
+	}
+
 	logger.Info("INIT", "SwarmSim starting")
 
 	ebiten.SetWindowSize(screenW, screenH)
@@ -3263,8 +3283,25 @@ func main() {
 	ebiten.SetTPS(60)
 
 	game := NewGame()
+
+	// Enable telemetry if requested via --telemetry flag
+	if telemetryEnabled {
+		tw, err := swarm.NewTelemetryWriter("telemetry.jsonl", 10)
+		if err != nil {
+			logger.Error("TELEMETRY", "Cannot open telemetry.jsonl: %v", err)
+		} else {
+			logger.Info("TELEMETRY", "Writing telemetry to telemetry.jsonl")
+			game.telemetryWriter = tw
+		}
+	}
+
 	if err := ebiten.RunGame(game); err != nil {
 		log.Fatal(err)
+	}
+
+	// Close telemetry
+	if game.telemetryWriter != nil {
+		game.telemetryWriter.Close()
 	}
 	StopProfile() // ensure profiling stops on clean exit
 	logger.Info("INIT", "SwarmSim exiting cleanly")

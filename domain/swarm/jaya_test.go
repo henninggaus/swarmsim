@@ -173,10 +173,10 @@ func TestJayaPersonalBestUpdates(t *testing.T) {
 	for tick := 0; tick < 20; tick++ {
 		TickJaya(ss)
 	}
-	// All personal best fitnesses should be >= 0 (updated from -1e18)
+	// All personal best fitnesses should be updated from the initial -1e18.
 	for i := 0; i < len(ss.Bots); i++ {
-		if ss.Jaya.PersonalBestF[i] < 0 {
-			t.Fatalf("bot %d: personal best fitness should be >= 0, got %f", i, ss.Jaya.PersonalBestF[i])
+		if ss.Jaya.PersonalBestF[i] <= -1e18 {
+			t.Fatalf("bot %d: personal best fitness should be updated from initial value, got %f", i, ss.Jaya.PersonalBestF[i])
 		}
 	}
 }

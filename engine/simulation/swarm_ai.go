@@ -651,6 +651,11 @@ func (s *Simulation) updateSwarmMode() {
 		swarm.TickAlgoTournament(ss)
 	}
 
+	// Phase 4.89: Telemetry sampling (writes to telemetry.jsonl if enabled)
+	if ss.Telemetry != nil {
+		ss.Telemetry.Sample(ss)
+	}
+
 	// Phase 4.9: Challenge timer update
 	if ss.TeamsEnabled {
 		swarm.UpdateChallenge(ss)

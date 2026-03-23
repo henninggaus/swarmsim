@@ -899,6 +899,9 @@ type SwarmState struct {
 	AlgoTournamentTotal int                  // total algorithms to test (for progress)
 	AlgoTournamentDone  int                  // algorithms completed so far
 
+	// Telemetry writer (nil if telemetry is disabled)
+	Telemetry *TelemetryWriter
+
 	// Transfer learning between scenarios
 	Transfer *TransferState
 

@@ -80,27 +80,9 @@ func TickGWO(ss *SwarmState) {
 		st.HuntTick = 1
 	}
 
-	// Compute fitness for each bot based on neighbor density and resource proximity.
-	// In the swarm context, fitness rewards bots that are near many neighbors
-	// (successful encirclement) and near resources (prey).
+	// Compute fitness using the shared fitness landscape.
 	for i := range ss.Bots {
-		bot := &ss.Bots[i]
-		neighborFit := float64(bot.NeighborCount) / 10.0
-		if neighborFit > 1.0 {
-			neighborFit = 1.0
-		}
-		// Bonus for carrying resources
-		carryFit := 0.0
-		if bot.CarryingPkg >= 0 {
-			carryFit = 0.3
-		}
-		// Fitness landscape evaluation (normalised to 0-1)
-		landFit := distanceFitness(bot, ss) / 100.0
-		if landFit < 0 {
-			landFit = 0
-		}
-
-		st.Fitness[i] = neighborFit*0.4 + carryFit + landFit*0.3
+		st.Fitness[i] = distanceFitness(&ss.Bots[i], ss)
 	}
 
 	// Find top 3 fitness indices (alpha, beta, delta)
@@ -150,7 +132,7 @@ func TickGWO(ss *SwarmState) {
 	// Update sensor cache
 	for i := range ss.Bots {
 		ss.Bots[i].GWORank = st.Rank[i]
-		ss.Bots[i].GWOFitness = int(st.Fitness[i] * 100)
+		ss.Bots[i].GWOFitness = fitToSensor(st.Fitness[i])
 		if st.AlphaIdx >= 0 {
 			dx := st.AlphaX - ss.Bots[i].X
 			dy := st.AlphaY - ss.Bots[i].Y

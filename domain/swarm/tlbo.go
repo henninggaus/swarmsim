@@ -87,22 +87,9 @@ func TickTLBO(ss *SwarmState) {
 		st.Tick = 1
 	}
 
-	// Compute fitness using shared landscape
+	// Compute fitness using the shared fitness landscape.
 	for i := range ss.Bots {
-		bot := &ss.Bots[i]
-		neighborFit := float64(bot.NeighborCount) / 10.0
-		if neighborFit > 1.0 {
-			neighborFit = 1.0
-		}
-		carryFit := 0.0
-		if bot.CarryingPkg >= 0 {
-			carryFit = 0.3
-		}
-		landFit := distanceFitness(bot, ss) / 100.0
-		if landFit < 0 {
-			landFit = 0
-		}
-		st.Fitness[i] = neighborFit*0.4 + carryFit + landFit*0.3
+		st.Fitness[i] = distanceFitness(&ss.Bots[i], ss)
 	}
 
 	// Find teacher (best individual)
@@ -149,7 +136,7 @@ func TickTLBO(ss *SwarmState) {
 
 	// Update sensor cache
 	for i := range ss.Bots {
-		ss.Bots[i].TLBOFitness = int(st.Fitness[i] * 100)
+		ss.Bots[i].TLBOFitness = fitToSensor(st.Fitness[i])
 		if ss.Bots[i].TLBOFitness > 100 {
 			ss.Bots[i].TLBOFitness = 100
 		}

@@ -74,7 +74,7 @@ func InitPSO(ss *SwarmState) {
 	for i := range ss.Bots {
 		st.BestX[i] = ss.Bots[i].X
 		st.BestY[i] = ss.Bots[i].Y
-		f := psoEvaluate(st, ss.Bots[i].X, ss.Bots[i].Y)
+		f := distanceFitness(&ss.Bots[i], ss)
 		st.BestFit[i] = f
 		if f > st.GlobalFit {
 			st.GlobalFit = f
@@ -126,7 +126,7 @@ func TickPSO(ss *SwarmState) {
 		bot := &ss.Bots[i]
 
 		if evaluate {
-			f := psoEvaluate(st, bot.X, bot.Y)
+			f := distanceFitness(bot, ss)
 			if f > st.BestFit[i] {
 				st.BestFit[i] = f
 				st.BestX[i] = bot.X
@@ -162,7 +162,7 @@ func TickPSO(ss *SwarmState) {
 		}
 
 		// Update sensor cache
-		currentFit := psoEvaluate(st, bot.X, bot.Y)
+		currentFit := distanceFitness(bot, ss)
 		bot.PSOFitness = int(currentFit)
 		bot.PSOBest = int(st.BestFit[i])
 
@@ -195,7 +195,7 @@ func ApplyPSOMove(bot *SwarmBot, ss *SwarmState, idx int) {
 	}
 
 	// LED: green = high fitness, red = low fitness
-	fit := psoEvaluate(st, bot.X, bot.Y)
+	fit := distanceFitness(bot, ss)
 	t := math.Min(1, fit/80.0)
 	bot.LEDColor = [3]uint8{uint8((1 - t) * 255), uint8(t * 255), 50}
 }

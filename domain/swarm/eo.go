@@ -108,22 +108,9 @@ func TickEO(ss *SwarmState) {
 	// Time ratio t ∈ (0, 1]
 	t := float64(st.CycleTick) / float64(eoMaxTicks)
 
-	// Compute fitness using shared landscape
+	// Compute fitness using the shared fitness landscape.
 	for i := range ss.Bots {
-		bot := &ss.Bots[i]
-		neighborFit := float64(bot.NeighborCount) / 10.0
-		if neighborFit > 1.0 {
-			neighborFit = 1.0
-		}
-		carryFit := 0.0
-		if bot.CarryingPkg >= 0 {
-			carryFit = 0.3
-		}
-		landFit := distanceFitness(bot, ss) / 100.0
-		if landFit < 0 {
-			landFit = 0
-		}
-		st.Fitness[i] = neighborFit*0.4 + carryFit + landFit*0.3
+		st.Fitness[i] = distanceFitness(&ss.Bots[i], ss)
 	}
 
 	// Update personal bests
@@ -202,7 +189,7 @@ func TickEO(ss *SwarmState) {
 
 	// Update sensor cache
 	for i := range ss.Bots {
-		ss.Bots[i].EOFitness = int(st.Fitness[i] * 100)
+		ss.Bots[i].EOFitness = fitToSensor(st.Fitness[i])
 		ss.Bots[i].EOPhase = st.Phase[i]
 		dx := st.PoolX[0] - ss.Bots[i].X
 		dy := st.PoolY[0] - ss.Bots[i].Y

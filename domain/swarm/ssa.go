@@ -99,22 +99,9 @@ func TickSSA(ss *SwarmState) {
 		half = 1
 	}
 
-	// Compute fitness for each salp using shared landscape
+	// Compute fitness using the shared fitness landscape.
 	for i := range ss.Bots {
-		bot := &ss.Bots[i]
-		neighborFit := float64(bot.NeighborCount) / 10.0
-		if neighborFit > 1.0 {
-			neighborFit = 1.0
-		}
-		carryFit := 0.0
-		if bot.CarryingPkg >= 0 {
-			carryFit = 0.3
-		}
-		landFit := distanceFitness(bot, ss) / 100.0
-		if landFit < 0 {
-			landFit = 0
-		}
-		st.Fitness[i] = neighborFit*0.4 + carryFit + landFit*0.3
+		st.Fitness[i] = distanceFitness(&ss.Bots[i], ss)
 	}
 
 	// Find the food source (global best)
@@ -145,7 +132,7 @@ func TickSSA(ss *SwarmState) {
 	// Update sensor cache
 	for i := range ss.Bots {
 		ss.Bots[i].SSARole = st.Role[i]
-		ss.Bots[i].SSAFitness = int(st.Fitness[i] * 100)
+		ss.Bots[i].SSAFitness = fitToSensor(st.Fitness[i])
 		dx := st.FoodX - ss.Bots[i].X
 		dy := st.FoodY - ss.Bots[i].Y
 		ss.Bots[i].SSAFoodDist = int(math.Sqrt(dx*dx + dy*dy))

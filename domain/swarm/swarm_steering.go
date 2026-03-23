@@ -90,3 +90,16 @@ func MantegnaLevy(rng *rand.Rand, beta float64) float64 {
 	}
 	return u / math.Pow(v, 1.0/beta)
 }
+
+// fitToSensor converts a raw fitness value (typically 0-100+ from
+// distanceFitness / EvaluateFitnessLandscape) into a sensor integer
+// clamped to [0, 100]. Used by algorithm sensor cache updates.
+func fitToSensor(f float64) int {
+	if f < 0 {
+		return 0
+	}
+	if f > 100 {
+		return 100
+	}
+	return int(f)
+}

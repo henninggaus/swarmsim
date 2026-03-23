@@ -698,6 +698,31 @@ archiveConvergence:
 	archiveConvergenceCurve(ss)
 }
 
+// RecordAlgoPerformanceExported is the exported wrapper around
+// recordAlgoPerformance for use by the headless benchmark runner.
+func RecordAlgoPerformanceExported(ss *SwarmState) {
+	recordAlgoPerformance(ss)
+}
+
+// ReinitFitnessLandscape forces re-initialisation of the Gaussian fitness
+// peaks. For non-Gaussian landscapes (Rastrigin, Ackley, etc.) this is a
+// no-op since those use analytical formulas. Call this after changing
+// SwarmAlgo.FitnessFunc to ensure the landscape matches.
+func ReinitFitnessLandscape(ss *SwarmState) {
+	if ss.SwarmAlgo == nil {
+		return
+	}
+	if ss.SwarmAlgo.FitnessFunc == FitGaussian {
+		// Clear peaks to force regeneration
+		ss.SwarmAlgo.FitPeakX = nil
+		ss.SwarmAlgo.FitPeakY = nil
+		ss.SwarmAlgo.FitPeakH = nil
+		ss.SwarmAlgo.FitPeakS = nil
+		initFitnessLandscape(ss)
+	}
+	// Non-Gaussian landscapes use analytical formulas; nothing to reinit.
+}
+
 // archiveConvergenceCurve copies the current algorithm's best-fitness
 // convergence history into the archive on SwarmState. Replaces an existing
 // entry for the same algo+fitness combo. Evicts the oldest entry when full.

@@ -96,18 +96,21 @@ func TestPSOEvaluate(t *testing.T) {
 
 func TestTickPSOStandalone(t *testing.T) {
 	ss := makePSOState(20)
-	InitPSO(ss)
-	// Place one bot directly at the strongest peak
+	// Use the full algorithm init to set up shared fitness landscape.
+	InitSwarmAlgorithm(ss, AlgoPSO)
+	sa := ss.SwarmAlgo
+
+	// Place one bot directly at the strongest shared peak
 	peakIdx := 0
-	bestH := ss.PSO.PeakH[0]
-	for p := 1; p < len(ss.PSO.PeakH); p++ {
-		if ss.PSO.PeakH[p] > bestH {
-			bestH = ss.PSO.PeakH[p]
+	bestH := sa.FitPeakH[0]
+	for p := 1; p < len(sa.FitPeakH); p++ {
+		if sa.FitPeakH[p] > bestH {
+			bestH = sa.FitPeakH[p]
 			peakIdx = p
 		}
 	}
-	ss.Bots[0].X = ss.PSO.PeakX[peakIdx]
-	ss.Bots[0].Y = ss.PSO.PeakY[peakIdx]
+	ss.Bots[0].X = sa.FitPeakX[peakIdx]
+	ss.Bots[0].Y = sa.FitPeakY[peakIdx]
 
 	// Run ticks (including at least one fitness evaluation tick)
 	for tick := 0; tick < psoUpdateRate+1; tick++ {
@@ -116,8 +119,8 @@ func TestTickPSOStandalone(t *testing.T) {
 	}
 
 	// Global best should be near the peak
-	dx := ss.PSO.GlobalX - ss.PSO.PeakX[peakIdx]
-	dy := ss.PSO.GlobalY - ss.PSO.PeakY[peakIdx]
+	dx := ss.PSO.GlobalX - sa.FitPeakX[peakIdx]
+	dy := ss.PSO.GlobalY - sa.FitPeakY[peakIdx]
 	dist := math.Sqrt(dx*dx + dy*dy)
 	if dist > 200 {
 		t.Fatalf("global best should be near strongest peak, distance: %f", dist)

@@ -1,6 +1,6 @@
 package swarm
 
-import "math"
+import "swarmsim/domain/physics"
 
 // Ant Brood Sorting (Deneubourg model): Bots sort colored items by
 // picking up when surrounded by few same-color neighbors and dropping
@@ -26,6 +26,7 @@ type BroodItem struct {
 type BroodState struct {
 	Items    []BroodItem
 	Carrying []int // per-bot: item index being carried (-1 = none)
+	ItemHash *physics.SpatialHash // spatial hash for unheld items
 }
 
 // InitBrood allocates brood sorting state with scattered items.
@@ -63,6 +64,19 @@ func ClearBrood(ss *SwarmState) {
 	ss.BroodOn = false
 }
 
+// rebuildItemHash rebuilds the spatial hash for unheld brood items.
+func rebuildItemHash(st *BroodState, arenaW, arenaH float64) {
+	if st.ItemHash == nil {
+		st.ItemHash = physics.NewSpatialHash(arenaW, arenaH, broodSenseRadius)
+	}
+	st.ItemHash.Clear()
+	for i := range st.Items {
+		if !st.Items[i].Held {
+			st.ItemHash.Insert(i, st.Items[i].X, st.Items[i].Y)
+		}
+	}
+}
+
 // TickBrood updates brood sorting: compute local density, move held items.
 func TickBrood(ss *SwarmState) {
 	if ss.Brood == nil {
@@ -84,7 +98,11 @@ func TickBrood(ss *SwarmState) {
 		}
 	}
 
+	// Build spatial hash for unheld items
+	rebuildItemHash(st, ss.ArenaW, ss.ArenaH)
+
 	// Update sensor cache
+	senseRadSq := broodSenseRadius * broodSenseRadius
 	for i := range ss.Bots {
 		bot := &ss.Bots[i]
 
@@ -96,31 +114,49 @@ func TickBrood(ss *SwarmState) {
 			ss.Bots[i].BroodItemColor = 0
 		}
 
-		// Count nearby items and same-color density
+		// Count nearby items and same-color density via spatial hash
 		nearCount := 0
 		sameCount := 0
-		nearestDist := math.MaxFloat64
-		for j := range st.Items {
-			if st.Items[j].Held {
+		nearIDs := st.ItemHash.Query(bot.X, bot.Y, broodSenseRadius)
+		for _, j := range nearIDs {
+			if j < 0 || j >= len(st.Items) || st.Items[j].Held {
 				continue
 			}
 			dx := st.Items[j].X - bot.X
 			dy := st.Items[j].Y - bot.Y
-			dist := math.Sqrt(dx*dx + dy*dy)
-			if dist < broodSenseRadius {
+			if dx*dx+dy*dy < senseRadSq {
 				nearCount++
 				if st.Carrying[i] >= 0 && st.Items[j].Color == st.Items[st.Carrying[i]].Color {
 					sameCount++
 				}
-			}
-			if dist < nearestDist {
-				nearestDist = dist
 			}
 		}
 
 		ss.Bots[i].BroodDensity = nearCount
 		ss.Bots[i].BroodSameColor = sameCount
 	}
+}
+
+// countSameColorNear counts unheld items of the given color within broodSenseRadius
+// of (x, y) using the item spatial hash.
+func countSameColorNear(st *BroodState, x, y float64, color, excludeIdx int) int {
+	if st.ItemHash == nil {
+		return 0
+	}
+	senseRadSq := broodSenseRadius * broodSenseRadius
+	sameNear := 0
+	nearIDs := st.ItemHash.Query(x, y, broodSenseRadius)
+	for _, j := range nearIDs {
+		if j == excludeIdx || j < 0 || j >= len(st.Items) || st.Items[j].Held {
+			continue
+		}
+		dx := st.Items[j].X - x
+		dy := st.Items[j].Y - y
+		if dx*dx+dy*dy < senseRadSq && st.Items[j].Color == color {
+			sameNear++
+		}
+	}
+	return sameNear
 }
 
 // ApplyBroodSort picks up or drops items based on local color density.
@@ -136,18 +172,8 @@ func ApplyBroodSort(bot *SwarmBot, ss *SwarmState, idx int) {
 		itemIdx := st.Carrying[idx]
 		item := &st.Items[itemIdx]
 
-		// Count same-color items nearby (not held)
-		sameNear := 0
-		for j := range st.Items {
-			if j == itemIdx || st.Items[j].Held {
-				continue
-			}
-			dx := st.Items[j].X - bot.X
-			dy := st.Items[j].Y - bot.Y
-			if math.Sqrt(dx*dx+dy*dy) < broodSenseRadius && st.Items[j].Color == item.Color {
-				sameNear++
-			}
-		}
+		// Count same-color items nearby via spatial hash
+		sameNear := countSameColorNear(st, bot.X, bot.Y, item.Color, itemIdx)
 
 		// Higher same-color density → higher drop probability
 		dropP := float64(sameNear) / 10.0
@@ -167,36 +193,29 @@ func ApplyBroodSort(bot *SwarmBot, ss *SwarmState, idx int) {
 			setItemLED(bot, item.Color)
 		}
 	} else {
-		// Not carrying: consider picking up nearest item
-		bestDist := math.MaxFloat64
+		// Not carrying: consider picking up nearest item via spatial hash
+		bestDistSq := broodItemRadius * broodItemRadius
 		bestItem := -1
-		for j := range st.Items {
-			if st.Items[j].Held {
-				continue
-			}
-			dx := st.Items[j].X - bot.X
-			dy := st.Items[j].Y - bot.Y
-			dist := math.Sqrt(dx*dx + dy*dy)
-			if dist < broodItemRadius && dist < bestDist {
-				bestDist = dist
-				bestItem = j
+		if st.ItemHash != nil {
+			nearIDs := st.ItemHash.Query(bot.X, bot.Y, broodItemRadius)
+			for _, j := range nearIDs {
+				if j < 0 || j >= len(st.Items) || st.Items[j].Held {
+					continue
+				}
+				dx := st.Items[j].X - bot.X
+				dy := st.Items[j].Y - bot.Y
+				dSq := dx*dx + dy*dy
+				if dSq < bestDistSq {
+					bestDistSq = dSq
+					bestItem = j
+				}
 			}
 		}
 
 		if bestItem >= 0 {
 			item := &st.Items[bestItem]
-			// Count same-color items nearby
-			sameNear := 0
-			for j := range st.Items {
-				if j == bestItem || st.Items[j].Held {
-					continue
-				}
-				dx := st.Items[j].X - bot.X
-				dy := st.Items[j].Y - bot.Y
-				if math.Sqrt(dx*dx+dy*dy) < broodSenseRadius && st.Items[j].Color == item.Color {
-					sameNear++
-				}
-			}
+			// Count same-color items nearby via spatial hash
+			sameNear := countSameColorNear(st, bot.X, bot.Y, item.Color, bestItem)
 
 			// Lower same-color density → higher pickup probability
 			pickP := broodPickupProb / (1 + float64(sameNear))

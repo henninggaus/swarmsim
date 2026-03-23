@@ -67,19 +67,9 @@ func TickWOA(ss *SwarmState) {
 		st.HuntTick = 1
 	}
 
-	// Compute fitness: neighbor density + carrying bonus + landscape fitness
+	// Compute fitness using the shared fitness landscape.
 	for i := range ss.Bots {
-		bot := &ss.Bots[i]
-		nFit := math.Min(float64(bot.NeighborCount)/8.0, 1.0)
-		carry := 0.0
-		if bot.CarryingPkg >= 0 {
-			carry = 0.4
-		}
-		landFit := distanceFitness(bot, ss) / 100.0
-		if landFit < 0 {
-			landFit = 0
-		}
-		st.Fitness[i] = nFit*0.3 + carry + landFit*0.3
+		st.Fitness[i] = distanceFitness(&ss.Bots[i], ss)
 	}
 
 	// Find best whale
@@ -118,7 +108,7 @@ func TickWOA(ss *SwarmState) {
 	// Update sensor cache
 	for i := range ss.Bots {
 		ss.Bots[i].WOAPhase = st.Phase[i]
-		ss.Bots[i].WOAFitness = int(st.Fitness[i] * 100)
+		ss.Bots[i].WOAFitness = fitToSensor(st.Fitness[i])
 		dx := st.BestX - ss.Bots[i].X
 		dy := st.BestY - ss.Bots[i].Y
 		ss.Bots[i].WOABestDist = int(math.Sqrt(dx*dx + dy*dy))

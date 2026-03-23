@@ -74,24 +74,14 @@ func TickMFO(ss *SwarmState) {
 		st.BotFitness = append(st.BotFitness, 0)
 	}
 
-	// Compute fitness for each moth using shared landscape
+	// Compute fitness using the shared fitness landscape.
 	for i := range ss.Bots {
-		bot := &ss.Bots[i]
-		nFit := math.Min(float64(bot.NeighborCount)/8.0, 1.0)
-		carry := 0.0
-		if bot.CarryingPkg >= 0 {
-			carry = 0.3
-		}
-		landFit := distanceFitness(bot, ss) / 100.0
-		if landFit < 0 {
-			landFit = 0
-		}
-		st.BotFitness[i] = nFit*0.3 + carry + landFit*0.4
+		st.BotFitness[i] = distanceFitness(&ss.Bots[i], ss)
 	}
 
 	// Update flames: add current best positions, merge nearby, cull weak
 	for i := range ss.Bots {
-		if st.BotFitness[i] > 0.5 { // only good positions become flames
+		if st.BotFitness[i] > 10 { // only good positions become flames
 			mfoAddFlame(st, ss.Bots[i].X, ss.Bots[i].Y, st.BotFitness[i])
 		}
 	}
@@ -147,7 +137,7 @@ func TickMFO(ss *SwarmState) {
 	// Update sensor cache
 	for i := range ss.Bots {
 		ss.Bots[i].MFOFlame = st.MothFlame[i]
-		ss.Bots[i].MFOFitness = int(st.BotFitness[i] * 100)
+		ss.Bots[i].MFOFitness = fitToSensor(st.BotFitness[i])
 		if st.MothFlame[i] >= 0 && st.MothFlame[i] < len(st.Flames) {
 			f := st.Flames[st.MothFlame[i]]
 			dx := f.X - ss.Bots[i].X
