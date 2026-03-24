@@ -51,44 +51,6 @@ type BatState struct {
 	PBestF   []float64
 }
 
-// batMovBot moves a bot directly toward a target position.
-// Sets Speed=0 afterward to prevent double-movement in GUI mode.
-func batMovBot(bot *SwarmBot, targetX, targetY, arenaW, arenaH float64) {
-	dx := targetX - bot.X
-	dy := targetY - bot.Y
-	dist := math.Sqrt(dx*dx + dy*dy)
-	if dist < 2 {
-		bot.X = targetX
-		bot.Y = targetY
-		bot.Speed = 0
-		return
-	}
-	maxStep := SwarmBotSpeed * batSpeedMult
-	if dist <= maxStep {
-		bot.X = targetX
-		bot.Y = targetY
-	} else {
-		ratio := maxStep / dist
-		bot.X += dx * ratio
-		bot.Y += dy * ratio
-	}
-	// Clamp to arena
-	if bot.X < SwarmBotRadius {
-		bot.X = SwarmBotRadius
-	}
-	if bot.X > arenaW-SwarmBotRadius {
-		bot.X = arenaW - SwarmBotRadius
-	}
-	if bot.Y < SwarmBotRadius {
-		bot.Y = SwarmBotRadius
-	}
-	if bot.Y > arenaH-SwarmBotRadius {
-		bot.Y = arenaH - SwarmBotRadius
-	}
-	bot.Angle = math.Atan2(dy, dx)
-	bot.Speed = 0
-}
-
 // InitBat allocates Bat Algorithm state.
 func InitBat(ss *SwarmState) {
 	n := len(ss.Bots)
@@ -274,7 +236,7 @@ func ApplyBat(bot *SwarmBot, ss *SwarmState, idx int) {
 	newFit := distanceFitnessPt(ss, newX, newY)
 	if newFit > st.Fitness[idx] || ss.Rng.Float64() < st.Loud[idx] {
 		// Move directly to accepted position (eigenbewegung)
-		batMovBot(bot, newX, newY, ss.ArenaW, ss.ArenaH)
+		algoMovBot(bot, newX, newY, ss.ArenaW, ss.ArenaH, batSpeedMult)
 
 		// Decrease loudness and increase pulse rate
 		st.Loud[idx] *= batAlpha

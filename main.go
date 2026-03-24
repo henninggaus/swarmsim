@@ -1073,6 +1073,32 @@ func (g *Game) handleSwarmInput() {
 		}
 	}
 
+	// ] key: Next algorithm, [ key: Previous algorithm
+	if inpututil.IsKeyJustPressed(ebiten.KeyBracketRight) && !ed.Focused && !ss.BotCountEdit {
+		var current swarm.SwarmAlgorithmType
+		if ss.SwarmAlgo != nil {
+			current = ss.SwarmAlgo.ActiveAlgo
+		} else {
+			current = swarm.AlgoNone
+		}
+		next := swarm.NextAlgorithm(current)
+		swarm.InitSwarmAlgorithm(ss, next)
+		ss.ShowPSO = true
+		logger.Info("SWARM", "Algorithmus: %s", swarm.SwarmAlgorithmName(next))
+	}
+	if inpututil.IsKeyJustPressed(ebiten.KeyBracketLeft) && !ed.Focused && !ss.BotCountEdit {
+		var current swarm.SwarmAlgorithmType
+		if ss.SwarmAlgo != nil {
+			current = ss.SwarmAlgo.ActiveAlgo
+		} else {
+			current = swarm.AlgoCount - 1
+		}
+		prev := swarm.PrevAlgorithm(current)
+		swarm.InitSwarmAlgorithm(ss, prev)
+		ss.ShowPSO = true
+		logger.Info("SWARM", "Algorithmus: %s", swarm.SwarmAlgorithmName(prev))
+	}
+
 	// Ctrl+T key: Auto-Tournament — benchmark all optimization algorithms
 	if inpututil.IsKeyJustPressed(ebiten.KeyT) && ebiten.IsKeyPressed(ebiten.KeyControl) && !ed.Focused && !ss.BotCountEdit {
 		swarm.StartAlgoTournament(ss)

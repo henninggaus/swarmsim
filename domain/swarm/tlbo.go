@@ -165,35 +165,6 @@ func TickTLBO(ss *SwarmState) {
 	}
 }
 
-// tlboMovBot moves a bot directly toward (tx,ty) with max step size.
-// Sets Speed=0 to prevent double movement in GUI mode.
-func tlboMovBot(bot *SwarmBot, ss *SwarmState, tx, ty float64) {
-	maxStep := SwarmBotSpeed * 1.5
-	dx := tx - bot.X
-	dy := ty - bot.Y
-	dist := math.Sqrt(dx*dx + dy*dy)
-	if dist < 2.0 {
-		// Snap to target
-		bot.X = tx
-		bot.Y = ty
-	} else if dist <= maxStep {
-		bot.X = tx
-		bot.Y = ty
-	} else {
-		ratio := maxStep / dist
-		bot.X += dx * ratio
-		bot.Y += dy * ratio
-	}
-	// Clamp to arena
-	bot.X = math.Max(SwarmEdgeMargin, math.Min(ss.ArenaW-SwarmEdgeMargin, bot.X))
-	bot.Y = math.Max(SwarmEdgeMargin, math.Min(ss.ArenaH-SwarmEdgeMargin, bot.Y))
-	// Set angle for visual, prevent double movement
-	if dx != 0 || dy != 0 {
-		bot.Angle = math.Atan2(dy, dx)
-	}
-	bot.Speed = 0
-}
-
 // ApplyTLBO moves a bot according to the TLBO algorithm with direct position updates.
 func ApplyTLBO(bot *SwarmBot, ss *SwarmState, idx int) {
 	if ss.TLBO == nil {
@@ -260,7 +231,7 @@ func ApplyTLBO(bot *SwarmBot, ss *SwarmState, idx int) {
 	}
 
 	// Direct position update (Eigenbewegung)
-	tlboMovBot(bot, ss, targetX, targetY)
+	algoMovBot(bot, targetX, targetY, ss.ArenaW, ss.ArenaH, 1.5)
 
 	// LED color: teacher phase = green tones, learner phase = blue tones
 	intensity := uint8(80 + st.Fitness[idx]*175)

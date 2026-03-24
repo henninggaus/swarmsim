@@ -174,49 +174,50 @@ func TickCuckoo(ss *SwarmState) {
 // Other nests perform larger Lévy flights for exploration.
 func ApplyCuckoo(bot *SwarmBot, ss *SwarmState, idx int) {
 	if ss.Cuckoo == nil {
-		bot.Speed = SwarmBotSpeed
+		bot.Speed = 0
 		return
 	}
 	st := ss.Cuckoo
 	if idx >= len(st.Fitness) {
-		bot.Speed = SwarmBotSpeed
+		bot.Speed = 0
 		return
 	}
 
-	// Global best keeps natural behavior
+	// Global best does small random walk
 	if idx == st.BestIdx {
-		bot.Speed = SwarmBotSpeed
+		rx := bot.X + (ss.Rng.Float64()-0.5)*10
+		ry := bot.Y + (ss.Rng.Float64()-0.5)*10
+		algoMovBot(bot, rx, ry, ss.ArenaW, ss.ArenaH, 1.0)
 		bot.LEDColor = [3]uint8{255, 215, 0} // gold for best
 		return
 	}
 
-	// Lévy flight step toward global best with random perturbation.
+	// Levy flight step toward global best with random perturbation.
 	step := csStepScale * MantegnaLevy(ss.Rng, csLevyAlpha)
 
-	// Direction: toward global best with Lévy perturbation
+	// Compute target position using Levy flight
 	dx := st.BestX - bot.X
 	dy := st.BestY - bot.Y
 	dist := math.Sqrt(dx*dx + dy*dy)
 
-	var desired float64
+	var targetX, targetY float64
 	if dist > 1.0 {
 		baseAngle := math.Atan2(dy, dx)
-		// Perturb angle by Lévy step (larger steps = more exploration)
-		desired = baseAngle + step*0.3
+		desired := baseAngle + step*0.3
+		// Step distance proportional to Levy magnitude
+		absStep := math.Abs(step)
+		stepDist := SwarmBotSpeed * (1.0 + math.Min(absStep*0.5, 1.0)) * 3.0
+		targetX = bot.X + math.Cos(desired)*stepDist
+		targetY = bot.Y + math.Sin(desired)*stepDist
 	} else {
 		// Very close to best: random exploration
-		desired = ss.Rng.Float64() * 2 * math.Pi
+		angle := ss.Rng.Float64() * 2 * math.Pi
+		targetX = bot.X + math.Cos(angle)*SwarmBotSpeed*3.0
+		targetY = bot.Y + math.Sin(angle)*SwarmBotSpeed*3.0
 	}
 
-	steerToward(bot, desired, csSteerRate)
-
-	// Speed varies: short steps = slow (exploitation), long steps = fast (exploration)
-	absStep := math.Abs(step)
-	speedMul := 1.0 + math.Min(absStep*0.5, 1.0)
-	bot.Speed = SwarmBotSpeed * speedMul
-	if bot.Speed > SwarmBotSpeed*2.0 {
-		bot.Speed = SwarmBotSpeed * 2.0
-	}
+	// Move directly (eigenbewegung)
+	algoMovBot(bot, targetX, targetY, ss.ArenaW, ss.ArenaH, 3.0)
 
 	// LED color: green gradient by fitness, blue tint for older nests
 	fitNorm := (st.Fitness[idx] + 50) / 150.0

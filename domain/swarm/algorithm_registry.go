@@ -177,8 +177,9 @@ var algoRegistry = map[SwarmAlgorithmType]algoHandler{
 		tick:  TickWOA,
 		apply: ApplyWOA,
 		bestFitness: func(ss *SwarmState) float64 {
-			if ss.WOA != nil && ss.WOA.BestIdx >= 0 && ss.WOA.BestIdx < len(ss.WOA.Fitness) {
-				return ss.WOA.Fitness[ss.WOA.BestIdx]
+			if ss.WOA != nil {
+				if ss.WOA.GlobalBestF > ss.WOA.BestF { return ss.WOA.GlobalBestF }
+				return ss.WOA.BestF
 			}
 			return 0
 		},
@@ -187,8 +188,8 @@ var algoRegistry = map[SwarmAlgorithmType]algoHandler{
 			return nil
 		},
 		bestPos: func(ss *SwarmState) (float64, float64, bool) {
-			if ss.WOA != nil && ss.WOA.BestIdx >= 0 {
-				return botPos(ss, ss.WOA.BestIdx)
+			if ss.WOA != nil && ss.WOA.GlobalBestF > -1e18 {
+				return ss.WOA.GlobalBestX, ss.WOA.GlobalBestY, true
 			}
 			return 0, 0, false
 		},
@@ -291,7 +292,12 @@ var algoRegistry = map[SwarmAlgorithmType]algoHandler{
 		tick:  TickABC,
 		apply: ApplyABC,
 		bestFitness: func(ss *SwarmState) float64 {
-			if ss.ABC != nil { return ss.ABC.BestF }
+			if ss.ABC != nil {
+				if ss.ABC.GlobalBestF > ss.ABC.BestF {
+					return ss.ABC.GlobalBestF
+				}
+				return ss.ABC.BestF
+			}
 			return 0
 		},
 		avgFitnessVals: func(ss *SwarmState) []float64 {
@@ -299,8 +305,12 @@ var algoRegistry = map[SwarmAlgorithmType]algoHandler{
 			return nil
 		},
 		bestPos: func(ss *SwarmState) (float64, float64, bool) {
-			if ss.ABC != nil { return ss.ABC.BestX, ss.ABC.BestY, true }
+			if ss.ABC != nil { return ss.ABC.GlobalBestX, ss.ABC.GlobalBestY, true }
 			return 0, 0, false
+		},
+		explorationRatio: func(ss *SwarmState) float64 {
+			if ss.ABC == nil { return -1 }
+			return cycleExplRatio(ss.ABC.Tick, abcMaxTicks)
 		},
 	},
 	AlgoHSO: {

@@ -26,10 +26,13 @@ import "math"
 
 const (
 	abcSteerRate     = 0.14  // max steering change per tick (radians)
-	abcAbandonLimit  = 80    // ticks without improvement before source is abandoned
+	abcAbandonLimit  = 60    // ticks without improvement before source is abandoned
 	abcLocalStep     = 40.0  // local search perturbation radius
 	abcScoutSpeed    = 1.5   // speed multiplier for scouting bees
 	abcOnlookerRatio = 0.5   // fraction of colony acting as onlookers
+	abcSpeedMult     = 5.0   // movement speed multiplier (7.5 px/tick)
+	abcMaxTicks      = 3000  // optimization cycle length (matches benchmark)
+	abcArrivalDist   = 5.0   // distance threshold for arrival at target
 )
 
 // ABCState holds Artificial Bee Colony state for the swarm.
@@ -41,11 +44,19 @@ type ABCState struct {
 	Stale   []int     // ticks since last improvement for each source
 	Role    []int     // 0=employed, 1=onlooker, 2=scout
 
-	// Global tracking.
-	BestIdx int     // index of best food source
-	BestF   float64 // best fitness found
-	BestX   float64 // best position
+	// Global tracking (per-tick best).
+	BestIdx int     // index of best food source this tick
+	BestF   float64 // best fitness found this tick
+	BestX   float64 // best position this tick
 	BestY   float64
+
+	// Persistent global best (never reset).
+	GlobalBestF   float64
+	GlobalBestX   float64
+	GlobalBestY   float64
+	GlobalBestIdx int
+
+	Tick int // current tick counter
 }
 
 // InitABC allocates Artificial Bee Colony state for all bots.
@@ -54,13 +65,15 @@ type ABCState struct {
 func InitABC(ss *SwarmState) {
 	n := len(ss.Bots)
 	st := &ABCState{
-		Fitness: make([]float64, n),
-		TrialX:  make([]float64, n),
-		TrialY:  make([]float64, n),
-		Stale:   make([]int, n),
-		Role:    make([]int, n),
-		BestF:   -1e9,
-		BestIdx: -1,
+		Fitness:       make([]float64, n),
+		TrialX:        make([]float64, n),
+		TrialY:        make([]float64, n),
+		Stale:         make([]int, n),
+		Role:          make([]int, n),
+		BestF:         -1e9,
+		BestIdx:       -1,
+		GlobalBestF:   -1e9,
+		GlobalBestIdx: -1,
 	}
 
 	// Assign initial roles: first half employed, second half onlooker.
@@ -76,6 +89,12 @@ func InitABC(ss *SwarmState) {
 			st.BestIdx = i
 			st.BestX = ss.Bots[i].X
 			st.BestY = ss.Bots[i].Y
+		}
+		if st.Fitness[i] > st.GlobalBestF {
+			st.GlobalBestF = st.Fitness[i]
+			st.GlobalBestIdx = i
+			st.GlobalBestX = ss.Bots[i].X
+			st.GlobalBestY = ss.Bots[i].Y
 		}
 	}
 
@@ -108,6 +127,7 @@ func TickABC(ss *SwarmState) {
 	}
 	st := ss.ABC
 	n := len(ss.Bots)
+	st.Tick++
 
 	// Grow slices if bots were added.
 	for len(st.Fitness) < n {
@@ -122,6 +142,13 @@ func TickABC(ss *SwarmState) {
 	for i := range ss.Bots {
 		st.Fitness[i] = abcFitness(&ss.Bots[i], ss)
 	}
+
+	// Adaptive Global-Best attraction weight: 5% → 30% over abcMaxTicks.
+	progress := float64(st.Tick) / float64(abcMaxTicks)
+	if progress > 1 {
+		progress = 1
+	}
+	gbWeight := 0.05 + 0.25*progress
 
 	// ── Phase 1: Employed bees — local search ──
 	for i := 0; i < n; i++ {
@@ -138,6 +165,12 @@ func TickABC(ss *SwarmState) {
 		phi := (ss.Rng.Float64()*2.0 - 1.0) // phi ∈ [-1, 1]
 		tx := ss.Bots[i].X + phi*(ss.Bots[i].X-ss.Bots[k].X)
 		ty := ss.Bots[i].Y + phi*(ss.Bots[i].Y-ss.Bots[k].Y)
+
+		// Shift toward GlobalBest.
+		if st.GlobalBestIdx >= 0 {
+			tx += gbWeight * (st.GlobalBestX - tx)
+			ty += gbWeight * (st.GlobalBestY - ty)
+		}
 
 		// Clamp to arena.
 		tx = math.Max(SwarmEdgeMargin, math.Min(ss.ArenaW-SwarmEdgeMargin, tx))
@@ -194,6 +227,12 @@ func TickABC(ss *SwarmState) {
 		tx := ss.Bots[selected].X + phi*(ss.Bots[selected].X-ss.Bots[k].X)
 		ty := ss.Bots[selected].Y + phi*(ss.Bots[selected].Y-ss.Bots[k].Y)
 
+		// Shift toward GlobalBest.
+		if st.GlobalBestIdx >= 0 {
+			tx += gbWeight * (st.GlobalBestX - tx)
+			ty += gbWeight * (st.GlobalBestY - ty)
+		}
+
 		tx = math.Max(SwarmEdgeMargin, math.Min(ss.ArenaW-SwarmEdgeMargin, tx))
 		ty = math.Max(SwarmEdgeMargin, math.Min(ss.ArenaH-SwarmEdgeMargin, ty))
 
@@ -216,7 +255,8 @@ func TickABC(ss *SwarmState) {
 		}
 	}
 
-	// Update global best.
+	// Update per-tick best and persistent GlobalBest.
+	st.BestF = -1e9
 	for i := range ss.Bots {
 		if st.Fitness[i] > st.BestF {
 			st.BestF = st.Fitness[i]
@@ -224,15 +264,21 @@ func TickABC(ss *SwarmState) {
 			st.BestX = ss.Bots[i].X
 			st.BestY = ss.Bots[i].Y
 		}
+		if st.Fitness[i] > st.GlobalBestF {
+			st.GlobalBestF = st.Fitness[i]
+			st.GlobalBestIdx = i
+			st.GlobalBestX = ss.Bots[i].X
+			st.GlobalBestY = ss.Bots[i].Y
+		}
 	}
 
 	// Update sensor cache.
 	for i := range ss.Bots {
 		ss.Bots[i].ABCFitness = int(st.Fitness[i] * 100)
 		ss.Bots[i].ABCRole = st.Role[i]
-		if st.BestIdx >= 0 && st.BestIdx < n {
-			dx := st.BestX - ss.Bots[i].X
-			dy := st.BestY - ss.Bots[i].Y
+		if st.GlobalBestIdx >= 0 && st.GlobalBestIdx < n {
+			dx := st.GlobalBestX - ss.Bots[i].X
+			dy := st.GlobalBestY - ss.Bots[i].Y
 			ss.Bots[i].ABCBestDist = int(math.Sqrt(dx*dx + dy*dy))
 		}
 	}
@@ -246,67 +292,56 @@ func TickABC(ss *SwarmState) {
 // their randomly assigned new position, then revert to employed status.
 func ApplyABC(bot *SwarmBot, ss *SwarmState, idx int) {
 	if ss.ABC == nil {
-		bot.Speed = SwarmBotSpeed
+		bot.Speed = 0
 		return
 	}
 	st := ss.ABC
 	if idx >= len(st.Role) {
-		bot.Speed = SwarmBotSpeed
+		bot.Speed = 0
 		return
 	}
 
+	// Move directly toward trial position (eigenbewegung)
+	algoMovBot(bot, st.TrialX[idx], st.TrialY[idx], ss.ArenaW, ss.ArenaH, abcSpeedMult)
+
+	// Check arrival — evaluate fitness at new position
 	dx := st.TrialX[idx] - bot.X
 	dy := st.TrialY[idx] - bot.Y
 	dist := math.Sqrt(dx*dx + dy*dy)
 
 	switch st.Role[idx] {
 	case 0: // Employed bee — exploit food source neighborhood.
-		if dist < abcLocalStep {
-			// Arrived at trial: greedy selection.
+		if dist < abcArrivalDist {
 			trialF := abcFitness(bot, ss)
 			if trialF > st.Fitness[idx] {
 				st.Fitness[idx] = trialF
 				st.Stale[idx] = 0
 			}
-			bot.Speed = SwarmBotSpeed * 0.6
-		} else {
-			desired := math.Atan2(dy, dx)
-			steerToward(bot, desired, abcSteerRate)
-			bot.Speed = SwarmBotSpeed
 		}
-		// LED: warm yellow for employed bees, brighter = higher fitness.
 		fit01 := math.Min(math.Max((st.Fitness[idx]+50)/150, 0), 1)
 		g := uint8(150 + fit01*105)
 		bot.LEDColor = [3]uint8{255, g, 30}
 
 	case 1: // Onlooker bee — follow recruited source.
-		if dist < abcLocalStep {
+		if dist < abcArrivalDist {
 			trialF := abcFitness(bot, ss)
 			if trialF > st.Fitness[idx] {
 				st.Fitness[idx] = trialF
 			}
-			bot.Speed = SwarmBotSpeed * 0.5
-		} else {
-			desired := math.Atan2(dy, dx)
-			steerToward(bot, desired, abcSteerRate)
-			bot.Speed = SwarmBotSpeed * 0.9
 		}
-		// LED: orange for onlooker bees.
 		bot.LEDColor = [3]uint8{255, 140, 0}
 
 	case 2: // Scout bee — explore new random position.
-		if dist < abcLocalStep*0.5 {
-			// Arrived at scouting position — become employed next tick.
+		if dist < abcArrivalDist {
 			st.Role[idx] = 0
 			st.Fitness[idx] = abcFitness(bot, ss)
-			bot.Speed = SwarmBotSpeed * 0.4
-		} else {
-			desired := math.Atan2(dy, dx)
-			steerToward(bot, desired, abcSteerRate*1.5)
-			bot.Speed = SwarmBotSpeed * abcScoutSpeed
 		}
-		// LED: white for scout bees (exploring).
 		bot.LEDColor = [3]uint8{255, 255, 255}
+	}
+
+	// Gold LED for global best bot.
+	if idx == st.GlobalBestIdx {
+		bot.LEDColor = [3]uint8{255, 215, 0}
 	}
 }
 

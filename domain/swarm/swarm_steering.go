@@ -91,6 +91,48 @@ func MantegnaLevy(rng *rand.Rand, beta float64) float64 {
 	return u / math.Pow(v, 1.0/beta)
 }
 
+// algoMovBot moves a bot directly toward (targetX, targetY) with a maximum
+// step of SwarmBotSpeed * speedMult per tick. Snaps to target when within 2px.
+// Clamps to arena bounds and sets bot.Speed = 0 to prevent double-movement
+// in GUI mode where applySwarmPhysics would otherwise apply Speed again.
+// This is the canonical way for optimization algorithms to move bots; it
+// replaces the many per-algorithm xxxMovBot functions that were copy-pasted.
+func algoMovBot(bot *SwarmBot, targetX, targetY, arenaW, arenaH, speedMult float64) {
+	dx := targetX - bot.X
+	dy := targetY - bot.Y
+	dist := math.Sqrt(dx*dx + dy*dy)
+	if dist < 2 {
+		bot.X = targetX
+		bot.Y = targetY
+		bot.Speed = 0
+		return
+	}
+	maxStep := SwarmBotSpeed * speedMult
+	if dist <= maxStep {
+		bot.X = targetX
+		bot.Y = targetY
+	} else {
+		ratio := maxStep / dist
+		bot.X += dx * ratio
+		bot.Y += dy * ratio
+	}
+	// Clamp to arena
+	if bot.X < SwarmBotRadius {
+		bot.X = SwarmBotRadius
+	}
+	if bot.X > arenaW-SwarmBotRadius {
+		bot.X = arenaW - SwarmBotRadius
+	}
+	if bot.Y < SwarmBotRadius {
+		bot.Y = SwarmBotRadius
+	}
+	if bot.Y > arenaH-SwarmBotRadius {
+		bot.Y = arenaH - SwarmBotRadius
+	}
+	bot.Angle = math.Atan2(dy, dx)
+	bot.Speed = 0
+}
+
 // fitToSensor converts a raw fitness value (typically 0-100+ from
 // distanceFitness / EvaluateFitnessLandscape) into a sensor integer
 // clamped to [0, 100]. Used by algorithm sensor cache updates.

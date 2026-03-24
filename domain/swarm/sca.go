@@ -27,7 +27,11 @@ const (
 	scaMaxTicks  = 3000  // full optimization cycle (matches benchmark length)
 	scaSteerRate = 0.25  // max steering change per tick (radians)
 	scaAMax      = 2.0   // initial r1 upper bound (exploration range)
-	scaSpeedMult = 3.0   // movement speed multiplier
+	scaAMin      = 0.15  // minimum r1 floor — keeps oscillation alive in late stages
+	scaSpeedMult = 5.0   // movement speed multiplier (was 3.0)
+	scaScoutRate = 100   // every N ticks, 20% of bots do random exploration
+	scaScoutFrac = 0.20  // fraction of bots that scout
+	scaLocalWalk = 40.0  // best bot local random walk radius
 )
 
 // SCAState holds Sine Cosine Algorithm state for the swarm.
@@ -131,50 +135,6 @@ func TickSCA(ss *SwarmState) {
 	}
 }
 
-// scaMovBot moves a bot directly toward a target position.
-// Sets Speed=0 after moving to prevent double-movement in GUI mode.
-func scaMovBot(bot *SwarmBot, ss *SwarmState, tx, ty float64) {
-	dx := tx - bot.X
-	dy := ty - bot.Y
-	dist := math.Sqrt(dx*dx + dy*dy)
-
-	maxStep := SwarmBotSpeed * scaSpeedMult
-	if dist < 2.0 {
-		bot.X = tx
-		bot.Y = ty
-	} else if dist <= maxStep {
-		bot.X = tx
-		bot.Y = ty
-	} else {
-		ratio := maxStep / dist
-		bot.X += dx * ratio
-		bot.Y += dy * ratio
-	}
-	// Update angle to face movement direction
-	if dist > 0.5 {
-		bot.Angle = math.Atan2(dy, dx)
-	}
-	bot.Speed = 0
-	// Arena clamping
-	scaClampArena(bot, ss)
-}
-
-// scaClampArena keeps bot within arena bounds.
-func scaClampArena(bot *SwarmBot, ss *SwarmState) {
-	if bot.X < SwarmEdgeMargin {
-		bot.X = SwarmEdgeMargin
-	}
-	if bot.X > ss.ArenaW-SwarmEdgeMargin {
-		bot.X = ss.ArenaW - SwarmEdgeMargin
-	}
-	if bot.Y < SwarmEdgeMargin {
-		bot.Y = SwarmEdgeMargin
-	}
-	if bot.Y > ss.ArenaH-SwarmEdgeMargin {
-		bot.Y = ss.ArenaH - SwarmEdgeMargin
-	}
-}
-
 // ApplySCA steers a bot according to the Sine Cosine Algorithm.
 // The r1 parameter decreases linearly over the cycle, transitioning
 // from wide sinusoidal exploration to tight convergence on the best position.
@@ -189,9 +149,11 @@ func ApplySCA(bot *SwarmBot, ss *SwarmState, idx int) {
 		return
 	}
 
-	// Best bot keeps natural behavior
+	// Best bot does local random walk to explore nearby peaks
 	if idx == st.CurBestIdx {
-		bot.Speed = 0
+		walkX := bot.X + (ss.Rng.Float64()*2-1)*scaLocalWalk
+		walkY := bot.Y + (ss.Rng.Float64()*2-1)*scaLocalWalk
+		algoMovBot(bot, walkX, walkY, ss.ArenaW, ss.ArenaH, scaSpeedMult)
 		bot.LEDColor = [3]uint8{255, 215, 0} // gold for best
 		return
 	}
@@ -206,10 +168,19 @@ func ApplySCA(bot *SwarmBot, ss *SwarmState, idx int) {
 		progress = 1.0
 	}
 
-	// r1: linearly decreasing from scaAMax to 0
-	r1 := scaAMax * (1.0 - progress)
-	if r1 < 0 {
-		r1 = 0
+	// Periodic random scouting: every scaScoutRate ticks, some bots explore randomly
+	if st.Tick%scaScoutRate == 0 && ss.Rng.Float64() < scaScoutFrac {
+		scoutX := ss.Rng.Float64() * ss.ArenaW
+		scoutY := ss.Rng.Float64() * ss.ArenaH
+		algoMovBot(bot, scoutX, scoutY, ss.ArenaW, ss.ArenaH, scaSpeedMult)
+		bot.LEDColor = [3]uint8{0, 255, 0} // green for scouts
+		return
+	}
+
+	// r1: linearly decreasing from scaAMax to scaAMin (floor keeps oscillation alive)
+	r1 := scaAMax - (scaAMax-scaAMin)*progress
+	if r1 < scaAMin {
+		r1 = scaAMin
 	}
 
 	// r2: random in [0, 2π]
@@ -244,13 +215,13 @@ func ApplySCA(bot *SwarmBot, ss *SwarmState, idx int) {
 	targetX := bot.X + offsetX
 	targetY := bot.Y + offsetY
 
-	// Adaptive global-best attraction: weight increases 5%→25% over time
-	gbWeight := 0.05 + 0.20*progress
+	// Adaptive global-best attraction: weight increases 5%→40% over time
+	gbWeight := 0.05 + 0.35*progress
 	targetX += (destX - targetX) * gbWeight
 	targetY += (destY - targetY) * gbWeight
 
 	// Move bot directly to target
-	scaMovBot(bot, ss, targetX, targetY)
+	algoMovBot(bot, targetX, targetY, ss.ArenaW, ss.ArenaH, scaSpeedMult)
 
 	// Also steer angle for GUI mode
 	desired := math.Atan2(targetY-bot.Y, targetX-bot.X)

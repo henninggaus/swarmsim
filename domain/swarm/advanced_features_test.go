@@ -77,8 +77,8 @@ func TestApplyPSOMoveNilSafe(t *testing.T) {
 	ss := newAdvancedTestState(1)
 	bot := &ss.Bots[0]
 	ApplyPSOMove(bot, ss, 0)
-	if bot.Speed != SwarmBotSpeed {
-		t.Fatal("Expected SwarmBotSpeed with nil PSO")
+	if bot.Speed != 0 {
+		t.Fatal("Expected Speed=0 with nil PSO (eigenbewegung)")
 	}
 }
 

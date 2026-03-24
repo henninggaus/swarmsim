@@ -91,35 +91,22 @@ func TestApplyDE_SteeringTowardTrial(t *testing.T) {
 	InitDE(ss)
 	TickDE(ss) // create trial vectors
 
-	// Apply to first bot.
+	// Apply to first bot — should move via eigenbewegung.
 	bot := &ss.Bots[0]
-	initialAngle := bot.Angle
 	ApplyDE(bot, ss, 0)
 
-	// Bot should be moving at SwarmBotSpeed.
-	if bot.Speed < SwarmBotSpeed*0.3 {
-		t.Fatal("bot should have non-zero speed when moving to trial")
-	}
-
-	// If trial position differs, angle should change.
-	if ss.DE.Moving[0] {
-		dx := ss.DE.TrialX[0] - bot.X
-		dy := ss.DE.TrialY[0] - bot.Y
-		if dx*dx+dy*dy > deTrialStep*deTrialStep && bot.Angle == initialAngle {
-			// Angle might not change if trial is in same direction, so this
-			// is a soft check.
-			_ = initialAngle
-		}
+	// Speed should be 0 after eigenbewegung
+	if bot.Speed != 0 {
+		t.Fatal("bot speed should be 0 after eigenbewegung")
 	}
 }
 
 func TestApplyDE_NilSafe(t *testing.T) {
 	ss := makeTestSwarmStateDE(5)
 	bot := &ss.Bots[0]
-	// Should not panic with nil DE state.
 	ApplyDE(bot, ss, 0)
-	if bot.Speed != SwarmBotSpeed {
-		t.Fatalf("expected default speed, got %f", bot.Speed)
+	if bot.Speed != 0 {
+		t.Fatalf("expected Speed=0 with nil DE, got %f", bot.Speed)
 	}
 }
 

@@ -28,19 +28,19 @@ import "math"
 //	SIMULATION, 76(2), pp. 60-68.
 
 const (
-	hsoSteerRate       = 0.25  // max steering change per tick (radians)
-	hsoHMCR            = 0.92  // Harmony Memory Considering Rate — probability of picking from HM
-	hsoPAR             = 0.45  // Pitch Adjusting Rate — probability of perturbing a HM note
-	hsoBWMax           = 60.0  // initial bandwidth — maximum pitch adjustment distance (pixels)
-	hsoBWMin           = 8.0   // final bandwidth — decreases over time for finer exploitation
-	hsoHMSize          = 50    // Harmony Memory size (number of stored solutions)
-	hsoEliteBias       = 0.25  // probability of biasing toward best known solution
-	hsoArrivalDist     = 3.0   // distance threshold for considering bot arrived at target
-	hsoBWDecayTicks    = 2500  // ticks over which bandwidth decays from max to min
-	hsoSpeedMult       = 5.0   // movement speed multiplier over SwarmBotSpeed
-	hsoDivCheckInterval = 200  // ticks between HM diversity checks
-	hsoDivThreshold    = 30.0  // minimum RMS spread in HM before diversity injection
-	hsoDivInjectFrac   = 0.2   // fraction of HM entries to replace with random when too clustered
+	hsoSteerRate        = 0.25  // max steering change per tick (radians)
+	hsoHMCR             = 0.92  // Harmony Memory Considering Rate — probability of picking from HM
+	hsoPAR              = 0.45  // Pitch Adjusting Rate — probability of perturbing a HM note
+	hsoBWMax            = 60.0  // initial bandwidth — maximum pitch adjustment distance (pixels)
+	hsoBWMin            = 8.0   // final bandwidth — decreases over time for finer exploitation
+	hsoHMSize           = 50    // Harmony Memory size (number of stored solutions)
+	hsoEliteBias        = 0.25  // probability of biasing toward best known solution
+	hsoArrivalDist      = 3.0   // distance threshold for considering bot arrived at target
+	hsoBWDecayTicks     = 2500  // ticks over which bandwidth decays from max to min
+	hsoSpeedMult        = 5.0   // movement speed multiplier over SwarmBotSpeed
+	hsoDivCheckInterval = 200   // ticks between HM diversity checks
+	hsoDivThreshold     = 30.0  // minimum RMS spread in HM before diversity injection
+	hsoDivInjectFrac    = 0.2   // fraction of HM entries to replace with random when too clustered
 )
 
 // HSOHarmony stores one solution in the Harmony Memory.
@@ -76,7 +76,9 @@ type HSOState struct {
 }
 
 // InitHSO allocates Harmony Search state and fills the Harmony Memory
-// with the current bot positions as initial harmonies.
+// with uniformly distributed positions across the arena. This ensures
+// good initial coverage regardless of current bot positions (which may
+// be clustered from a previous algorithm run).
 func InitHSO(ss *SwarmState) {
 	n := len(ss.Bots)
 	st := &HSOState{
@@ -89,28 +91,56 @@ func InitHSO(ss *SwarmState) {
 		BestIdx: -1,
 	}
 
-	// Seed the Harmony Memory with up to hsoHMSize bot positions.
-	limit := n
-	if limit > hsoHMSize {
-		limit = hsoHMSize
-	}
-	for i := 0; i < limit; i++ {
-		f := hsoFitness(&ss.Bots[i], ss)
-		st.HM = append(st.HM, HSOHarmony{
-			X: ss.Bots[i].X, Y: ss.Bots[i].Y, Fitness: f,
-		})
-		if f > st.BestF {
-			st.BestF = f
-			st.BestIdx = i
-			st.BestX = ss.Bots[i].X
-			st.BestY = ss.Bots[i].Y
+	margin := SwarmEdgeMargin
+
+	// Seed the Harmony Memory with a uniform grid across the arena.
+	// Generate more candidates than hsoHMSize, evaluate each, and keep
+	// the top hsoHMSize positions. This gives the algorithm a head start
+	// on multi-modal landscapes like Gaussian Peaks.
+	gridSide := 10 // 10x10 = 100 candidate positions
+	candidates := make([]HSOHarmony, 0, gridSide*gridSide)
+	usableW := ss.ArenaW - 2*margin
+	usableH := ss.ArenaH - 2*margin
+	for gx := 0; gx < gridSide; gx++ {
+		for gy := 0; gy < gridSide; gy++ {
+			x := margin + usableW*(float64(gx)+0.5)/float64(gridSide)
+			y := margin + usableH*(float64(gy)+0.5)/float64(gridSide)
+			// Add small jitter to avoid exact grid patterns.
+			x += (ss.Rng.Float64()*2.0 - 1.0) * usableW * 0.03
+			y += (ss.Rng.Float64()*2.0 - 1.0) * usableH * 0.03
+			x = math.Max(margin, math.Min(ss.ArenaW-margin, x))
+			y = math.Max(margin, math.Min(ss.ArenaH-margin, y))
+			f := distanceFitnessPt(ss, x, y)
+			candidates = append(candidates, HSOHarmony{X: x, Y: y, Fitness: f})
 		}
 	}
 
-	// Assign initial targets (each bot moves to its own position initially).
+	// Sort candidates by fitness (descending) and keep top hsoHMSize.
+	// Simple selection sort for small array.
+	for i := 0; i < len(candidates) && i < hsoHMSize; i++ {
+		best := i
+		for j := i + 1; j < len(candidates); j++ {
+			if candidates[j].Fitness > candidates[best].Fitness {
+				best = j
+			}
+		}
+		if best != i {
+			candidates[i], candidates[best] = candidates[best], candidates[i]
+		}
+		st.HM = append(st.HM, candidates[i])
+		if candidates[i].Fitness > st.BestF {
+			st.BestF = candidates[i].Fitness
+			st.BestIdx = i
+			st.BestX = candidates[i].X
+			st.BestY = candidates[i].Y
+		}
+	}
+
+	// Assign initial targets: send each bot to a diverse HM position.
 	for i := 0; i < n; i++ {
-		st.TargetX[i] = ss.Bots[i].X
-		st.TargetY[i] = ss.Bots[i].Y
+		hmIdx := i % len(st.HM)
+		st.TargetX[i] = st.HM[hmIdx].X
+		st.TargetY[i] = st.HM[hmIdx].Y
 	}
 
 	ss.HSO = st

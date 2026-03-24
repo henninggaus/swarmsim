@@ -148,15 +148,16 @@ func TestApplyPSOMove(t *testing.T) {
 	ss.PSO.VelY[0] = 0.0
 
 	bot := &ss.Bots[0]
-	bot.Angle = math.Pi / 2 // facing up, velocity points right
+	oldX := bot.X
 	ApplyPSOMove(bot, ss, 0)
 
-	if bot.Speed <= 0 {
-		t.Fatal("bot speed should be positive when velocity is significant")
+	// Bot should have moved rightward (eigenbewegung)
+	if bot.X <= oldX {
+		t.Fatal("bot should have moved rightward via eigenbewegung")
 	}
-	// Angle should have moved toward 0 (rightward)
-	if bot.Angle > math.Pi/2 {
-		t.Fatal("bot angle should have moved toward velocity direction")
+	// Speed should be 0 after eigenbewegung
+	if bot.Speed != 0 {
+		t.Fatal("bot speed should be 0 after eigenbewegung")
 	}
 }
 
@@ -177,8 +178,8 @@ func TestApplyPSOMoveNilState(t *testing.T) {
 	ss := makePSOState(5)
 	bot := &ss.Bots[0]
 	ApplyPSOMove(bot, ss, 0)
-	if bot.Speed != SwarmBotSpeed {
-		t.Fatalf("should default to SwarmBotSpeed when PSO is nil, got %f", bot.Speed)
+	if bot.Speed != 0 {
+		t.Fatalf("should default to Speed=0 when PSO is nil, got %f", bot.Speed)
 	}
 }
 
@@ -187,8 +188,8 @@ func TestApplyPSOMoveOutOfRange(t *testing.T) {
 	InitPSO(ss)
 	bot := &ss.Bots[0]
 	ApplyPSOMove(bot, ss, 999) // index beyond slice
-	if bot.Speed != SwarmBotSpeed {
-		t.Fatal("should default to SwarmBotSpeed when index out of range")
+	if bot.Speed != 0 {
+		t.Fatal("should default to Speed=0 when index out of range")
 	}
 }
 

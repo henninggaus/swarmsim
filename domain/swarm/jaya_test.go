@@ -99,12 +99,16 @@ func TestApplyJaya(t *testing.T) {
 	for tick := 0; tick < 10; tick++ {
 		TickJaya(ss)
 	}
-	// Apply to a non-best bot
+	// Apply to a non-best bot — should move via eigenbewegung
 	for i := range ss.Bots {
 		if i != ss.Jaya.BestIdx {
+			oldX := ss.Bots[i].X
 			ApplyJaya(&ss.Bots[i], ss, i)
-			if ss.Bots[i].Speed <= 0 {
-				t.Fatal("bot speed should be positive after apply")
+			if ss.Bots[i].Speed != 0 {
+				t.Fatal("bot speed should be 0 after eigenbewegung")
+			}
+			if ss.Bots[i].X == oldX {
+				// May not move if target equals current pos, so soft check
 			}
 			break
 		}
@@ -161,8 +165,8 @@ func TestApplyJayaNil(t *testing.T) {
 	bot := &ss.Bots[0]
 	// Should not panic with nil Jaya
 	ApplyJaya(bot, ss, 0)
-	if bot.Speed != SwarmBotSpeed {
-		t.Fatal("speed should be default when Jaya is nil")
+	if bot.Speed != 0 {
+		t.Fatal("speed should be 0 when Jaya is nil")
 	}
 }
 

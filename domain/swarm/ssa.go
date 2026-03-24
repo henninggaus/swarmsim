@@ -149,34 +149,6 @@ func TickSSA(ss *SwarmState) {
 	}
 }
 
-// ssaMovBot moves a bot directly via position updates and sets Speed=0
-// to prevent double movement in GUI mode.
-func ssaMovBot(bot *SwarmBot, ss *SwarmState, tx, ty float64) {
-	dx := tx - bot.X
-	dy := ty - bot.Y
-	dist := math.Sqrt(dx*dx + dy*dy)
-
-	maxStep := SwarmBotSpeed * ssaSpeedMult
-	if dist < 2.0 {
-		bot.X = tx
-		bot.Y = ty
-	} else if dist <= maxStep {
-		bot.X = tx
-		bot.Y = ty
-	} else {
-		ratio := maxStep / dist
-		bot.X += dx * ratio
-		bot.Y += dy * ratio
-	}
-
-	// Clamp to arena
-	bot.X = math.Max(SwarmEdgeMargin, math.Min(ss.ArenaW-SwarmEdgeMargin, bot.X))
-	bot.Y = math.Max(SwarmEdgeMargin, math.Min(ss.ArenaH-SwarmEdgeMargin, bot.Y))
-
-	bot.Angle = math.Atan2(dy, dx)
-	bot.Speed = 0 // prevent double movement in GUI mode
-}
-
 // ApplySSA moves a bot according to the Salp Swarm Algorithm.
 // Bots move directly via position updates (bot.X/bot.Y) to work in both
 // GUI and headless benchmark modes.
@@ -256,7 +228,7 @@ func ApplySSA(bot *SwarmBot, ss *SwarmState, idx int) {
 	targetY = math.Max(SwarmEdgeMargin, math.Min(ss.ArenaH-SwarmEdgeMargin, targetY))
 
 	// Move directly to target
-	ssaMovBot(bot, ss, targetX, targetY)
+	algoMovBot(bot, targetX, targetY, ss.ArenaW, ss.ArenaH, ssaSpeedMult)
 
 	// Best salp gets bright gold LED
 	if idx == st.BestIdx {

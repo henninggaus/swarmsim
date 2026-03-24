@@ -184,44 +184,40 @@ func TickDE(ss *SwarmState) {
 // the generation cycle to complete selection.
 func ApplyDE(bot *SwarmBot, ss *SwarmState, idx int) {
 	if ss.DE == nil {
-		bot.Speed = SwarmBotSpeed
+		bot.Speed = 0
 		return
 	}
 	st := ss.DE
 	if idx >= len(st.Moving) {
-		bot.Speed = SwarmBotSpeed
+		bot.Speed = 0
 		return
 	}
 
 	if !st.Moving[idx] {
-		// Not moving — maintain slow drift for visual interest.
-		bot.Speed = SwarmBotSpeed * 0.3
-		// LED: dim blue for idle.
+		// Not moving — idle.
+		bot.Speed = 0
 		bot.LEDColor = [3]uint8{60, 60, 120}
 		return
 	}
 
-	// Steer toward trial position.
+	// Move directly toward trial position (eigenbewegung)
+	algoMovBot(bot, st.TrialX[idx], st.TrialY[idx], ss.ArenaW, ss.ArenaH, 3.0)
+
+	// Check arrival
 	dx := st.TrialX[idx] - bot.X
 	dy := st.TrialY[idx] - bot.Y
 	dist := math.Sqrt(dx*dx + dy*dy)
 
 	if dist < deTrialStep {
-		// Arrived at trial position — mark as arrived.
 		st.Moving[idx] = false
 		st.TrialF[idx] = deFitness(bot, ss)
 		if st.TrialF[idx] >= st.Fitness[idx] {
 			st.Fitness[idx] = st.TrialF[idx]
 		}
-		bot.Speed = SwarmBotSpeed * 0.3
 		return
 	}
 
-	desired := math.Atan2(dy, dx)
-	steerToward(bot, desired, deSteerRate)
-	bot.Speed = SwarmBotSpeed
-
-	// LED: color by generation progress — green when moving, brighter = higher fitness.
+	// LED: green when moving, brighter = higher fitness.
 	fit01 := math.Min(math.Max(st.Fitness[idx]/100.0, 0), 1)
 	g := uint8(80 + fit01*175)
 	bot.LEDColor = [3]uint8{30, g, 50}

@@ -156,39 +156,6 @@ func TickAO(ss *SwarmState) {
 	}
 }
 
-// aoMovBot moves a bot directly toward a target position.
-func aoMovBot(bot *SwarmBot, ss *SwarmState, tx, ty float64) {
-	dx := tx - bot.X
-	dy := ty - bot.Y
-	dist := math.Sqrt(dx*dx + dy*dy)
-
-	maxStep := SwarmBotSpeed * aoSpeedMult
-	if dist < 2.0 {
-		bot.X = tx
-		bot.Y = ty
-	} else if dist <= maxStep {
-		bot.X = tx
-		bot.Y = ty
-	} else {
-		ratio := maxStep / dist
-		bot.X += dx * ratio
-		bot.Y += dy * ratio
-	}
-
-	// Arena clamping
-	if bot.X < 0 {
-		bot.X = 0
-	} else if bot.X > ss.ArenaW {
-		bot.X = ss.ArenaW
-	}
-	if bot.Y < 0 {
-		bot.Y = 0
-	} else if bot.Y > ss.ArenaH {
-		bot.Y = ss.ArenaH
-	}
-	bot.Speed = 0
-}
-
 // ApplyAO steers an eagle according to its current hunting phase.
 func ApplyAO(bot *SwarmBot, ss *SwarmState, idx int) {
 	if ss.AO == nil {
@@ -266,7 +233,7 @@ func ApplyAO(bot *SwarmBot, ss *SwarmState, idx int) {
 	// Direct movement + steering for GUI mode
 	desired := math.Atan2(targetY-bot.Y, targetX-bot.X)
 	steerToward(bot, desired, aoSteerRate)
-	aoMovBot(bot, ss, targetX, targetY)
+	algoMovBot(bot, targetX, targetY, ss.ArenaW, ss.ArenaH, aoSpeedMult)
 }
 
 // aoLevyStep generates a Lévy-flight step using the shared Mantegna algorithm.

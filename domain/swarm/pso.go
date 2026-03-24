@@ -173,26 +173,40 @@ func TickPSO(ss *SwarmState) {
 	}
 }
 
-// ApplyPSOMove applies PSO velocity to bot movement.
-// It steers the bot toward the PSO velocity vector using rate-limited
-// turning via steerToward, and scales speed proportionally.
+// ApplyPSOMove applies PSO velocity to bot movement via direct position
+// updates (eigenbewegung). Bots move directly by their velocity vector
+// so they converge in both GUI and benchmark mode. Speed is set to 0
+// afterward to prevent double-movement in GUI mode.
 func ApplyPSOMove(bot *SwarmBot, ss *SwarmState, idx int) {
 	if ss.PSO == nil || idx >= len(ss.PSO.VelX) {
-		bot.Speed = SwarmBotSpeed
+		bot.Speed = 0
 		return
 	}
 	st := ss.PSO
 
-	// Steer toward velocity vector
+	// Apply velocity directly to position (eigenbewegung)
 	vx, vy := st.VelX[idx], st.VelY[idx]
 	speed := math.Sqrt(vx*vx + vy*vy)
 	if speed > 0.1 {
-		targetAngle := math.Atan2(vy, vx)
-		steerToward(bot, targetAngle, 0.2)
-		bot.Speed = math.Min(speed*0.5, SwarmBotSpeed)
-	} else {
-		bot.Speed = 0
+		bot.X += vx
+		bot.Y += vy
+		bot.Angle = math.Atan2(vy, vx)
 	}
+
+	// Clamp to arena
+	if bot.X < SwarmBotRadius {
+		bot.X = SwarmBotRadius
+	}
+	if bot.X > ss.ArenaW-SwarmBotRadius {
+		bot.X = ss.ArenaW - SwarmBotRadius
+	}
+	if bot.Y < SwarmBotRadius {
+		bot.Y = SwarmBotRadius
+	}
+	if bot.Y > ss.ArenaH-SwarmBotRadius {
+		bot.Y = ss.ArenaH - SwarmBotRadius
+	}
+	bot.Speed = 0
 
 	// LED: green = high fitness, red = low fitness
 	fit := distanceFitness(bot, ss)

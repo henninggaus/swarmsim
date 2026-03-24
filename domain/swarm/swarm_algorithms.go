@@ -72,6 +72,26 @@ const (
 	AlgoCount
 )
 
+// NextAlgorithm returns the next algorithm in enum order, wrapping around.
+// Skips AlgoNone.
+func NextAlgorithm(current SwarmAlgorithmType) SwarmAlgorithmType {
+	next := current + 1
+	if next >= AlgoCount {
+		next = AlgoBoids // wrap to first real algorithm
+	}
+	return next
+}
+
+// PrevAlgorithm returns the previous algorithm in enum order, wrapping around.
+// Skips AlgoNone.
+func PrevAlgorithm(current SwarmAlgorithmType) SwarmAlgorithmType {
+	prev := current - 1
+	if prev <= AlgoNone {
+		prev = AlgoCount - 1 // wrap to last algorithm
+	}
+	return prev
+}
+
 // AlgoPerformanceRecord stores the final performance of an algorithm run
 // on a specific fitness landscape. Used by the scoreboard to compare algorithms.
 type AlgoPerformanceRecord struct {
@@ -1226,33 +1246,6 @@ func distanceFitnessPt(ss *SwarmState, x, y float64) float64 {
 const fireflyMaxTicks = 3000 // cycle length for alpha decay and exploration ratio
 const fireflySpeedMult = 3.0 // 3x movement speed for faster convergence
 
-// fireflyMovBot moves a bot directly via position updates and sets Speed=0
-// to prevent double movement in GUI mode.
-func fireflyMovBot(bot *SwarmBot, ss *SwarmState, tx, ty float64) {
-	dx := tx - bot.X
-	dy := ty - bot.Y
-	dist := math.Sqrt(dx*dx + dy*dy)
-
-	maxStep := SwarmBotSpeed * fireflySpeedMult
-	if dist < 2.0 {
-		bot.X = tx
-		bot.Y = ty
-	} else if dist <= maxStep {
-		bot.X = tx
-		bot.Y = ty
-	} else {
-		ratio := maxStep / dist
-		bot.X += dx * ratio
-		bot.Y += dy * ratio
-	}
-
-	// Clamp to arena
-	bot.X = math.Max(SwarmEdgeMargin, math.Min(ss.ArenaW-SwarmEdgeMargin, bot.X))
-	bot.Y = math.Max(SwarmEdgeMargin, math.Min(ss.ArenaH-SwarmEdgeMargin, bot.Y))
-
-	bot.Angle = math.Atan2(dy, dx)
-	bot.Speed = 0 // prevent double movement in GUI mode
-}
 
 // InitFireflyAlgo allocates per-bot brightness and initialises global best tracking.
 func InitFireflyAlgo(ss *SwarmState) {
@@ -1365,7 +1358,7 @@ func tickFirefly(ss *SwarmState, sa *SwarmAlgorithmState) {
 		}
 
 		// Move bot directly to target (works in both GUI and benchmark mode)
-		fireflyMovBot(bot, ss, targetX, targetY)
+		algoMovBot(bot, targetX, targetY, ss.ArenaW, ss.ArenaH, fireflySpeedMult)
 
 		// LED: warm-to-cool gradient based on fitness; gold for global best
 		if i == sa.FireflyBestIdx {

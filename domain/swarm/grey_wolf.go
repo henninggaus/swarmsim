@@ -78,33 +78,6 @@ func ClearGWO(ss *SwarmState) {
 	ss.GWOOn = false
 }
 
-// gwoMovBot moves a bot directly toward the target position.
-// This ensures bots move even in headless benchmark mode (no physics step).
-func gwoMovBot(bot *SwarmBot, targetX, targetY, arenaW, arenaH float64) {
-	dx := targetX - bot.X
-	dy := targetY - bot.Y
-	dist := math.Sqrt(dx*dx + dy*dy)
-	if dist < 2 {
-		bot.X = targetX
-		bot.Y = targetY
-		bot.Speed = 0
-		return
-	}
-	maxStep := SwarmBotSpeed * gwoSpeedMult
-	if dist <= maxStep {
-		bot.X = targetX
-		bot.Y = targetY
-	} else {
-		ratio := maxStep / dist
-		bot.X += dx * ratio
-		bot.Y += dy * ratio
-	}
-	// Clamp to arena
-	bot.X = math.Max(5, math.Min(arenaW-5, bot.X))
-	bot.Y = math.Max(5, math.Min(arenaH-5, bot.Y))
-	bot.Speed = 0 // prevent double movement in GUI mode
-}
-
 // TickGWO updates the Grey Wolf Optimizer for all bots.
 // Computes fitness, assigns ranks, updates sensor cache.
 func TickGWO(ss *SwarmState) {
@@ -284,7 +257,7 @@ func ApplyGWO(bot *SwarmBot, ss *SwarmState, idx int) {
 	// Direct position update (works in both GUI and headless benchmark mode)
 	aw := float64(ss.ArenaW)
 	ah := float64(ss.ArenaH)
-	gwoMovBot(bot, targetX, targetY, aw, ah)
+	algoMovBot(bot, targetX, targetY, aw, ah, gwoSpeedMult)
 
 	// Also set steering for GUI mode visual consistency
 	desired := math.Atan2(targetY-bot.Y, targetX-bot.X)

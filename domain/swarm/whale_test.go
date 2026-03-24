@@ -84,11 +84,38 @@ func TestApplyWOA(t *testing.T) {
 	for tick := 0; tick < 10; tick++ {
 		TickWOA(ss)
 	}
+	initX := make([]float64, len(ss.Bots))
+	for i := range ss.Bots {
+		initX[i] = ss.Bots[i].X
+	}
 	for i := range ss.Bots {
 		ApplyWOA(&ss.Bots[i], ss, i)
-		if ss.Bots[i].Speed <= 0 {
-			t.Fatalf("bot %d: speed should be positive", i)
+		if ss.Bots[i].Speed != 0 {
+			t.Fatalf("bot %d: speed should be 0 after eigenbewegung", i)
 		}
+	}
+	moved := 0
+	for i := range ss.Bots {
+		if ss.Bots[i].X != initX[i] {
+			moved++
+		}
+	}
+	if moved == 0 {
+		t.Fatal("expected some bots to move via eigenbewegung")
+	}
+}
+
+func TestWOAGlobalBest(t *testing.T) {
+	ss := makeWOAState(15)
+	InitWOA(ss)
+	for tick := 0; tick < 50; tick++ {
+		TickWOA(ss)
+		for i := range ss.Bots {
+			ApplyWOA(&ss.Bots[i], ss, i)
+		}
+	}
+	if ss.WOA.GlobalBestF <= -1e18 {
+		t.Fatal("GlobalBestF should be updated after 50 ticks")
 	}
 }
 

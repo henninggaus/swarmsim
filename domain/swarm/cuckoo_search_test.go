@@ -102,11 +102,27 @@ func TestApplyCuckoo(t *testing.T) {
 	for tick := 0; tick < 10; tick++ {
 		TickCuckoo(ss)
 	}
+	// Record initial positions
+	initX := make([]float64, len(ss.Bots))
+	for i := range ss.Bots {
+		initX[i] = ss.Bots[i].X
+	}
 	for i := range ss.Bots {
 		ApplyCuckoo(&ss.Bots[i], ss, i)
-		if ss.Bots[i].Speed <= 0 {
-			t.Fatalf("bot %d: speed should be positive", i)
+		// Speed should be 0 after eigenbewegung
+		if ss.Bots[i].Speed != 0 {
+			t.Fatalf("bot %d: speed should be 0 after eigenbewegung", i)
 		}
+	}
+	// At least some bots should have moved
+	moved := 0
+	for i := range ss.Bots {
+		if ss.Bots[i].X != initX[i] {
+			moved++
+		}
+	}
+	if moved == 0 {
+		t.Fatal("expected some bots to move via eigenbewegung")
 	}
 }
 
@@ -114,8 +130,8 @@ func TestApplyCuckooNil(t *testing.T) {
 	ss := makeCuckooState(5)
 	bot := &ss.Bots[0]
 	ApplyCuckoo(bot, ss, 0) // should not panic with nil state
-	if bot.Speed != SwarmBotSpeed {
-		t.Fatalf("expected default speed, got %f", bot.Speed)
+	if bot.Speed != 0 {
+		t.Fatalf("expected Speed=0 with nil cuckoo, got %f", bot.Speed)
 	}
 }
 

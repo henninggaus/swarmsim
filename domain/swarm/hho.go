@@ -64,33 +64,6 @@ func ClearHHO(ss *SwarmState) {
 	ss.HHOOn = false
 }
 
-// hhoMovBot moves a bot directly toward a target position (Eigenbewegung).
-// This ensures bots move in benchmark mode where applySwarmPhysics is not called.
-func hhoMovBot(bot *SwarmBot, targetX, targetY, arenaW, arenaH float64) {
-	dx := targetX - bot.X
-	dy := targetY - bot.Y
-	dist := math.Sqrt(dx*dx + dy*dy)
-	if dist < 2 {
-		bot.X = targetX
-		bot.Y = targetY
-		bot.Speed = 0
-		return
-	}
-	maxStep := SwarmBotSpeed * hhoSpeedMult
-	if dist <= maxStep {
-		bot.X = targetX
-		bot.Y = targetY
-	} else {
-		ratio := maxStep / dist
-		bot.X += dx * ratio
-		bot.Y += dy * ratio
-	}
-	// Clamp to arena
-	bot.X = math.Max(5, math.Min(arenaW-5, bot.X))
-	bot.Y = math.Max(5, math.Min(arenaH-5, bot.Y))
-	bot.Speed = 0 // prevent double movement in GUI mode
-}
-
 // TickHHO updates the Harris Hawks Optimization for all bots.
 func TickHHO(ss *SwarmState) {
 	if ss.HHO == nil {
@@ -191,7 +164,7 @@ func ApplyHHO(bot *SwarmBot, ss *SwarmState, idx int) {
 		targetY := bot.Y + (ss.Rng.Float64()-0.5)*40
 		targetX = math.Max(10, math.Min(ss.ArenaW-10, targetX))
 		targetY = math.Max(10, math.Min(ss.ArenaH-10, targetY))
-		hhoMovBot(bot, targetX, targetY, ss.ArenaW, ss.ArenaH)
+		algoMovBot(bot, targetX, targetY, ss.ArenaW, ss.ArenaH, hhoSpeedMult)
 		return
 	}
 
@@ -261,7 +234,7 @@ func ApplyHHO(bot *SwarmBot, ss *SwarmState, idx int) {
 	steerToward(bot, desired, hhoSteerRate)
 
 	// Direct movement (Eigenbewegung) — ensures movement in benchmark mode
-	hhoMovBot(bot, targetX, targetY, ss.ArenaW, ss.ArenaH)
+	algoMovBot(bot, targetX, targetY, ss.ArenaW, ss.ArenaH, hhoSpeedMult)
 }
 
 // levyStep generates a Lévy-flight step using the shared Mantegna algorithm.

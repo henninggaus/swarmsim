@@ -159,24 +159,26 @@ func TickJaya(ss *SwarmState) {
 // ApplyJaya steers a bot according to the Jaya algorithm.
 func ApplyJaya(bot *SwarmBot, ss *SwarmState, idx int) {
 	if ss.Jaya == nil {
-		bot.Speed = SwarmBotSpeed
+		bot.Speed = 0
 		return
 	}
 	st := ss.Jaya
 	if idx >= len(st.Fitness) {
-		bot.Speed = SwarmBotSpeed
+		bot.Speed = 0
 		return
 	}
 
-	// Best bot keeps natural behavior
+	// Best bot does small random walk
 	if idx == st.BestIdx {
-		bot.Speed = SwarmBotSpeed
+		rx := bot.X + (ss.Rng.Float64()-0.5)*10
+		ry := bot.Y + (ss.Rng.Float64()-0.5)*10
+		algoMovBot(bot, rx, ry, ss.ArenaW, ss.ArenaH, 1.0)
 		bot.LEDColor = [3]uint8{255, 215, 0} // gold for best
 		return
 	}
 
 	if st.BestIdx < 0 || st.WorstIdx < 0 {
-		bot.Speed = SwarmBotSpeed
+		bot.Speed = 0
 		return
 	}
 
@@ -191,22 +193,14 @@ func ApplyJaya(bot *SwarmBot, ss *SwarmState, idx int) {
 	targetX := bot.X + r1*(st.BestX-absX) - r2*(st.WorstX-absX)
 	targetY := bot.Y + r1*(st.BestY-absY) - r2*(st.WorstY-absY)
 
-	// Steer toward target
-	dx := targetX - bot.X
-	dy := targetY - bot.Y
-	if dx != 0 || dy != 0 {
-		desired := math.Atan2(dy, dx)
-		steerToward(bot, desired, jayaSteerRate)
-	}
-	bot.Speed = SwarmBotSpeed
+	// Move directly toward target (eigenbewegung)
+	algoMovBot(bot, targetX, targetY, ss.ArenaW, ss.ArenaH, 3.0)
 
 	// LED color: brightness proportional to fitness
-	// Green = close to best, Red = close to worst
 	intensity := uint8(80 + st.Fitness[idx]*175)
 	if intensity < 80 {
 		intensity = 80
 	}
-	// Ratio: how close to best vs worst (0 = worst, 1 = best)
 	fitnessRange := st.BestF - st.WorstF
 	var ratio float64
 	if fitnessRange > 1e-10 {
@@ -214,7 +208,6 @@ func ApplyJaya(bot *SwarmBot, ss *SwarmState, idx int) {
 	} else {
 		ratio = 0.5
 	}
-	// Interpolate red→green based on ratio
 	r := uint8(float64(intensity) * (1 - ratio))
 	g := uint8(float64(intensity) * ratio)
 	bot.LEDColor = [3]uint8{r, g, intensity / 4}

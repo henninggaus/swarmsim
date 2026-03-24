@@ -555,6 +555,13 @@ func DrawSwarmHUD(screen *ebiten.Image, s *simulation.Simulation, fps float64) {
 			ss.BotCount, ss.ProgramName, ss.Tick)
 		ebitenutil.DebugPrintAt(screen, arenaInfo, 420, 35)
 
+		// Active algorithm indicator
+		if ss.SwarmAlgo != nil {
+			algoLabel := fmt.Sprintf("Algo: %s  [ ] / [ ] switch",
+				swarm.SwarmAlgorithmName(ss.SwarmAlgo.ActiveAlgo))
+			printColoredAt(screen, algoLabel, 420, 50, color.RGBA{200, 255, 100, 230})
+		}
+
 		// Dynamic environment indicator
 		if ss.DynamicEnv {
 			printColoredAt(screen, "DYNAMISCH", 750, 35, color.RGBA{255, 150, 50, 220})
