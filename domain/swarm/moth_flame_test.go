@@ -89,11 +89,25 @@ func TestApplyMFO(t *testing.T) {
 	for tick := 0; tick < 20; tick++ {
 		TickMFO(ss)
 	}
+	// Save initial positions to verify movement
+	origX := make([]float64, len(ss.Bots))
+	origY := make([]float64, len(ss.Bots))
+	for i := range ss.Bots {
+		origX[i] = ss.Bots[i].X
+		origY[i] = ss.Bots[i].Y
+	}
 	for i := range ss.Bots {
 		ApplyMFO(&ss.Bots[i], ss, i)
-		if ss.Bots[i].Speed <= 0 {
-			t.Fatalf("bot %d: speed should be positive", i)
+	}
+	// At least some bots should have moved
+	moved := 0
+	for i := range ss.Bots {
+		if ss.Bots[i].X != origX[i] || ss.Bots[i].Y != origY[i] {
+			moved++
 		}
+	}
+	if moved == 0 {
+		t.Fatal("no bots moved after ApplyMFO")
 	}
 }
 

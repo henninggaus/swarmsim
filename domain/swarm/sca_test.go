@@ -70,8 +70,8 @@ func TestTickSCA(t *testing.T) {
 		TickSCA(ss)
 	}
 	st := ss.SCA
-	if st.BestIdx < 0 || st.BestIdx >= 20 {
-		t.Fatalf("best index out of range: %d", st.BestIdx)
+	if st.CurBestIdx < 0 || st.CurBestIdx >= 20 {
+		t.Fatalf("current best index out of range: %d", st.CurBestIdx)
 	}
 	// Sensor cache should be populated
 	for i := range ss.Bots {
@@ -90,12 +90,17 @@ func TestApplySCA(t *testing.T) {
 	for tick := 0; tick < 10; tick++ {
 		TickSCA(ss)
 	}
-	// Apply to a non-best bot
+	// Apply to a non-best bot — should move position and set Speed=0
 	for i := range ss.Bots {
-		if i != ss.SCA.BestIdx {
+		if i != ss.SCA.CurBestIdx {
+			oldX := ss.Bots[i].X
+			oldY := ss.Bots[i].Y
 			ApplySCA(&ss.Bots[i], ss, i)
-			if ss.Bots[i].Speed <= 0 {
-				t.Fatal("bot speed should be positive after apply")
+			if ss.Bots[i].Speed != 0 {
+				t.Fatal("bot speed should be 0 after apply (self-movement)")
+			}
+			if ss.Bots[i].X == oldX && ss.Bots[i].Y == oldY {
+				t.Fatal("bot position should change after apply")
 			}
 			break
 		}
@@ -108,7 +113,7 @@ func TestApplySCABestBot(t *testing.T) {
 	for tick := 0; tick < 10; tick++ {
 		TickSCA(ss)
 	}
-	bestIdx := ss.SCA.BestIdx
+	bestIdx := ss.SCA.CurBestIdx
 	if bestIdx >= 0 {
 		ApplySCA(&ss.Bots[bestIdx], ss, bestIdx)
 		// Best bot should get gold LED
@@ -167,7 +172,7 @@ func TestSCAPhaseDistribution(t *testing.T) {
 	// Apply to all non-best bots and count sine vs cosine phases
 	sine, cosine := 0, 0
 	for i := range ss.Bots {
-		if i != ss.SCA.BestIdx {
+		if i != ss.SCA.CurBestIdx {
 			ApplySCA(&ss.Bots[i], ss, i)
 			if ss.SCA.Phase[i] == 0 {
 				sine++
@@ -182,5 +187,23 @@ func TestSCAPhaseDistribution(t *testing.T) {
 	}
 	if cosine == 0 {
 		t.Fatal("expected some bots in cosine phase")
+	}
+}
+
+func TestSCAGlobalBest(t *testing.T) {
+	ss := makeSCAState(20)
+	InitSCA(ss)
+	for tick := 0; tick < 100; tick++ {
+		TickSCA(ss)
+	}
+	st := ss.SCA
+	if st.GlobalBestF <= -1e18 {
+		t.Fatal("global best fitness should be set after 100 ticks")
+	}
+	// Global best should be >= any current fitness
+	for i := range ss.Bots {
+		if st.GlobalBestF < st.Fitness[i]-0.01 {
+			t.Fatalf("global best %f should be >= bot %d fitness %f", st.GlobalBestF, i, st.Fitness[i])
+		}
 	}
 }

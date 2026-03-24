@@ -96,12 +96,14 @@ func TestApplyDA(t *testing.T) {
 	for tick := 0; tick < 10; tick++ {
 		TickDA(ss)
 	}
-	// Apply to a non-best bot
+	// Apply to a non-best bot — position should change (Eigenbewegung)
 	for i := range ss.Bots {
-		if i != ss.DA.BestIdx {
+		if i != ss.DA.CurBestIdx {
+			oldX := ss.Bots[i].X
+			oldY := ss.Bots[i].Y
 			ApplyDA(&ss.Bots[i], ss, i)
-			if ss.Bots[i].Speed <= 0 {
-				t.Fatal("bot speed should be positive after apply")
+			if ss.Bots[i].X == oldX && ss.Bots[i].Y == oldY {
+				t.Fatal("bot position should change after apply (Eigenbewegung)")
 			}
 			break
 		}
@@ -114,7 +116,7 @@ func TestApplyDABestBot(t *testing.T) {
 	for tick := 0; tick < 10; tick++ {
 		TickDA(ss)
 	}
-	bestIdx := ss.DA.BestIdx
+	bestIdx := ss.DA.CurBestIdx
 	if bestIdx >= 0 {
 		ApplyDA(&ss.Bots[bestIdx], ss, bestIdx)
 		// Best bot should get gold LED
@@ -173,7 +175,7 @@ func TestDARoleDistribution(t *testing.T) {
 	// Apply to all non-best bots and check roles are assigned
 	roles := map[int]int{}
 	for i := range ss.Bots {
-		if i != ss.DA.BestIdx {
+		if i != ss.DA.CurBestIdx {
 			ApplyDA(&ss.Bots[i], ss, i)
 			roles[ss.DA.Role[i]]++
 		}
@@ -203,7 +205,7 @@ func TestDALevyFlight(t *testing.T) {
 	// Apply to bot 0 — it should have no neighbours and use Lévy flight
 	ApplyDA(&ss.Bots[0], ss, 0)
 	// Lévy flight should set role to 2
-	if ss.DA.Role[0] != 2 && ss.DA.BestIdx != 0 {
+	if ss.DA.Role[0] != 2 && ss.DA.CurBestIdx != 0 {
 		// Only check if bot 0 is not the best (best keeps role 0)
 		t.Fatalf("isolated bot should be in lévy flight mode, got role %d", ss.DA.Role[0])
 	}

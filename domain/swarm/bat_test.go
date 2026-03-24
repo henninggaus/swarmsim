@@ -67,11 +67,38 @@ func TestBatTickConvergence(t *testing.T) {
 	ss.Light.Y = 400
 	InitBat(ss)
 
+	// Record initial positions
+	initX := make([]float64, len(ss.Bots))
+	initY := make([]float64, len(ss.Bots))
+	for i := range ss.Bots {
+		initX[i] = ss.Bots[i].X
+		initY[i] = ss.Bots[i].Y
+	}
+
 	// Run 200 ticks
 	for tick := 0; tick < 200; tick++ {
 		TickBat(ss)
 		for i := range ss.Bots {
 			ApplyBat(&ss.Bots[i], ss, i)
+		}
+	}
+
+	// After 200 ticks, bots should have moved (eigenbewegung)
+	moved := 0
+	for i := range ss.Bots {
+		if ss.Bots[i].X != initX[i] || ss.Bots[i].Y != initY[i] {
+			moved++
+		}
+	}
+	if moved == 0 {
+		t.Error("expected bots to move via eigenbewegung after 200 ticks")
+	}
+
+	// Speed should be 0 after ApplyBat (eigenbewegung sets Speed=0)
+	for i := range ss.Bots {
+		if ss.Bots[i].Speed != 0 {
+			t.Errorf("bot %d: expected Speed=0 after ApplyBat, got %f", i, ss.Bots[i].Speed)
+			break
 		}
 	}
 
@@ -95,6 +122,31 @@ func TestBatTickConvergence(t *testing.T) {
 	}
 	if highPulse == 0 {
 		t.Error("expected at least some bats with increased pulse rate")
+	}
+}
+
+func TestBatGlobalBest(t *testing.T) {
+	ss := makeTestSwarmStateBat(20)
+	ss.Light.Active = true
+	ss.Light.X = 400
+	ss.Light.Y = 400
+	InitBat(ss)
+
+	for tick := 0; tick < 100; tick++ {
+		TickBat(ss)
+		for i := range ss.Bots {
+			ApplyBat(&ss.Bots[i], ss, i)
+		}
+	}
+
+	// GlobalBestF should be updated
+	if ss.Bat.GlobalBestF <= -1e18 {
+		t.Error("expected GlobalBestF to be updated after 100 ticks")
+	}
+
+	// GlobalBestF should be >= BestF
+	if ss.Bat.GlobalBestF < ss.Bat.BestF {
+		t.Errorf("GlobalBestF (%f) should be >= BestF (%f)", ss.Bat.GlobalBestF, ss.Bat.BestF)
 	}
 }
 

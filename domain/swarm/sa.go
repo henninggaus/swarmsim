@@ -30,7 +30,9 @@ import (
 //            Science, 220(4598), pp. 671–680.
 
 const (
-	saSteerRate = 0.2 // max steering change per tick (radians)
+	saSteerRate   = 0.3   // max steering change per tick (radians)
+	saMaxTicks    = 3000  // total optimization ticks (matches benchmark length)
+	saGBestWeight = 0.15  // attraction weight toward global best
 )
 
 // SAState holds Simulated Annealing state for the swarm.
@@ -49,6 +51,9 @@ type SAState struct {
 	// Global tracking
 	GlobalBestIdx int     // index of globally best bot
 	GlobalBestF   float64 // best fitness found across all bots
+	GlobalBestX   float64 // global best position X
+	GlobalBestY   float64 // global best position Y
+	Tick          int     // current tick counter
 
 	// Parameters
 	InitialTemp   float64 // T0 (default 100.0)
@@ -86,6 +91,8 @@ func InitSA(ss *SwarmState) {
 		if st.Fitness[i] > st.GlobalBestF {
 			st.GlobalBestF = st.Fitness[i]
 			st.GlobalBestIdx = i
+			st.GlobalBestX = ss.Bots[i].X
+			st.GlobalBestY = ss.Bots[i].Y
 		}
 	}
 
@@ -122,6 +129,15 @@ func TickSA(ss *SwarmState) {
 		st.Accepted = append(st.Accepted, false)
 	}
 
+	st.Tick++
+	progress := float64(st.Tick) / float64(saMaxTicks)
+	if progress > 1 {
+		progress = 1
+	}
+
+	// Adaptive global best attraction: increases over time (exploitation).
+	gbestW := saGBestWeight * progress
+
 	for i := 0; i < n; i++ {
 		if st.Moving[i] {
 			continue // bot is still moving toward its target
@@ -142,6 +158,8 @@ func TickSA(ss *SwarmState) {
 		if currentF > st.GlobalBestF {
 			st.GlobalBestF = currentF
 			st.GlobalBestIdx = i
+			st.GlobalBestX = ss.Bots[i].X
+			st.GlobalBestY = ss.Bots[i].Y
 		}
 
 		// Generate neighbor: random perturbation scaled by temperature ratio.
@@ -153,6 +171,12 @@ func TickSA(ss *SwarmState) {
 
 		nx := ss.Bots[i].X + dist*math.Cos(angle)
 		ny := ss.Bots[i].Y + dist*math.Sin(angle)
+
+		// Blend toward global best position (social component).
+		if st.GlobalBestF > -1e8 && gbestW > 0 {
+			nx = nx*(1-gbestW) + st.GlobalBestX*gbestW
+			ny = ny*(1-gbestW) + st.GlobalBestY*gbestW
+		}
 
 		// Clamp to arena bounds.
 		nx = math.Max(SwarmEdgeMargin, math.Min(ss.ArenaW-SwarmEdgeMargin, nx))
@@ -205,7 +229,9 @@ func TickSA(ss *SwarmState) {
 	}
 }
 
-// ApplySA steers a bot toward its accepted target position.
+// ApplySA moves a bot toward its accepted target position.
+// Bots move directly via position updates (bot.X/bot.Y) to work in both
+// GUI and headless benchmark modes.
 func ApplySA(bot *SwarmBot, ss *SwarmState, idx int) {
 	if ss.SA == nil {
 		bot.Speed = SwarmBotSpeed
@@ -218,8 +244,8 @@ func ApplySA(bot *SwarmBot, ss *SwarmState, idx int) {
 	}
 
 	if !st.Moving[idx] {
-		// Not moving — slow drift.
-		bot.Speed = SwarmBotSpeed * 0.2
+		// Not moving — idle.
+		bot.Speed = 0
 		// LED: color by temperature (hot=red, cold=blue).
 		tempRatio := st.Temp[idx] / st.InitialTemp
 		r := uint8(math.Min(255, tempRatio*255))
@@ -232,8 +258,12 @@ func ApplySA(bot *SwarmBot, ss *SwarmState, idx int) {
 	dy := st.TargetY[idx] - bot.Y
 	dist := math.Sqrt(dx*dx + dy*dy)
 
-	if dist < 5.0 {
-		// Arrived at target.
+	// Move directly toward target via position update.
+	stepSize := SwarmBotSpeed * 2.0 // faster movement to maximize evaluations
+	if dist < stepSize {
+		// Arrived at target — snap to position.
+		bot.X = st.TargetX[idx]
+		bot.Y = st.TargetY[idx]
 		st.Moving[idx] = false
 		st.Fitness[idx] = saFitness(bot, ss)
 		if st.Fitness[idx] > st.BestF[idx] {
@@ -244,14 +274,23 @@ func ApplySA(bot *SwarmBot, ss *SwarmState, idx int) {
 		if st.Fitness[idx] > st.GlobalBestF {
 			st.GlobalBestF = st.Fitness[idx]
 			st.GlobalBestIdx = idx
+			st.GlobalBestX = bot.X
+			st.GlobalBestY = bot.Y
 		}
-		bot.Speed = SwarmBotSpeed * 0.2
+		bot.Speed = 0
 		return
 	}
 
-	desired := math.Atan2(dy, dx)
-	steerToward(bot, desired, saSteerRate)
-	bot.Speed = SwarmBotSpeed * 1.2
+	// Step toward target.
+	ratio := stepSize / dist
+	bot.X += dx * ratio
+	bot.Y += dy * ratio
+	bot.Angle = math.Atan2(dy, dx)
+	bot.Speed = 0 // prevent double movement in GUI mode
+
+	// Clamp to arena.
+	bot.X = math.Max(SwarmEdgeMargin, math.Min(ss.ArenaW-SwarmEdgeMargin, bot.X))
+	bot.Y = math.Max(SwarmEdgeMargin, math.Min(ss.ArenaH-SwarmEdgeMargin, bot.Y))
 
 	// LED: temperature gradient with acceptance flash.
 	tempRatio := st.Temp[idx] / st.InitialTemp

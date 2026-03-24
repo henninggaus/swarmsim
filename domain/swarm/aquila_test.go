@@ -88,12 +88,18 @@ func TestApplyAO(t *testing.T) {
 	for tick := 0; tick < 10; tick++ {
 		TickAO(ss)
 	}
-	// Apply to a non-best eagle
+	// Apply to a non-best eagle — should move position and set Speed=0
 	for i := range ss.Bots {
-		if i != ss.AO.BestIdx {
+		if i != ss.AO.CurBestIdx {
+			oldX, oldY := ss.Bots[i].X, ss.Bots[i].Y
 			ApplyAO(&ss.Bots[i], ss, i)
-			if ss.Bots[i].Speed <= 0 {
-				t.Fatal("eagle speed should be positive")
+			if ss.Bots[i].Speed != 0 {
+				t.Fatal("eagle speed should be 0 after self-movement")
+			}
+			dx := ss.Bots[i].X - oldX
+			dy := ss.Bots[i].Y - oldY
+			if dx == 0 && dy == 0 {
+				t.Fatal("eagle should have moved")
 			}
 			break
 		}
@@ -106,10 +112,10 @@ func TestApplyAOBestEagle(t *testing.T) {
 	for tick := 0; tick < 10; tick++ {
 		TickAO(ss)
 	}
-	bestIdx := ss.AO.BestIdx
+	bestIdx := ss.AO.CurBestIdx
 	if bestIdx >= 0 {
 		ApplyAO(&ss.Bots[bestIdx], ss, bestIdx)
-		// Best eagle (prey) should get gold LED
+		// Current best eagle should get gold LED
 		if ss.Bots[bestIdx].LEDColor != [3]uint8{255, 215, 0} {
 			t.Fatal("best eagle should have gold LED")
 		}
@@ -134,9 +140,10 @@ func TestAOGrowSlices(t *testing.T) {
 func TestAOAllPhases(t *testing.T) {
 	ss := makeAOState(50)
 	InitAO(ss)
-	// Run many ticks to hit all phases (exploration early, exploitation late)
+	// Run enough ticks to hit all phases (exploration early, exploitation late)
+	// With aoMaxTicks=3000, need >2000 ticks to reach exploitation phase (tRatio >= 2/3)
 	phasesSeen := map[int]bool{}
-	for tick := 0; tick < 500; tick++ {
+	for tick := 0; tick < 2500; tick++ {
 		TickAO(ss)
 		for i := range ss.Bots {
 			phasesSeen[ss.AO.Phase[i]] = true
@@ -148,7 +155,7 @@ func TestAOAllPhases(t *testing.T) {
 	// Should see all 4 phases
 	for p := 0; p <= 3; p++ {
 		if !phasesSeen[p] {
-			t.Errorf("phase %d never seen in 500 ticks", p)
+			t.Errorf("phase %d never seen in 2500 ticks", p)
 		}
 	}
 }
@@ -185,5 +192,25 @@ func TestAOCycleReset(t *testing.T) {
 	}
 	if ss.AO.HuntTick > aoMaxTicks {
 		t.Fatalf("HuntTick should have reset, got %d", ss.AO.HuntTick)
+	}
+}
+
+func TestAOGlobalBest(t *testing.T) {
+	ss := makeAOState(20)
+	InitAO(ss)
+	for tick := 0; tick < 100; tick++ {
+		TickAO(ss)
+	}
+	// GlobalBestF should be set after ticks
+	if ss.AO.GlobalBestF <= -1e18 {
+		t.Fatal("GlobalBestF should have been updated")
+	}
+	// GlobalBestF should persist across cycle reset
+	bestBefore := ss.AO.GlobalBestF
+	for tick := 0; tick < aoMaxTicks+10; tick++ {
+		TickAO(ss)
+	}
+	if ss.AO.GlobalBestF < bestBefore {
+		t.Fatalf("GlobalBestF should not decrease after cycle reset: %f < %f", ss.AO.GlobalBestF, bestBefore)
 	}
 }

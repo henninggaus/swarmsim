@@ -24,30 +24,39 @@ import "math"
 //            Knowledge-Based Systems.
 
 const (
-	scaMaxTicks  = 600   // full optimization cycle
-	scaSteerRate = 0.15  // max steering change per tick (radians)
+	scaMaxTicks  = 3000  // full optimization cycle (matches benchmark length)
+	scaSteerRate = 0.25  // max steering change per tick (radians)
 	scaAMax      = 2.0   // initial r1 upper bound (exploration range)
+	scaSpeedMult = 3.0   // movement speed multiplier
 )
 
 // SCAState holds Sine Cosine Algorithm state for the swarm.
 type SCAState struct {
-	Fitness    []float64 // current fitness per bot
-	BestX      float64   // global best position X
-	BestY      float64   // global best position Y
-	BestF      float64   // global best fitness
-	BestIdx    int       // index of best bot
-	Tick       int       // ticks into current cycle
-	Phase      []int     // 0=sine, 1=cosine per bot (last used)
+	Fitness      []float64 // current fitness per bot
+	GlobalBestX  float64   // persistent global best position X
+	GlobalBestY  float64   // persistent global best position Y
+	GlobalBestF  float64   // persistent global best fitness
+	GlobalBestIdx int      // index of bot at global best
+	CurBestIdx   int       // current tick best (for LED)
+	BestX        float64   // current tick best X (kept for compat)
+	BestY        float64   // current tick best Y
+	BestF        float64   // current tick best fitness
+	BestIdx      int       // alias for CurBestIdx
+	Tick         int       // ticks into current cycle
+	Phase        []int     // 0=sine, 1=cosine per bot (last used)
 }
 
 // InitSCA allocates Sine Cosine Algorithm state for all bots.
 func InitSCA(ss *SwarmState) {
 	n := len(ss.Bots)
 	ss.SCA = &SCAState{
-		Fitness: make([]float64, n),
-		Phase:   make([]int, n),
-		BestF:   -1e18,
-		BestIdx: -1,
+		Fitness:       make([]float64, n),
+		Phase:         make([]int, n),
+		GlobalBestF:   -1e18,
+		GlobalBestIdx: -1,
+		BestF:         -1e18,
+		BestIdx:       -1,
+		CurBestIdx:    -1,
 	}
 	ss.SCAOn = true
 }
@@ -81,18 +90,28 @@ func TickSCA(ss *SwarmState) {
 		st.Fitness[i] = distanceFitness(&ss.Bots[i], ss)
 	}
 
-	// Find global best
-	st.BestIdx = -1
-	st.BestF = -1e18
+	// Find current tick best
+	st.CurBestIdx = -1
+	curBestF := -1e18
 	for i := range ss.Bots {
-		if st.Fitness[i] > st.BestF {
-			st.BestF = st.Fitness[i]
-			st.BestIdx = i
+		if st.Fitness[i] > curBestF {
+			curBestF = st.Fitness[i]
+			st.CurBestIdx = i
 		}
 	}
-	if st.BestIdx >= 0 {
-		st.BestX = ss.Bots[st.BestIdx].X
-		st.BestY = ss.Bots[st.BestIdx].Y
+	st.BestF = curBestF
+	st.BestIdx = st.CurBestIdx
+	if st.CurBestIdx >= 0 {
+		st.BestX = ss.Bots[st.CurBestIdx].X
+		st.BestY = ss.Bots[st.CurBestIdx].Y
+	}
+
+	// Update persistent global best
+	if curBestF > st.GlobalBestF && st.CurBestIdx >= 0 {
+		st.GlobalBestF = curBestF
+		st.GlobalBestX = ss.Bots[st.CurBestIdx].X
+		st.GlobalBestY = ss.Bots[st.CurBestIdx].Y
+		st.GlobalBestIdx = st.CurBestIdx
 	}
 
 	// Update sensor cache
@@ -102,13 +121,57 @@ func TickSCA(ss *SwarmState) {
 			ss.Bots[i].SCAFitness = 100
 		}
 		ss.Bots[i].SCAPhase = st.Phase[i]
-		if st.BestIdx >= 0 {
-			dx := st.BestX - ss.Bots[i].X
-			dy := st.BestY - ss.Bots[i].Y
+		if st.GlobalBestF > -1e18 {
+			dx := st.GlobalBestX - ss.Bots[i].X
+			dy := st.GlobalBestY - ss.Bots[i].Y
 			ss.Bots[i].SCABestDist = int(math.Sqrt(dx*dx + dy*dy))
 		} else {
 			ss.Bots[i].SCABestDist = 9999
 		}
+	}
+}
+
+// scaMovBot moves a bot directly toward a target position.
+// Sets Speed=0 after moving to prevent double-movement in GUI mode.
+func scaMovBot(bot *SwarmBot, ss *SwarmState, tx, ty float64) {
+	dx := tx - bot.X
+	dy := ty - bot.Y
+	dist := math.Sqrt(dx*dx + dy*dy)
+
+	maxStep := SwarmBotSpeed * scaSpeedMult
+	if dist < 2.0 {
+		bot.X = tx
+		bot.Y = ty
+	} else if dist <= maxStep {
+		bot.X = tx
+		bot.Y = ty
+	} else {
+		ratio := maxStep / dist
+		bot.X += dx * ratio
+		bot.Y += dy * ratio
+	}
+	// Update angle to face movement direction
+	if dist > 0.5 {
+		bot.Angle = math.Atan2(dy, dx)
+	}
+	bot.Speed = 0
+	// Arena clamping
+	scaClampArena(bot, ss)
+}
+
+// scaClampArena keeps bot within arena bounds.
+func scaClampArena(bot *SwarmBot, ss *SwarmState) {
+	if bot.X < SwarmEdgeMargin {
+		bot.X = SwarmEdgeMargin
+	}
+	if bot.X > ss.ArenaW-SwarmEdgeMargin {
+		bot.X = ss.ArenaW - SwarmEdgeMargin
+	}
+	if bot.Y < SwarmEdgeMargin {
+		bot.Y = SwarmEdgeMargin
+	}
+	if bot.Y > ss.ArenaH-SwarmEdgeMargin {
+		bot.Y = ss.ArenaH - SwarmEdgeMargin
 	}
 }
 
@@ -127,19 +190,24 @@ func ApplySCA(bot *SwarmBot, ss *SwarmState, idx int) {
 	}
 
 	// Best bot keeps natural behavior
-	if idx == st.BestIdx {
-		bot.Speed = SwarmBotSpeed
+	if idx == st.CurBestIdx {
+		bot.Speed = 0
 		bot.LEDColor = [3]uint8{255, 215, 0} // gold for best
 		return
 	}
 
-	if st.BestIdx < 0 {
+	if st.GlobalBestF <= -1e18 {
 		bot.Speed = SwarmBotSpeed
 		return
 	}
 
+	progress := float64(st.Tick) / float64(scaMaxTicks)
+	if progress > 1.0 {
+		progress = 1.0
+	}
+
 	// r1: linearly decreasing from scaAMax to 0
-	r1 := scaAMax * (1.0 - float64(st.Tick)/float64(scaMaxTicks))
+	r1 := scaAMax * (1.0 - progress)
 	if r1 < 0 {
 		r1 = 0
 	}
@@ -151,9 +219,13 @@ func ApplySCA(bot *SwarmBot, ss *SwarmState, idx int) {
 	// r4: random in [0, 1] — switches sine/cosine
 	r4 := ss.Rng.Float64()
 
+	// Use persistent global best as destination
+	destX := st.GlobalBestX
+	destY := st.GlobalBestY
+
 	// Distance components to best position
-	dx := r3*st.BestX - bot.X
-	dy := r3*st.BestY - bot.Y
+	dx := r3*destX - bot.X
+	dy := r3*destY - bot.Y
 
 	var offsetX, offsetY float64
 	if r4 < 0.5 {
@@ -172,10 +244,17 @@ func ApplySCA(bot *SwarmBot, ss *SwarmState, idx int) {
 	targetX := bot.X + offsetX
 	targetY := bot.Y + offsetY
 
-	// Steer toward target
+	// Adaptive global-best attraction: weight increases 5%→25% over time
+	gbWeight := 0.05 + 0.20*progress
+	targetX += (destX - targetX) * gbWeight
+	targetY += (destY - targetY) * gbWeight
+
+	// Move bot directly to target
+	scaMovBot(bot, ss, targetX, targetY)
+
+	// Also steer angle for GUI mode
 	desired := math.Atan2(targetY-bot.Y, targetX-bot.X)
 	steerToward(bot, desired, scaSteerRate)
-	bot.Speed = SwarmBotSpeed
 
 	// LED color: sine=cyan oscillation, cosine=magenta oscillation
 	// Brightness scales with r1 (brighter during exploration)

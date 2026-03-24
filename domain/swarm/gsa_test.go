@@ -92,15 +92,30 @@ func TestApplyGSA(t *testing.T) {
 	for tick := 0; tick < 10; tick++ {
 		TickGSA(ss)
 	}
-	// Apply to a non-best bot
+	// Apply to a non-best bot — should move directly (position change, Speed=0)
 	for i := range ss.Bots {
 		if i != ss.GSA.BestIdx {
+			oldX, oldY := ss.Bots[i].X, ss.Bots[i].Y
 			ApplyGSA(&ss.Bots[i], ss, i)
-			if ss.Bots[i].Speed <= 0 {
-				t.Fatal("bot speed should be positive after ApplyGSA")
+			if ss.Bots[i].Speed != 0 {
+				t.Fatal("bot Speed should be 0 after ApplyGSA (direct movement)")
+			}
+			if ss.Bots[i].X == oldX && ss.Bots[i].Y == oldY {
+				t.Fatal("bot position should change after ApplyGSA")
 			}
 			break
 		}
+	}
+}
+
+func TestGSAGlobalBest(t *testing.T) {
+	ss := makeGSAState(20)
+	InitGSA(ss)
+	for tick := 0; tick < 50; tick++ {
+		TickGSA(ss)
+	}
+	if ss.GSA.GlobalBestF <= -1e17 {
+		t.Fatal("GlobalBestF should be updated after ticks")
 	}
 }
 

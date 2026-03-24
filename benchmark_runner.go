@@ -43,11 +43,17 @@ func runBenchmark() {
 			fitName := swarm.FitnessLandscapeName(fitFunc)
 			fmt.Printf("[%d/%d] %s auf %s ... ", runIdx, totalRuns, algoName, fitName)
 
-			// Init algorithm with this fitness landscape
+			// Init algorithm with this fitness landscape.
+			// InitSwarmAlgorithm creates a SwarmAlgorithmState with default
+			// FitGaussian and evaluates initial fitness against Gaussian peaks.
+			// We then set the actual fitness function and re-init the algorithm
+			// so all cached fitness values are evaluated against the correct
+			// landscape (fixes stale Gaussian fitness leaking into other landscapes).
 			swarm.InitSwarmAlgorithm(ss, algo)
 			if ss.SwarmAlgo != nil {
 				ss.SwarmAlgo.FitnessFunc = fitFunc
 				swarm.ReinitFitnessLandscape(ss)
+				swarm.ReinitActiveAlgorithm(ss)
 			}
 
 			start := time.Now()

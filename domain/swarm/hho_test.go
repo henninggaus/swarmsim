@@ -88,12 +88,19 @@ func TestApplyHHO(t *testing.T) {
 	for tick := 0; tick < 10; tick++ {
 		TickHHO(ss)
 	}
-	// Apply to a non-best hawk
+	// Apply to a non-best hawk — should move directly (Eigenbewegung)
 	for i := range ss.Bots {
-		if i != ss.HHO.BestIdx {
+		if i != ss.HHO.CurBestIdx {
+			oldX := ss.Bots[i].X
+			oldY := ss.Bots[i].Y
 			ApplyHHO(&ss.Bots[i], ss, i)
-			if ss.Bots[i].Speed <= 0 {
-				t.Fatal("hawk speed should be positive")
+			// Bot should have moved
+			if ss.Bots[i].X == oldX && ss.Bots[i].Y == oldY {
+				t.Fatal("hawk should have moved (Eigenbewegung)")
+			}
+			// Speed should be 0 (prevent double movement in GUI mode)
+			if ss.Bots[i].Speed != 0 {
+				t.Fatalf("hawk speed should be 0 after direct movement, got %f", ss.Bots[i].Speed)
 			}
 			break
 		}
@@ -106,7 +113,7 @@ func TestApplyHHOBestHawk(t *testing.T) {
 	for tick := 0; tick < 10; tick++ {
 		TickHHO(ss)
 	}
-	bestIdx := ss.HHO.BestIdx
+	bestIdx := ss.HHO.CurBestIdx
 	if bestIdx >= 0 {
 		ApplyHHO(&ss.Bots[bestIdx], ss, bestIdx)
 		// Best hawk (rabbit) should get gold LED
@@ -140,7 +147,7 @@ func TestHHOAllPhases(t *testing.T) {
 		TickHHO(ss)
 		for i := range ss.Bots {
 			phasesSeen[ss.HHO.Phase[i]] = true
-			if i != ss.HHO.BestIdx {
+			if i != ss.HHO.CurBestIdx {
 				ApplyHHO(&ss.Bots[i], ss, i)
 			}
 		}
@@ -161,5 +168,25 @@ func TestLevyStep(t *testing.T) {
 		if math.IsNaN(step) || math.IsInf(step, 0) {
 			t.Fatalf("levyStep returned %v", step)
 		}
+	}
+}
+
+func TestHHOGlobalBest(t *testing.T) {
+	ss := makeHHOState(20)
+	InitHHO(ss)
+	// Run enough ticks to establish a global best
+	for tick := 0; tick < 50; tick++ {
+		TickHHO(ss)
+	}
+	st := ss.HHO
+	if st.GlobalBestF <= -1e18 {
+		t.Fatal("GlobalBestF should be set after 50 ticks")
+	}
+	if st.GlobalBestIdx < 0 {
+		t.Fatal("GlobalBestIdx should be set after 50 ticks")
+	}
+	// GlobalBestF should be >= BestF (persistent best is at least as good as cycle best)
+	if st.GlobalBestF < st.BestF {
+		t.Fatalf("GlobalBestF (%f) should be >= BestF (%f)", st.GlobalBestF, st.BestF)
 	}
 }

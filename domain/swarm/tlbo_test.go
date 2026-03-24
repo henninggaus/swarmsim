@@ -93,12 +93,19 @@ func TestApplyTLBO(t *testing.T) {
 	for tick := 0; tick < 10; tick++ {
 		TickTLBO(ss)
 	}
-	// Apply to a non-best bot
+	// Apply to a non-best bot — should move directly (Eigenbewegung)
 	for i := range ss.Bots {
 		if i != ss.TLBO.BestIdx {
+			oldX := ss.Bots[i].X
+			oldY := ss.Bots[i].Y
 			ApplyTLBO(&ss.Bots[i], ss, i)
-			if ss.Bots[i].Speed <= 0 {
-				t.Fatal("bot speed should be positive after apply")
+			if ss.Bots[i].Speed != 0 {
+				t.Fatal("bot speed should be 0 after apply (direct movement)")
+			}
+			dx := ss.Bots[i].X - oldX
+			dy := ss.Bots[i].Y - oldY
+			if dx*dx+dy*dy < 0.001 {
+				t.Fatal("bot should have moved via direct position update")
 			}
 			break
 		}
@@ -192,6 +199,21 @@ func TestTLBOPeersDifferFromSelf(t *testing.T) {
 		if ss.TLBO.PeerIdx[i] == i {
 			t.Fatalf("bot %d: peer should differ from self", i)
 		}
+	}
+}
+
+func TestTLBOGlobalBest(t *testing.T) {
+	ss := makeTLBOState(20)
+	InitTLBO(ss)
+	for tick := 0; tick < 50; tick++ {
+		TickTLBO(ss)
+	}
+	st := ss.TLBO
+	if st.GlobalBestF < -1e17 {
+		t.Fatal("global best fitness should be set after 50 ticks")
+	}
+	if st.GlobalBestF < st.BestF-0.001 {
+		t.Fatalf("global best (%.2f) should be >= current best (%.2f)", st.GlobalBestF, st.BestF)
 	}
 }
 

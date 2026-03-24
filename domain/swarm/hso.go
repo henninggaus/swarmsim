@@ -28,11 +28,19 @@ import "math"
 //	SIMULATION, 76(2), pp. 60-68.
 
 const (
-	hsoSteerRate = 0.12  // max steering change per tick (radians)
-	hsoHMCR      = 0.90  // Harmony Memory Considering Rate — probability of picking from HM
-	hsoPAR       = 0.30  // Pitch Adjusting Rate — probability of perturbing a HM note
-	hsoBW        = 40.0  // bandwidth — maximum pitch adjustment distance (pixels)
-	hsoHMSize    = 20    // Harmony Memory size (number of stored solutions)
+	hsoSteerRate       = 0.25  // max steering change per tick (radians)
+	hsoHMCR            = 0.92  // Harmony Memory Considering Rate — probability of picking from HM
+	hsoPAR             = 0.45  // Pitch Adjusting Rate — probability of perturbing a HM note
+	hsoBWMax           = 60.0  // initial bandwidth — maximum pitch adjustment distance (pixels)
+	hsoBWMin           = 8.0   // final bandwidth — decreases over time for finer exploitation
+	hsoHMSize          = 50    // Harmony Memory size (number of stored solutions)
+	hsoEliteBias       = 0.25  // probability of biasing toward best known solution
+	hsoArrivalDist     = 3.0   // distance threshold for considering bot arrived at target
+	hsoBWDecayTicks    = 2500  // ticks over which bandwidth decays from max to min
+	hsoSpeedMult       = 5.0   // movement speed multiplier over SwarmBotSpeed
+	hsoDivCheckInterval = 200  // ticks between HM diversity checks
+	hsoDivThreshold    = 30.0  // minimum RMS spread in HM before diversity injection
+	hsoDivInjectFrac   = 0.2   // fraction of HM entries to replace with random when too clustered
 )
 
 // HSOHarmony stores one solution in the Harmony Memory.
@@ -59,6 +67,12 @@ type HSOState struct {
 	BestF   float64 // best fitness found
 	BestX   float64 // best position
 	BestY   float64
+
+	// HMRevalidated is set after the first TickHSO re-evaluates all HM
+	// entries with the current fitness landscape. This is needed because
+	// InitHSO runs before the benchmark sets the correct landscape, so HM
+	// entries may be seeded with wrong fitness values.
+	HMRevalidated bool
 }
 
 // InitHSO allocates Harmony Search state and fills the Harmony Memory
@@ -128,6 +142,22 @@ func TickHSO(ss *SwarmState) {
 	st := ss.HSO
 	n := len(ss.Bots)
 
+	// Re-evaluate HM fitness on first tick. InitHSO seeds the HM before
+	// the benchmark sets the correct fitness landscape, so HM entries may
+	// have fitness values from a different landscape (typically Gaussian).
+	if !st.HMRevalidated {
+		st.HMRevalidated = true
+		st.BestF = -1e9
+		for j := range st.HM {
+			st.HM[j].Fitness = distanceFitnessPt(ss, st.HM[j].X, st.HM[j].Y)
+			if st.HM[j].Fitness > st.BestF {
+				st.BestF = st.HM[j].Fitness
+				st.BestX = st.HM[j].X
+				st.BestY = st.HM[j].Y
+			}
+		}
+	}
+
 	// Grow slices if bots were added.
 	for len(st.TargetX) < n {
 		st.TargetX = append(st.TargetX, ss.Bots[len(st.TargetX)].X)
@@ -138,6 +168,13 @@ func TickHSO(ss *SwarmState) {
 
 	margin := SwarmEdgeMargin
 
+	// Adaptive bandwidth: decreases linearly from max to min over time.
+	progress := float64(ss.Tick) / hsoBWDecayTicks
+	if progress > 1.0 {
+		progress = 1.0
+	}
+	bw := hsoBWMax - progress*(hsoBWMax-hsoBWMin)
+
 	for i := 0; i < n; i++ {
 		bot := &ss.Bots[i]
 
@@ -145,7 +182,7 @@ func TickHSO(ss *SwarmState) {
 		dx := st.TargetX[i] - bot.X
 		dy := st.TargetY[i] - bot.Y
 		dist := math.Sqrt(dx*dx + dy*dy)
-		if dist < 15.0 {
+		if dist < hsoArrivalDist {
 			st.Phase[i] = 1
 		}
 
@@ -158,15 +195,30 @@ func TickHSO(ss *SwarmState) {
 		var newX, newY float64
 
 		if len(st.HM) > 0 && ss.Rng.Float64() < hsoHMCR {
-			// Memory consideration: pick a random harmony from HM.
-			hmIdx := ss.Rng.Intn(len(st.HM))
+			// Elite bias: with increasing probability, start from the best HM
+			// entry instead of a random one. Increases from 25% to 50% over time.
+			var hmIdx int
+			eliteBias := hsoEliteBias + 0.25*progress
+			if ss.Rng.Float64() < eliteBias {
+				hmIdx = st.BestIdx
+			} else {
+				// Tournament selection: pick best of 3 random HM entries
+				// for better exploitation than uniform random.
+				hmIdx = ss.Rng.Intn(len(st.HM))
+				for t := 0; t < 2; t++ {
+					cand := ss.Rng.Intn(len(st.HM))
+					if st.HM[cand].Fitness > st.HM[hmIdx].Fitness {
+						hmIdx = cand
+					}
+				}
+			}
 			newX = st.HM[hmIdx].X
 			newY = st.HM[hmIdx].Y
 
-			// Pitch adjustment: perturb within bandwidth.
+			// Pitch adjustment: perturb within adaptive bandwidth.
 			if ss.Rng.Float64() < hsoPAR {
-				newX += (ss.Rng.Float64()*2.0 - 1.0) * hsoBW
-				newY += (ss.Rng.Float64()*2.0 - 1.0) * hsoBW
+				newX += (ss.Rng.Float64()*2.0 - 1.0) * bw
+				newY += (ss.Rng.Float64()*2.0 - 1.0) * bw
 			}
 		} else {
 			// Random selection: uniformly random position in arena.
@@ -174,16 +226,20 @@ func TickHSO(ss *SwarmState) {
 			newY = margin + ss.Rng.Float64()*(ss.ArenaH-2*margin)
 		}
 
+		// Adaptive global-best attraction: pull new harmonies toward the
+		// best known position. Weight increases from 10% to 45% over time.
+		if st.BestF > -1e8 {
+			gbWeight := 0.10 + 0.35*progress
+			newX += gbWeight * (st.BestX - newX)
+			newY += gbWeight * (st.BestY - newY)
+		}
+
 		// Clamp to arena.
 		newX = math.Max(margin, math.Min(ss.ArenaW-margin, newX))
 		newY = math.Max(margin, math.Min(ss.ArenaH-margin, newY))
 
-		// Evaluate the new harmony.
-		// Temporarily use bot position to compute fitness at the target.
-		origX, origY := bot.X, bot.Y
-		bot.X, bot.Y = newX, newY
-		newF := hsoFitness(bot, ss)
-		bot.X, bot.Y = origX, origY
+		// Evaluate the new harmony at the target position.
+		newF := distanceFitnessPt(ss, newX, newY)
 
 		// Replace worst harmony in HM if the new one is better.
 		if len(st.HM) < hsoHMSize {
@@ -215,6 +271,53 @@ func TickHSO(ss *SwarmState) {
 		st.Phase[i] = 0
 	}
 
+	// HM diversity maintenance: if all HM entries cluster tightly,
+	// reinject random positions to prevent premature convergence.
+	if ss.Tick > 0 && ss.Tick%hsoDivCheckInterval == 0 && len(st.HM) >= 4 {
+		// Compute HM centroid and RMS spread.
+		var cx, cy float64
+		for j := range st.HM {
+			cx += st.HM[j].X
+			cy += st.HM[j].Y
+		}
+		cx /= float64(len(st.HM))
+		cy /= float64(len(st.HM))
+		var sumSq float64
+		for j := range st.HM {
+			ddx := st.HM[j].X - cx
+			ddy := st.HM[j].Y - cy
+			sumSq += ddx*ddx + ddy*ddy
+		}
+		rms := math.Sqrt(sumSq / float64(len(st.HM)))
+		if rms < hsoDivThreshold {
+			// Replace worst fraction of HM with random positions.
+			nReplace := int(float64(len(st.HM)) * hsoDivInjectFrac)
+			if nReplace < 1 {
+				nReplace = 1
+			}
+			for r := 0; r < nReplace; r++ {
+				// Find worst HM entry.
+				worstIdx := 0
+				worstF := st.HM[0].Fitness
+				for j := 1; j < len(st.HM); j++ {
+					if st.HM[j].Fitness < worstF {
+						worstF = st.HM[j].Fitness
+						worstIdx = j
+					}
+				}
+				rx := margin + ss.Rng.Float64()*(ss.ArenaW-2*margin)
+				ry := margin + ss.Rng.Float64()*(ss.ArenaH-2*margin)
+				rf := distanceFitnessPt(ss, rx, ry)
+				st.HM[worstIdx] = HSOHarmony{X: rx, Y: ry, Fitness: rf}
+				if rf > st.BestF {
+					st.BestF = rf
+					st.BestX = rx
+					st.BestY = ry
+				}
+			}
+		}
+	}
+
 	// Find best HM index for display.
 	st.BestIdx = 0
 	for j := 1; j < len(st.HM); j++ {
@@ -233,16 +336,18 @@ func TickHSO(ss *SwarmState) {
 		if i < len(st.Phase) {
 			ss.Bots[i].HSOPhase = st.Phase[i]
 		}
-		dx := st.BestX - ss.Bots[i].X
-		dy := st.BestY - ss.Bots[i].Y
-		ss.Bots[i].HSOBestDist = int(math.Sqrt(dx*dx + dy*dy))
+		bdx := st.BestX - ss.Bots[i].X
+		bdy := st.BestY - ss.Bots[i].Y
+		ss.Bots[i].HSOBestDist = int(math.Sqrt(bdx*bdx + bdy*bdy))
 	}
 }
 
-// ApplyHSO steers a bot toward its improvised target position.
+// ApplyHSO moves a bot toward its improvised target position via direct
+// position updates (required for headless benchmark mode where
+// applySwarmPhysics is not called).
 //
-// Bots in phase 0 (improvising) steer toward the target at normal speed.
-// Bots in phase 1 (arrived) slow down while the next harmony is generated.
+// Bots in phase 0 (improvising) move toward the target.
+// Bots in phase 1 (arrived) wait while the next harmony is generated.
 // LED color encodes fitness: cyan gradient from dim (low fitness) to bright.
 func ApplyHSO(bot *SwarmBot, ss *SwarmState, idx int) {
 	if ss.HSO == nil {
@@ -260,16 +365,27 @@ func ApplyHSO(bot *SwarmBot, ss *SwarmState, idx int) {
 	dist := math.Sqrt(dx*dx + dy*dy)
 
 	if st.Phase[idx] == 1 {
-		// Arrived — slow movement while evaluating.
-		bot.Speed = SwarmBotSpeed * 0.3
-	} else if dist < 30.0 {
-		// Approaching target — slow down.
-		bot.Speed = SwarmBotSpeed * 0.6
+		// Arrived — idle while evaluating.
+		bot.Speed = 0
 	} else {
-		// Heading toward target.
-		desired := math.Atan2(dy, dx)
-		steerToward(bot, desired, hsoSteerRate)
-		bot.Speed = SwarmBotSpeed
+		// Move directly toward target via position update.
+		stepSize := SwarmBotSpeed * hsoSpeedMult
+		if dist < stepSize {
+			// Snap to target for precise fitness evaluation.
+			bot.X = st.TargetX[idx]
+			bot.Y = st.TargetY[idx]
+		} else {
+			ratio := stepSize / dist
+			bot.X += dx * ratio
+			bot.Y += dy * ratio
+		}
+		bot.Angle = math.Atan2(dy, dx)
+		bot.Speed = 0 // prevent double movement in GUI mode
+
+		// Clamp to arena.
+		margin := SwarmEdgeMargin
+		bot.X = math.Max(margin, math.Min(ss.ArenaW-margin, bot.X))
+		bot.Y = math.Max(margin, math.Min(ss.ArenaH-margin, bot.Y))
 	}
 
 	// LED: cyan gradient — brighter cyan indicates higher fitness.

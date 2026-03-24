@@ -21,9 +21,11 @@ const (
 	batFMax      = 2.0   // maximum frequency
 	batAlpha     = 0.95  // loudness decay rate (0 < alpha < 1)
 	batGamma     = 0.9   // pulse rate increase coefficient
-	batSteerRate = 0.2   // max steering change per tick (radians)
+	batSteerRate = 0.25  // max steering change per tick (radians)
 	batMaxSpeed  = 2.5   // max bot speed under BA
 	batLocalStep = 15.0  // local random walk step size
+	batSpeedMult = 3.0   // movement speed multiplier for eigenbewegung
+	batMaxTicks  = 3000  // full benchmark length
 )
 
 // BatState holds per-bot echolocation state for the Bat Algorithm.
@@ -33,16 +35,58 @@ type BatState struct {
 	Loud     []float64 // loudness per bat (decreases over time)
 	Pulse    []float64 // pulse emission rate per bat (increases over time)
 	Fitness  []float64 // fitness per bat
-	BestX    float64   // global best position X
-	BestY    float64   // global best position Y
-	BestF    float64   // global best fitness
+	BestX    float64   // current tick best position X
+	BestY    float64   // current tick best position Y
+	BestF    float64   // current tick best fitness
 	BestIdx  int       // index of best bat
 	Tick     int       // iteration counter
 	AvgLoud  float64   // precomputed average loudness (avoids O(n²) in ApplyBat)
+	// Persistent global best (never reset)
+	GlobalBestF float64
+	GlobalBestX float64
+	GlobalBestY float64
 	// Personal best tracking: each bat remembers its own best position.
 	PBestX   []float64
 	PBestY   []float64
 	PBestF   []float64
+}
+
+// batMovBot moves a bot directly toward a target position.
+// Sets Speed=0 afterward to prevent double-movement in GUI mode.
+func batMovBot(bot *SwarmBot, targetX, targetY, arenaW, arenaH float64) {
+	dx := targetX - bot.X
+	dy := targetY - bot.Y
+	dist := math.Sqrt(dx*dx + dy*dy)
+	if dist < 2 {
+		bot.X = targetX
+		bot.Y = targetY
+		bot.Speed = 0
+		return
+	}
+	maxStep := SwarmBotSpeed * batSpeedMult
+	if dist <= maxStep {
+		bot.X = targetX
+		bot.Y = targetY
+	} else {
+		ratio := maxStep / dist
+		bot.X += dx * ratio
+		bot.Y += dy * ratio
+	}
+	// Clamp to arena
+	if bot.X < SwarmBotRadius {
+		bot.X = SwarmBotRadius
+	}
+	if bot.X > arenaW-SwarmBotRadius {
+		bot.X = arenaW - SwarmBotRadius
+	}
+	if bot.Y < SwarmBotRadius {
+		bot.Y = SwarmBotRadius
+	}
+	if bot.Y > arenaH-SwarmBotRadius {
+		bot.Y = arenaH - SwarmBotRadius
+	}
+	bot.Angle = math.Atan2(dy, dx)
+	bot.Speed = 0
 }
 
 // InitBat allocates Bat Algorithm state.
@@ -57,9 +101,10 @@ func InitBat(ss *SwarmState) {
 		PBestX:  make([]float64, n),
 		PBestY:  make([]float64, n),
 		PBestF:  make([]float64, n),
-		BestF:   -1e18,
-		BestIdx: -1,
-		AvgLoud: 1.0,
+		BestF:       -1e18,
+		BestIdx:     -1,
+		AvgLoud:     1.0,
+		GlobalBestF: -1e18,
 	}
 	// Initialize each bat with full loudness and zero pulse rate.
 	// Personal best starts at the bot's initial position.
@@ -116,13 +161,18 @@ func TickBat(ss *SwarmState) {
 		}
 	}
 
-	// Find global best
+	// Find current tick best and update persistent global best
 	for i := range ss.Bots {
 		if st.Fitness[i] > st.BestF {
 			st.BestF = st.Fitness[i]
 			st.BestX = ss.Bots[i].X
 			st.BestY = ss.Bots[i].Y
 			st.BestIdx = i
+		}
+		if st.Fitness[i] > st.GlobalBestF {
+			st.GlobalBestF = st.Fitness[i]
+			st.GlobalBestX = ss.Bots[i].X
+			st.GlobalBestY = ss.Bots[i].Y
 		}
 	}
 
@@ -152,14 +202,21 @@ func TickBat(ss *SwarmState) {
 }
 
 // ApplyBat steers a single bat according to the echolocation algorithm.
+// Uses direct position updates (eigenbewegung) so bots move in benchmark mode.
 // Uses the precomputed AvgLoud from TickBat to avoid O(n²) recomputation.
 // Velocity update blends attraction to both global best and personal best
 // for improved convergence (cf. Yang 2010, enhanced BA variants).
 func ApplyBat(bot *SwarmBot, ss *SwarmState, idx int) {
 	st := ss.Bat
 	if st == nil || idx >= len(st.Freq) {
-		bot.Speed = SwarmBotSpeed
+		bot.Speed = 0
 		return
+	}
+
+	// Progress for adaptive parameters (0→1 over batMaxTicks)
+	progress := float64(st.Tick) / float64(batMaxTicks)
+	if progress > 1 {
+		progress = 1
 	}
 
 	// Update frequency: f_i = fMin + (fMax - fMin) * beta, beta ∈ [0,1]
@@ -171,8 +228,8 @@ func ApplyBat(bot *SwarmBot, ss *SwarmState, idx int) {
 	// toward the bat's personal best for better exploration/exploitation balance.
 	if st.BestIdx >= 0 {
 		// Global attraction (social)
-		st.Vel[0][idx] += (st.BestX - bot.X) * st.Freq[idx] * 0.01
-		st.Vel[1][idx] += (st.BestY - bot.Y) * st.Freq[idx] * 0.01
+		st.Vel[0][idx] += (st.GlobalBestX - bot.X) * st.Freq[idx] * 0.01
+		st.Vel[1][idx] += (st.GlobalBestY - bot.Y) * st.Freq[idx] * 0.01
 		// Personal best attraction (cognitive) — weaker than global
 		if idx < len(st.PBestX) {
 			st.Vel[0][idx] += (st.PBestX[idx] - bot.X) * st.Freq[idx] * 0.005
@@ -184,12 +241,19 @@ func ApplyBat(bot *SwarmBot, ss *SwarmState, idx int) {
 	newX := bot.X + st.Vel[0][idx]
 	newY := bot.Y + st.Vel[1][idx]
 
-	// Local search: if random > pulse rate, perturb around best
-	if ss.Rng.Float64() > st.Pulse[idx] && st.BestIdx >= 0 {
-		// Random walk around best solution scaled by precomputed average loudness.
-		// (Previously recomputed O(n) per bot call, now O(1) read.)
-		newX = st.BestX + batLocalStep*st.AvgLoud*(ss.Rng.Float64()-0.5)*2
-		newY = st.BestY + batLocalStep*st.AvgLoud*(ss.Rng.Float64()-0.5)*2
+	// Local search: if random > pulse rate, perturb around global best
+	if ss.Rng.Float64() > st.Pulse[idx] && st.GlobalBestF > -1e18 {
+		// Random walk around global best solution scaled by precomputed average loudness.
+		newX = st.GlobalBestX + batLocalStep*st.AvgLoud*(ss.Rng.Float64()-0.5)*2
+		newY = st.GlobalBestY + batLocalStep*st.AvgLoud*(ss.Rng.Float64()-0.5)*2
+	}
+
+	// Adaptive global-best attraction: shift target toward global best
+	// Weight increases from 5% to 25% over batMaxTicks
+	if st.GlobalBestF > -1e18 {
+		gbWeight := 0.05 + 0.20*progress
+		newX = newX*(1-gbWeight) + st.GlobalBestX*gbWeight
+		newY = newY*(1-gbWeight) + st.GlobalBestY*gbWeight
 	}
 
 	// Clamp to arena
@@ -207,15 +271,10 @@ func ApplyBat(bot *SwarmBot, ss *SwarmState, idx int) {
 	}
 
 	// Accept new position if it improves fitness or if random < loudness.
-	// Uses the shared fitness landscape (consistent with TickBat evaluation).
 	newFit := distanceFitnessPt(ss, newX, newY)
 	if newFit > st.Fitness[idx] || ss.Rng.Float64() < st.Loud[idx] {
-		// Steer toward the accepted position
-		desired := math.Atan2(newY-bot.Y, newX-bot.X)
-		steerToward(bot, desired, batSteerRate)
-
-		dist := math.Sqrt((newX-bot.X)*(newX-bot.X) + (newY-bot.Y)*(newY-bot.Y))
-		bot.Speed = math.Min(dist*0.1+SwarmBotSpeed*0.5, batMaxSpeed)
+		// Move directly to accepted position (eigenbewegung)
+		batMovBot(bot, newX, newY, ss.ArenaW, ss.ArenaH)
 
 		// Decrease loudness and increase pulse rate
 		st.Loud[idx] *= batAlpha
@@ -227,8 +286,8 @@ func ApplyBat(bot *SwarmBot, ss *SwarmState, idx int) {
 			st.Pulse[idx] = 0.99
 		}
 	} else {
-		// Keep current heading with base speed
-		bot.Speed = SwarmBotSpeed
+		// Rejected — stay in place
+		bot.Speed = 0
 	}
 
 	// LED color: pulse rate as blue intensity, loudness as red intensity

@@ -21,39 +21,46 @@ import "math"
 // determines the specific sub-strategy.
 //
 // Reference: Abualigah, L., Yousri, D., Abd Elaziz, M., Ewees, A.A.,
-//            Al-qaness, M.A.A. & Gandomi, A.H. (2021)
-//            "Aquila Optimizer: A novel meta-heuristic optimization algorithm",
-//            Computers & Industrial Engineering.
-
+//
+//	Al-qaness, M.A.A. & Gandomi, A.H. (2021)
+//	"Aquila Optimizer: A novel meta-heuristic optimization algorithm",
+//	Computers & Industrial Engineering.
 const (
-	aoMaxTicks  = 600   // full hunt cycle
-	aoSteerRate = 0.2   // max steering change per tick (radians)
+	aoMaxTicks  = 3000  // full hunt cycle (matches benchmark length)
+	aoSteerRate = 0.25  // max steering change per tick (radians)
 	aoLevyBeta  = 1.5   // Lévy flight exponent for high soar
 	aoAlpha     = 0.1   // exploitation step scaling
 	aoDelta     = 0.1   // walk-and-grab random walk scale
+	aoSpeedMult = 3.0   // movement speed multiplier
 )
 
 // AOState holds Aquila Optimizer state for the swarm.
 type AOState struct {
-	Fitness  []float64 // current fitness per eagle
-	Phase    []int     // 0=high soar, 1=contour, 2=low flight, 3=walk&grab
-	HuntTick int       // ticks into current hunt cycle
-	BestIdx  int       // index of best eagle (prey location)
-	BestX    float64   // best position X
-	BestY    float64   // best position Y
-	BestF    float64   // best fitness found
-	MeanX    float64   // swarm mean X (used for contour flight)
-	MeanY    float64   // swarm mean Y
+	Fitness      []float64 // current fitness per eagle
+	Phase        []int     // 0=high soar, 1=contour, 2=low flight, 3=walk&grab
+	HuntTick     int       // ticks into current hunt cycle
+	BestIdx      int       // index of best eagle (prey location)
+	CurBestIdx   int       // current tick best (for LED display)
+	BestX        float64   // best position X
+	BestY        float64   // best position Y
+	BestF        float64   // best fitness found (persistent)
+	GlobalBestF  float64   // persistent global best fitness
+	GlobalBestX  float64   // persistent global best X
+	GlobalBestY  float64   // persistent global best Y
+	MeanX        float64   // swarm mean X (used for contour flight)
+	MeanY        float64   // swarm mean Y
 }
 
 // InitAO allocates Aquila Optimizer state for all bots.
 func InitAO(ss *SwarmState) {
 	n := len(ss.Bots)
 	ss.AO = &AOState{
-		Fitness: make([]float64, n),
-		Phase:   make([]int, n),
-		BestIdx: -1,
-		BestF:   -1e18,
+		Fitness:     make([]float64, n),
+		Phase:       make([]int, n),
+		BestIdx:     -1,
+		CurBestIdx:  -1,
+		BestF:       -1e18,
+		GlobalBestF: -1e18,
 	}
 	ss.AOOn = true
 }
@@ -81,30 +88,39 @@ func TickAO(ss *SwarmState) {
 	st.HuntTick++
 	if st.HuntTick > aoMaxTicks {
 		st.HuntTick = 1
-		st.BestF = -1e18 // reset for new cycle
+		// Do NOT reset BestF — persistent global best
 	}
 
 	// Compute fitness and swarm mean
 	st.MeanX, st.MeanY = 0, 0
+	curBestF := -1e18
+	st.CurBestIdx = -1
 	for i := range ss.Bots {
 		st.Fitness[i] = distanceFitness(&ss.Bots[i], ss)
 		st.MeanX += ss.Bots[i].X
 		st.MeanY += ss.Bots[i].Y
+		if st.Fitness[i] > curBestF {
+			curBestF = st.Fitness[i]
+			st.CurBestIdx = i
+		}
 	}
 	if n > 0 {
 		st.MeanX /= float64(n)
 		st.MeanY /= float64(n)
 	}
 
-	// Find best eagle (prey location)
+	// Update persistent global best
 	for i := range ss.Bots {
-		if st.Fitness[i] > st.BestF {
-			st.BestF = st.Fitness[i]
+		if st.Fitness[i] > st.GlobalBestF {
+			st.GlobalBestF = st.Fitness[i]
+			st.GlobalBestX = ss.Bots[i].X
+			st.GlobalBestY = ss.Bots[i].Y
 			st.BestIdx = i
-			st.BestX = ss.Bots[i].X
-			st.BestY = ss.Bots[i].Y
 		}
 	}
+	st.BestF = st.GlobalBestF
+	st.BestX = st.GlobalBestX
+	st.BestY = st.GlobalBestY
 
 	// Phase assignment based on t/T ratio
 	tRatio := float64(st.HuntTick) / float64(aoMaxTicks)
@@ -140,6 +156,39 @@ func TickAO(ss *SwarmState) {
 	}
 }
 
+// aoMovBot moves a bot directly toward a target position.
+func aoMovBot(bot *SwarmBot, ss *SwarmState, tx, ty float64) {
+	dx := tx - bot.X
+	dy := ty - bot.Y
+	dist := math.Sqrt(dx*dx + dy*dy)
+
+	maxStep := SwarmBotSpeed * aoSpeedMult
+	if dist < 2.0 {
+		bot.X = tx
+		bot.Y = ty
+	} else if dist <= maxStep {
+		bot.X = tx
+		bot.Y = ty
+	} else {
+		ratio := maxStep / dist
+		bot.X += dx * ratio
+		bot.Y += dy * ratio
+	}
+
+	// Arena clamping
+	if bot.X < 0 {
+		bot.X = 0
+	} else if bot.X > ss.ArenaW {
+		bot.X = ss.ArenaW
+	}
+	if bot.Y < 0 {
+		bot.Y = 0
+	} else if bot.Y > ss.ArenaH {
+		bot.Y = ss.ArenaH
+	}
+	bot.Speed = 0
+}
+
 // ApplyAO steers an eagle according to its current hunting phase.
 func ApplyAO(bot *SwarmBot, ss *SwarmState, idx int) {
 	if ss.AO == nil {
@@ -152,11 +201,9 @@ func ApplyAO(bot *SwarmBot, ss *SwarmState, idx int) {
 		return
 	}
 
-	// The best eagle (prey marker) keeps moving normally
-	if idx == st.BestIdx {
-		bot.Speed = SwarmBotSpeed
-		bot.LEDColor = [3]uint8{255, 215, 0} // gold = prey location
-		return
+	// Current tick best gets gold LED but still participates
+	if idx == st.CurBestIdx {
+		bot.LEDColor = [3]uint8{255, 215, 0} // gold = current best
 	}
 
 	tRatio := float64(st.HuntTick) / float64(aoMaxTicks)
@@ -164,16 +211,14 @@ func ApplyAO(bot *SwarmBot, ss *SwarmState, idx int) {
 
 	switch st.Phase[idx] {
 	case 0: // High soar with vertical stoop
-		// X(t+1) = X_best * (1 - t/T) + (X_mean - X_best * rand)
-		// Uses Lévy flight for the stoop component
 		levy := aoLevyStep(ss)
 		targetX = st.BestX*(1-tRatio) + (st.MeanX-st.BestX*ss.Rng.Float64()) + levy*20*ss.Rng.NormFloat64()
 		targetY = st.BestY*(1-tRatio) + (st.MeanY-st.BestY*ss.Rng.Float64()) + levy*20*ss.Rng.NormFloat64()
-		bot.LEDColor = [3]uint8{100, 180, 255} // sky blue = high soar
+		if idx != st.CurBestIdx {
+			bot.LEDColor = [3]uint8{100, 180, 255} // sky blue = high soar
+		}
 
 	case 1: // Contour flight with short glide
-		// X(t+1) = X_best * Lévy + X_rand + (y - x) * rand
-		// where y and x are spiral-shaped offsets
 		levy := aoLevyStep(ss)
 		rIdx := ss.Rng.Intn(len(ss.Bots))
 		theta := -math.Pi + ss.Rng.Float64()*2*math.Pi
@@ -182,37 +227,46 @@ func ApplyAO(bot *SwarmBot, ss *SwarmState, idx int) {
 		spiralY := r * math.Sin(theta)
 		targetX = st.BestX + levy*math.Abs(st.BestX-bot.X) + spiralX + (ss.Bots[rIdx].X-bot.X)*ss.Rng.Float64()
 		targetY = st.BestY + levy*math.Abs(st.BestY-bot.Y) + spiralY + (ss.Bots[rIdx].Y-bot.Y)*ss.Rng.Float64()
-		bot.LEDColor = [3]uint8{50, 200, 100} // green = contour flight
+		if idx != st.CurBestIdx {
+			bot.LEDColor = [3]uint8{50, 200, 100} // green = contour flight
+		}
 
 	case 2: // Low flight with slow descent
-		// X(t+1) = (X_best - X_mean) * alpha - rand + ((UB - LB) * rand + LB) * delta
-		// Gradual approach with bounded random perturbation
 		targetX = (st.BestX-st.MeanX)*aoAlpha - ss.Rng.Float64()*math.Abs(st.BestX-bot.X) + bot.X
 		targetY = (st.BestY-st.MeanY)*aoAlpha - ss.Rng.Float64()*math.Abs(st.BestY-bot.Y) + bot.Y
-		// Add bounded perturbation toward prey
 		targetX += (st.BestX - bot.X) * ss.Rng.Float64() * 0.3
 		targetY += (st.BestY - bot.Y) * ss.Rng.Float64() * 0.3
-		bot.LEDColor = [3]uint8{255, 140, 0} // orange = low flight
+		if idx != st.CurBestIdx {
+			bot.LEDColor = [3]uint8{255, 140, 0} // orange = low flight
+		}
 
 	case 3: // Walk and grab prey
-		// X(t+1) = X_best - QF * abs(X_best - X_mean) * rand - random_walk
-		// QF is a quality function that increases as t/T increases
 		QF := math.Pow(tRatio, 2.0) * 2 * ss.Rng.Float64()
-		// Lévy-based random walk around prey
 		levy := aoLevyStep(ss)
 		targetX = st.BestX - QF*math.Abs(st.BestX-st.MeanX)*ss.Rng.Float64() - levy*aoDelta*math.Abs(st.BestX-bot.X)
 		targetY = st.BestY - QF*math.Abs(st.BestY-st.MeanY)*ss.Rng.Float64() - levy*aoDelta*math.Abs(st.BestY-bot.Y)
-		bot.LEDColor = [3]uint8{255, 50, 50} // red = grab prey
+		if idx != st.CurBestIdx {
+			bot.LEDColor = [3]uint8{255, 50, 50} // red = grab prey
+		}
 	}
+
+	// Adaptive global-best attraction (5% -> 25% over aoMaxTicks)
+	progress := float64(st.HuntTick) / float64(aoMaxTicks)
+	if progress > 1 {
+		progress = 1
+	}
+	gbWeight := 0.05 + 0.20*progress
+	targetX = targetX*(1-gbWeight) + st.GlobalBestX*gbWeight
+	targetY = targetY*(1-gbWeight) + st.GlobalBestY*gbWeight
 
 	// Clamp to arena
 	targetX = math.Max(10, math.Min(ss.ArenaW-10, targetX))
 	targetY = math.Max(10, math.Min(ss.ArenaH-10, targetY))
 
-	// Steer toward target
+	// Direct movement + steering for GUI mode
 	desired := math.Atan2(targetY-bot.Y, targetX-bot.X)
 	steerToward(bot, desired, aoSteerRate)
-	bot.Speed = SwarmBotSpeed
+	aoMovBot(bot, ss, targetX, targetY)
 }
 
 // aoLevyStep generates a Lévy-flight step using the shared Mantegna algorithm.

@@ -20,21 +20,25 @@ import "math"
 //	"Salp Swarm Algorithm: A bio-inspired optimizer for engineering
 //	 design problems", Advances in Engineering Software.
 const (
-	ssaRadius    = 120.0 // neighbor detection radius
-	ssaMaxTicks  = 800   // full cycle length
-	ssaSteerRate = 0.18  // max steering per tick (radians)
+	ssaRadius       = 120.0 // neighbor detection radius
+	ssaMaxTicks     = 3000  // full cycle length (matches benchmark duration)
+	ssaSteerRate    = 0.25  // max steering per tick (radians)
+	ssaSpeedMult    = 3.0   // movement speed multiplier for faster convergence
+	ssaGBestWeightA = 0.05  // global-best attraction start weight
+	ssaGBestWeightB = 0.25  // global-best attraction end weight
 )
 
 // SSAState holds Salp Swarm Algorithm state for the swarm.
 type SSAState struct {
-	Fitness  []float64 // current fitness per bot
-	Role     []int     // 0=leader, 1=follower
-	ChainIdx []int     // index of salp ahead in chain (-1 for first leader)
-	CycleTick int      // ticks into current cycle
-	FoodX    float64   // best-known food source position
-	FoodY    float64
-	FoodFit  float64   // best fitness value found
-	BestIdx  int       // index of best salp
+	Fitness    []float64 // current fitness per bot
+	Role       []int     // 0=leader, 1=follower
+	ChainIdx   []int     // index of salp ahead in chain (-1 for first leader)
+	CycleTick  int       // ticks into current cycle
+	FoodX      float64   // best-known food source position
+	FoodY      float64
+	FoodFit    float64 // best fitness value found
+	BestIdx    int     // index of best salp
+	CurBestIdx int     // current tick's best (for LED)
 }
 
 // InitSSA allocates Salp Swarm Algorithm state.
@@ -104,8 +108,14 @@ func TickSSA(ss *SwarmState) {
 		st.Fitness[i] = distanceFitness(&ss.Bots[i], ss)
 	}
 
-	// Find the food source (global best)
+	// Find the food source (persistent global best)
+	st.CurBestIdx = 0
+	curBestF := st.Fitness[0]
 	for i := range ss.Bots {
+		if st.Fitness[i] > curBestF {
+			curBestF = st.Fitness[i]
+			st.CurBestIdx = i
+		}
 		if st.Fitness[i] > st.FoodFit {
 			st.FoodFit = st.Fitness[i]
 			st.FoodX = ss.Bots[i].X
@@ -139,15 +149,45 @@ func TickSSA(ss *SwarmState) {
 	}
 }
 
-// ApplySSA steers a bot according to the Salp Swarm Algorithm.
+// ssaMovBot moves a bot directly via position updates and sets Speed=0
+// to prevent double movement in GUI mode.
+func ssaMovBot(bot *SwarmBot, ss *SwarmState, tx, ty float64) {
+	dx := tx - bot.X
+	dy := ty - bot.Y
+	dist := math.Sqrt(dx*dx + dy*dy)
+
+	maxStep := SwarmBotSpeed * ssaSpeedMult
+	if dist < 2.0 {
+		bot.X = tx
+		bot.Y = ty
+	} else if dist <= maxStep {
+		bot.X = tx
+		bot.Y = ty
+	} else {
+		ratio := maxStep / dist
+		bot.X += dx * ratio
+		bot.Y += dy * ratio
+	}
+
+	// Clamp to arena
+	bot.X = math.Max(SwarmEdgeMargin, math.Min(ss.ArenaW-SwarmEdgeMargin, bot.X))
+	bot.Y = math.Max(SwarmEdgeMargin, math.Min(ss.ArenaH-SwarmEdgeMargin, bot.Y))
+
+	bot.Angle = math.Atan2(dy, dx)
+	bot.Speed = 0 // prevent double movement in GUI mode
+}
+
+// ApplySSA moves a bot according to the Salp Swarm Algorithm.
+// Bots move directly via position updates (bot.X/bot.Y) to work in both
+// GUI and headless benchmark modes.
 func ApplySSA(bot *SwarmBot, ss *SwarmState, idx int) {
 	if ss.SSA == nil {
-		bot.Speed = SwarmBotSpeed
+		bot.Speed = 0
 		return
 	}
 	st := ss.SSA
 	if idx >= len(st.Role) {
-		bot.Speed = SwarmBotSpeed
+		bot.Speed = 0
 		return
 	}
 
@@ -156,14 +196,22 @@ func ApplySSA(bot *SwarmBot, ss *SwarmState, idx int) {
 	T := float64(ssaMaxTicks)
 	c1 := 2.0 * math.Exp(-math.Pow(4.0*t/T, 2))
 
+	// Adaptive global-best attraction: increases over time
+	progress := t / T
+	if progress > 1 {
+		progress = 1
+	}
+	gbestW := ssaGBestWeightA + (ssaGBestWeightB-ssaGBestWeightA)*progress
+
+	var targetX, targetY float64
+
 	if st.Role[idx] == 0 {
 		// === Leader behavior ===
 		// Leaders oscillate around the food source position.
-		// x_new = Food + c1 * ((ub - lb) * c2 + lb) where c2, c3 are random
 		c2 := ss.Rng.Float64() // [0,1]
 		c3 := ss.Rng.Float64() // [0,1]
 
-		targetX, targetY := st.FoodX, st.FoodY
+		targetX, targetY = st.FoodX, st.FoodY
 
 		// Oscillation around food source
 		amplitude := c1 * ss.ArenaW * 0.3
@@ -175,14 +223,6 @@ func ApplySSA(bot *SwarmBot, ss *SwarmState, idx int) {
 			targetY -= amplitude * c2
 		}
 
-		// Clamp to arena
-		targetX = math.Max(SwarmEdgeMargin, math.Min(ss.ArenaW-SwarmEdgeMargin, targetX))
-		targetY = math.Max(SwarmEdgeMargin, math.Min(ss.ArenaH-SwarmEdgeMargin, targetY))
-
-		desired := math.Atan2(targetY-bot.Y, targetX-bot.X)
-		steerToward(bot, desired, ssaSteerRate)
-		bot.Speed = SwarmBotSpeed
-
 		// Leader LED: cyan-teal gradient based on c1
 		intensity := uint8(100 + c1*77)
 		bot.LEDColor = [3]uint8{0, intensity, intensity}
@@ -191,23 +231,32 @@ func ApplySSA(bot *SwarmBot, ss *SwarmState, idx int) {
 		// Followers track the salp ahead: x_new = 0.5 * (x_i + x_{i-1})
 		prev := st.ChainIdx[idx]
 		if prev < 0 || prev >= len(ss.Bots) {
-			bot.Speed = SwarmBotSpeed
+			bot.Speed = 0
 			bot.LEDColor = [3]uint8{60, 60, 80}
 			return
 		}
 
-		targetX := 0.5 * (bot.X + ss.Bots[prev].X)
-		targetY := 0.5 * (bot.Y + ss.Bots[prev].Y)
-
-		desired := math.Atan2(targetY-bot.Y, targetX-bot.X)
-		steerToward(bot, desired, ssaSteerRate*0.8) // followers steer slightly slower
-		bot.Speed = SwarmBotSpeed * 0.9
+		targetX = 0.5 * (bot.X + ss.Bots[prev].X)
+		targetY = 0.5 * (bot.Y + ss.Bots[prev].Y)
 
 		// Follower LED: dim blue, brighter for higher chain position
 		chainPos := float64(idx) / float64(len(ss.Bots))
 		blue := uint8(80 + chainPos*100)
 		bot.LEDColor = [3]uint8{30, 30, blue}
 	}
+
+	// Blend target toward global best (adaptive attraction)
+	if st.FoodFit > -1e8 && gbestW > 0 {
+		targetX = targetX*(1-gbestW) + st.FoodX*gbestW
+		targetY = targetY*(1-gbestW) + st.FoodY*gbestW
+	}
+
+	// Clamp target to arena
+	targetX = math.Max(SwarmEdgeMargin, math.Min(ss.ArenaW-SwarmEdgeMargin, targetX))
+	targetY = math.Max(SwarmEdgeMargin, math.Min(ss.ArenaH-SwarmEdgeMargin, targetY))
+
+	// Move directly to target
+	ssaMovBot(bot, ss, targetX, targetY)
 
 	// Best salp gets bright gold LED
 	if idx == st.BestIdx {

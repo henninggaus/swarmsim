@@ -98,12 +98,26 @@ func TestApplyFPA(t *testing.T) {
 	for tick := 0; tick < 10; tick++ {
 		TickFPA(ss)
 	}
-	// Apply to all bots
+	// Record positions before apply
+	oldX := make([]float64, len(ss.Bots))
+	oldY := make([]float64, len(ss.Bots))
+	for i := range ss.Bots {
+		oldX[i] = ss.Bots[i].X
+		oldY[i] = ss.Bots[i].Y
+	}
+	// Apply to all bots — should move directly and set Speed=0
+	moved := 0
 	for i := range ss.Bots {
 		ApplyFPA(&ss.Bots[i], ss, i)
-		if ss.Bots[i].Speed <= 0 {
-			t.Fatalf("bot %d speed should be positive after ApplyFPA, got %f", i, ss.Bots[i].Speed)
+		if ss.Bots[i].Speed != 0 {
+			t.Fatalf("bot %d speed should be 0 after ApplyFPA (direct movement), got %f", i, ss.Bots[i].Speed)
 		}
+		if ss.Bots[i].X != oldX[i] || ss.Bots[i].Y != oldY[i] {
+			moved++
+		}
+	}
+	if moved == 0 {
+		t.Fatal("no bots moved after ApplyFPA — direct movement broken")
 	}
 }
 

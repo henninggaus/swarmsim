@@ -8,7 +8,7 @@ import "math"
 // to elimination-dispersal events that maintain population diversity.
 //
 // Phases:
-// 1. Chemotaxis — swim in current direction if improving, tumble (random dir) if not
+// 1. Chemotaxis — swim in current direction if improving, tumble (gradient-biased) if not
 // 2. Swarming — cell-to-cell signaling attracts bacteria to nutrient-rich areas
 // 3. Reproduction — fittest half clones replace least fit half
 // 4. Elimination-Dispersal — random bots teleport to new positions
@@ -17,39 +17,70 @@ import "math"
 //            "Biomimicry of bacterial foraging for distributed optimization"
 
 const (
-	bfoChemoSteps    = 4     // consecutive swim steps before re-evaluation
-	bfoTumbleRate    = 0.25  // probability of tumbling each step
-	bfoSwimSteerRate = 0.08  // max angle change during swim (radians)
-	bfoSwarmRadius   = 60.0  // swarming signal radius
-	bfoSwarmAttract  = 0.02  // swarming attraction coefficient
-	bfoSwarmRepel    = 0.01  // swarming repulsion coefficient
-	bfoReproInterval = 200   // ticks between reproduction events
-	bfoElimProb      = 0.02  // probability of elimination-dispersal per bot per cycle
-	bfoNutrientDecay = 0.995 // nutrient memory decay per tick
+	bfoChemoSteps     = 6     // consecutive swim steps before re-evaluation
+	bfoTumbleRate     = 0.15  // probability of tumbling each step
+	bfoSwimSteerRate  = 0.35  // max angle change during swim (radians)
+	bfoSwarmRadius    = 80.0  // swarming signal radius
+	bfoReproInterval  = 150   // ticks between reproduction events
+	bfoElimProb       = 0.003 // probability of elimination-dispersal per bot per cycle
+	bfoGradientDirs   = 8     // number of directions to probe during tumble
+	bfoMaxTicks       = 3000  // total ticks for adaptive parameter scheduling
+	bfoProbeDistStart = 40.0  // gradient probe distance at start (exploration)
+	bfoProbeDistEnd   = 8.0   // gradient probe distance at end (exploitation)
+	bfoGBestWStart    = 0.10  // global-best attraction weight at start
+	bfoGBestWEnd      = 0.45  // global-best attraction weight at end
 )
 
 // BFOState holds Bacterial Foraging Optimization state.
 type BFOState struct {
-	Health       []float64 // accumulated nutrient health per bot
-	SwimDir      []float64 // current swim direction (radians)
-	SwimCount    []int     // steps remaining in current swim
-	PrevNutrient []float64 // nutrient value at previous position
-	CycleTimer   int       // ticks since last reproduction
+	Fitness    []float64 // current landscape fitness per bot
+	SwimDir    []float64 // current swim direction (radians)
+	SwimCount  []int     // steps remaining in current swim
+	PrevFit    []float64 // fitness at previous position
+	Health     []float64 // accumulated health for reproduction selection
+	PBestF     []float64 // personal best fitness per bot
+	PBestX     []float64 // personal best X per bot
+	PBestY     []float64 // personal best Y per bot
+	CycleTimer int       // ticks since last reproduction
+	Tick       int       // total ticks elapsed (for adaptive scheduling)
+	BestF      float64   // global best fitness found
+	BestX      float64   // global best X position
+	BestY      float64   // global best Y position
+	BestIdx    int       // index of current best bot
 }
 
 // InitBFO allocates Bacterial Foraging state for all bots.
 func InitBFO(ss *SwarmState) {
 	n := len(ss.Bots)
-	ss.BFO = &BFOState{
-		Health:       make([]float64, n),
-		SwimDir:      make([]float64, n),
-		SwimCount:    make([]int, n),
-		PrevNutrient: make([]float64, n),
+	st := &BFOState{
+		Fitness:   make([]float64, n),
+		SwimDir:   make([]float64, n),
+		SwimCount: make([]int, n),
+		PrevFit:   make([]float64, n),
+		Health:    make([]float64, n),
+		PBestF:    make([]float64, n),
+		PBestX:    make([]float64, n),
+		PBestY:    make([]float64, n),
+		BestF:     -1e18,
+		BestIdx:   -1,
 	}
-	// Initialize random swim directions
-	for i := range ss.BFO.SwimDir {
-		ss.BFO.SwimDir[i] = ss.Rng.Float64() * 2 * math.Pi
+	// Initialize random swim directions and evaluate initial fitness
+	for i := range ss.Bots {
+		st.SwimDir[i] = ss.Rng.Float64() * 2 * math.Pi
+		f := distanceFitness(&ss.Bots[i], ss)
+		st.Fitness[i] = f
+		st.PrevFit[i] = f
+		st.PBestF[i] = f
+		st.PBestX[i] = ss.Bots[i].X
+		st.PBestY[i] = ss.Bots[i].Y
+		if f > st.BestF {
+			st.BestF = f
+			st.BestX = ss.Bots[i].X
+			st.BestY = ss.Bots[i].Y
+			st.BestIdx = i
+		}
 	}
+	ss.BFO = st
 	ss.BFOOn = true
 }
 
@@ -67,69 +98,109 @@ func TickBFO(ss *SwarmState) {
 	st := ss.BFO
 
 	// Grow slices if bots were added
-	for len(st.Health) < len(ss.Bots) {
-		st.Health = append(st.Health, 0)
+	for len(st.Fitness) < len(ss.Bots) {
+		idx := len(st.Fitness)
+		st.Fitness = append(st.Fitness, 0)
 		st.SwimDir = append(st.SwimDir, ss.Rng.Float64()*2*math.Pi)
 		st.SwimCount = append(st.SwimCount, 0)
-		st.PrevNutrient = append(st.PrevNutrient, 0)
+		st.PrevFit = append(st.PrevFit, 0)
+		st.Health = append(st.Health, 0)
+		st.PBestF = append(st.PBestF, -1e18)
+		if idx < len(ss.Bots) {
+			st.PBestX = append(st.PBestX, ss.Bots[idx].X)
+			st.PBestY = append(st.PBestY, ss.Bots[idx].Y)
+		} else {
+			st.PBestX = append(st.PBestX, 0)
+			st.PBestY = append(st.PBestY, 0)
+		}
 	}
 
 	st.CycleTimer++
+	st.Tick++
 
-	// Compute current nutrient value for each bot.
-	// Nutrient is a function of neighbor density (swarming signal)
-	// and resource proximity.
+	// Adaptive progress: 0.0 (exploration) → 1.0 (exploitation)
+	progress := float64(st.Tick) / float64(bfoMaxTicks)
+	if progress > 1.0 {
+		progress = 1.0
+	}
+	// Adaptive gradient probe distance: large early, small late
+	probeDist := bfoProbeDistStart + (bfoProbeDistEnd-bfoProbeDistStart)*progress
+
+	// Phase 1: Chemotaxis with gradient-guided tumble
 	for i := range ss.Bots {
 		bot := &ss.Bots[i]
-		nutrient := computeNutrient(bot, ss, i)
+		fit := distanceFitness(bot, ss)
+		st.Fitness[i] = fit
 
-		// Chemotaxis: compare with previous nutrient
+		// Update personal best
+		if fit > st.PBestF[i] {
+			st.PBestF[i] = fit
+			st.PBestX[i] = bot.X
+			st.PBestY[i] = bot.Y
+		}
+
+		// Update global best
+		if fit > st.BestF {
+			st.BestF = fit
+			st.BestX = bot.X
+			st.BestY = bot.Y
+			st.BestIdx = i
+		}
+
+		// Accumulate health for reproduction (faster EMA for better responsiveness)
+		st.Health[i] = st.Health[i]*0.95 + fit*0.05
+
+		// Chemotaxis decision
 		if st.SwimCount[i] <= 0 {
-			// Decide swim vs tumble
-			if nutrient > st.PrevNutrient[i] {
-				// Keep swimming in current direction (nutrient improving)
+			if fit > st.PrevFit[i] {
+				// Keep swimming — fitness improving
 				st.SwimCount[i] = bfoChemoSteps
 			} else {
-				// Tumble: pick a new random direction
-				st.SwimDir[i] = ss.Rng.Float64() * 2 * math.Pi
+				// Tumble: gradient-guided direction selection
+				st.SwimDir[i] = bfoGradientTumbleAdaptive(bot, ss, probeDist)
 				st.SwimCount[i] = bfoChemoSteps
 			}
 		}
 		st.SwimCount[i]--
 
-		// Random tumble chance even during swim
-		if ss.Rng.Float64() < bfoTumbleRate {
-			st.SwimDir[i] += (ss.Rng.Float64() - 0.5) * math.Pi
+		// Small random perturbation during swim (decreases over time)
+		perturbRate := bfoTumbleRate * (1.0 - 0.5*progress)
+		if ss.Rng.Float64() < perturbRate {
+			st.SwimDir[i] += (ss.Rng.Float64() - 0.5) * 0.6
 		}
 
-		st.PrevNutrient[i] = nutrient
-
-		// Accumulate health (higher nutrient = healthier bacterium)
-		st.Health[i] = st.Health[i]*bfoNutrientDecay + nutrient
+		st.PrevFit[i] = fit
 	}
 
-	// Reproduction: fittest half replaces least fit half
+	// Phase 3: Reproduction — fittest half clones replace least fit half
 	if st.CycleTimer >= bfoReproInterval {
 		st.CycleTimer = 0
 		bfoReproduce(ss)
 	}
 
-	// Elimination-dispersal: random bots teleport
+	// Phase 4: Elimination-dispersal — random bots teleport
 	for i := range ss.Bots {
 		if ss.Rng.Float64() < bfoElimProb {
 			ss.Bots[i].X = ss.Rng.Float64() * ss.ArenaW
 			ss.Bots[i].Y = ss.Rng.Float64() * ss.ArenaH
 			st.Health[i] = 0
+			st.PrevFit[i] = 0
 			st.SwimDir[i] = ss.Rng.Float64() * 2 * math.Pi
+			if i < len(st.PBestF) {
+				st.PBestF[i] = -1e18
+				st.PBestX[i] = ss.Bots[i].X
+				st.PBestY[i] = ss.Bots[i].Y
+			}
 		}
 	}
 
 	// Update sensor cache
 	for i := range ss.Bots {
-		ss.Bots[i].BFOHealth = int(st.Health[i] * 10)
-		if ss.Bots[i].BFOHealth > 100 {
-			ss.Bots[i].BFOHealth = 100
+		healthNorm := st.Health[i]
+		if healthNorm > 100 {
+			healthNorm = 100
 		}
+		ss.Bots[i].BFOHealth = int(healthNorm)
 		if ss.Bots[i].BFOHealth < 0 {
 			ss.Bots[i].BFOHealth = 0
 		}
@@ -137,65 +208,66 @@ func TickBFO(ss *SwarmState) {
 		if st.SwimCount[i] <= 0 {
 			ss.Bots[i].BFOSwimming = 0 // tumbling
 		}
-		ss.Bots[i].BFONutrient = int(st.PrevNutrient[i] * 100)
+		ss.Bots[i].BFONutrient = int(st.Fitness[i])
+		if ss.Bots[i].BFONutrient > 100 {
+			ss.Bots[i].BFONutrient = 100
+		}
 	}
 }
 
-// computeNutrient calculates the nutrient landscape value at a bot's position.
-// Combines swarming signals (attracted to nearby bacteria) with environmental cues.
-func computeNutrient(bot *SwarmBot, ss *SwarmState, idx int) float64 {
-	if ss.Hash == nil {
-		return 0.5
-	}
+// bfoGradientTumbleAdaptive probes several directions around the bot at
+// the given probe distance and returns a direction biased toward higher fitness.
+func bfoGradientTumbleAdaptive(bot *SwarmBot, ss *SwarmState, probeDist float64) float64 {
+	bestDir := ss.Rng.Float64() * 2 * math.Pi
+	bestFit := -1e18
 
-	nearIDs := ss.Hash.Query(bot.X, bot.Y, bfoSwarmRadius)
-	attractSignal := 0.0
-	repelSignal := 0.0
+	baseFit := distanceFitness(bot, ss)
 
-	for _, j := range nearIDs {
-		if j == idx || j < 0 || j >= len(ss.Bots) {
-			continue
+	for d := 0; d < bfoGradientDirs; d++ {
+		angle := float64(d) * (2 * math.Pi / float64(bfoGradientDirs))
+		// Add small random jitter to avoid deterministic patterns
+		angle += (ss.Rng.Float64() - 0.5) * 0.3
+
+		probeX := bot.X + math.Cos(angle)*probeDist
+		probeY := bot.Y + math.Sin(angle)*probeDist
+
+		// Clamp to arena
+		if probeX < 0 {
+			probeX = 0
 		}
-		nb := &ss.Bots[j]
-		dx := nb.X - bot.X
-		dy := nb.Y - bot.Y
-		dist := math.Sqrt(dx*dx + dy*dy)
-		if dist < 1.0 {
-			dist = 1.0
+		if probeX > ss.ArenaW {
+			probeX = ss.ArenaW
 		}
-		if dist > bfoSwarmRadius {
-			continue
+		if probeY < 0 {
+			probeY = 0
 		}
-		// Attraction: nearby bacteria indicate nutrients
-		attractSignal += bfoSwarmAttract * math.Exp(-dist/bfoSwarmRadius)
-		// Repulsion: too close causes competition
-		repelSignal += bfoSwarmRepel * math.Exp(-dist/(bfoSwarmRadius*0.3))
+		if probeY > ss.ArenaH {
+			probeY = ss.ArenaH
+		}
+
+		// Create temporary probe bot to evaluate fitness at probe position
+		probeBot := *bot
+		probeBot.X = probeX
+		probeBot.Y = probeY
+		probeFit := distanceFitness(&probeBot, ss)
+
+		if probeFit > bestFit {
+			bestFit = probeFit
+			bestDir = angle
+		}
 	}
 
-	// Landscape fitness as base nutrient (shared Gaussian peaks)
-	landFit := distanceFitness(bot, ss) / 100.0
-	if landFit < 0 {
-		landFit = 0
+	// Mix gradient direction with some randomness for exploration
+	if bestFit > baseFit {
+		// Strong bias toward gradient direction
+		return bestDir + (ss.Rng.Float64()-0.5)*0.4
 	}
-	baseNutrient := landFit * 0.5
-	energyBonus := (bot.Energy / 100.0) * 0.2
-	carry := 0.0
-	if bot.CarryingPkg >= 0 {
-		carry = 0.2
-	}
-
-	total := baseNutrient + energyBonus + carry + attractSignal - repelSignal
-	if total < 0 {
-		total = 0
-	}
-	if total > 1 {
-		total = 1
-	}
-	return total
+	// No improvement found — fully random tumble
+	return ss.Rng.Float64() * 2 * math.Pi
 }
 
 // bfoReproduce performs reproduction: healthiest half replaces least healthy half.
-// The healthy bacteria "clone" their swim direction and reset health.
+// The healthy bacteria "clone" their position (move toward donor) and swim direction.
 func bfoReproduce(ss *SwarmState) {
 	st := ss.BFO
 	n := len(ss.Bots)
@@ -203,13 +275,7 @@ func bfoReproduce(ss *SwarmState) {
 		return
 	}
 
-	// Simple selection: find median health, clone above-median to below-median
-	// Build sorted index by health (insertion sort for small N)
-	indices := make([]int, n)
-	for i := range indices {
-		indices[i] = i
-	}
-	// Partial sort: just find the half boundary
+	// Find mean health as threshold
 	midHealth := 0.0
 	for i := range ss.Bots {
 		midHealth += st.Health[i]
@@ -221,12 +287,23 @@ func bfoReproduce(ss *SwarmState) {
 		if st.Health[i] < midHealth {
 			// Find a random healthy donor
 			donor := ss.Rng.Intn(n)
-			for attempts := 0; attempts < 5 && st.Health[donor] < midHealth; attempts++ {
+			for attempts := 0; attempts < 8 && st.Health[donor] < midHealth; attempts++ {
 				donor = ss.Rng.Intn(n)
 			}
 			if st.Health[donor] >= midHealth {
-				st.SwimDir[i] = st.SwimDir[donor] + (ss.Rng.Float64()-0.5)*0.3
+				// Move weak bacterium toward donor position (partial teleport)
+				t := 0.3 + ss.Rng.Float64()*0.4 // blend factor 0.3-0.7
+				ss.Bots[i].X = ss.Bots[i].X*(1-t) + ss.Bots[donor].X*t
+				ss.Bots[i].Y = ss.Bots[i].Y*(1-t) + ss.Bots[donor].Y*t
+				st.SwimDir[i] = st.SwimDir[donor] + (ss.Rng.Float64()-0.5)*0.5
 				st.Health[i] = st.Health[donor] * 0.5
+				st.PrevFit[i] = 0 // force re-evaluation
+				// Inherit donor's personal best knowledge
+				if i < len(st.PBestF) && donor < len(st.PBestF) {
+					st.PBestF[i] = st.PBestF[donor]
+					st.PBestX[i] = st.PBestX[donor]
+					st.PBestY[i] = st.PBestY[donor]
+				}
 			}
 		}
 	}
@@ -244,12 +321,12 @@ func ApplyBFO(bot *SwarmBot, ss *SwarmState, idx int) {
 		return
 	}
 
-	// Swarming: attract toward nearby healthy bacteria
+	// Phase 2: Swarming — attract toward nearby high-fitness bacteria
 	swarmAngle := st.SwimDir[idx]
 	if ss.Hash != nil {
 		nearIDs := ss.Hash.Query(bot.X, bot.Y, bfoSwarmRadius)
 		sx, sy := 0.0, 0.0
-		n := 0
+		totalW := 0.0
 		for _, j := range nearIDs {
 			if j == idx || j < 0 || j >= len(ss.Bots) {
 				continue
@@ -257,23 +334,63 @@ func ApplyBFO(bot *SwarmBot, ss *SwarmState, idx int) {
 			nb := &ss.Bots[j]
 			dx := nb.X - bot.X
 			dy := nb.Y - bot.Y
-			dist := math.Sqrt(dx*dx + dy*dy)
-			if dist < 1.0 || dist > bfoSwarmRadius {
+			distSq := dx*dx + dy*dy
+			if distSq < 1.0 || distSq > bfoSwarmRadius*bfoSwarmRadius {
 				continue
 			}
-			// Weight attraction by neighbor health
+			dist := math.Sqrt(distSq)
+			// Weight attraction by neighbor fitness
 			w := 1.0
-			if j < len(st.Health) {
-				w = st.Health[j] * 0.1
+			if j < len(st.Fitness) {
+				w = math.Max(0, st.Fitness[j]) * 0.01
 			}
 			sx += (dx / dist) * w
 			sy += (dy / dist) * w
-			n++
+			totalW += w
 		}
-		if n > 0 {
+		if totalW > 0 {
+			// Blend swim direction with swarming signal
 			swarmAngle = math.Atan2(
-				math.Sin(st.SwimDir[idx])+sy*0.3,
-				math.Cos(st.SwimDir[idx])+sx*0.3,
+				math.Sin(st.SwimDir[idx])+sy*0.4,
+				math.Cos(st.SwimDir[idx])+sx*0.4,
+			)
+		}
+	}
+
+	// Adaptive progress for exploitation scaling
+	progress := float64(st.Tick) / float64(bfoMaxTicks)
+	if progress > 1.0 {
+		progress = 1.0
+	}
+
+	// Attract toward personal best (cognitive component)
+	if idx < len(st.PBestF) && st.PBestF[idx] > -1e17 {
+		dx := st.PBestX[idx] - bot.X
+		dy := st.PBestY[idx] - bot.Y
+		distSq := dx*dx + dy*dy
+		if distSq > 1.0 {
+			pbestAngle := math.Atan2(dy, dx)
+			pbestW := 0.05 + 0.10*progress // 0.05 → 0.15
+			swimW := 1.0 - pbestW
+			swarmAngle = math.Atan2(
+				math.Sin(swarmAngle)*swimW+math.Sin(pbestAngle)*pbestW,
+				math.Cos(swarmAngle)*swimW+math.Cos(pbestAngle)*pbestW,
+			)
+		}
+	}
+
+	// Attract toward global best (social component, adaptive strength)
+	gbestW := bfoGBestWStart + (bfoGBestWEnd-bfoGBestWStart)*progress
+	if st.BestIdx >= 0 && st.BestF > 0 {
+		dx := st.BestX - bot.X
+		dy := st.BestY - bot.Y
+		distSq := dx*dx + dy*dy
+		if distSq > 1.0 {
+			bestAngle := math.Atan2(dy, dx)
+			swimW := 1.0 - gbestW
+			swarmAngle = math.Atan2(
+				math.Sin(swarmAngle)*swimW+math.Sin(bestAngle)*gbestW,
+				math.Cos(swarmAngle)*swimW+math.Cos(bestAngle)*gbestW,
 			)
 		}
 	}
@@ -282,12 +399,46 @@ func ApplyBFO(bot *SwarmBot, ss *SwarmState, idx int) {
 	steerToward(bot, swarmAngle, bfoSwimSteerRate)
 	bot.Speed = SwarmBotSpeed
 
-	// LED color based on health: green (healthy) → red (unhealthy)
-	health := st.Health[idx]
-	if health > 10 {
-		health = 10
+	// LED color based on fitness: green (high) → red (low)
+	fit := st.Fitness[idx]
+	if fit < 0 {
+		fit = 0
 	}
-	g := uint8(math.Min(255, health*25))
-	r := uint8(math.Min(255, (10-health)*25))
+	if fit > 100 {
+		fit = 100
+	}
+	g := uint8(fit * 2.55)
+	r := uint8((100 - fit) * 2.55)
 	bot.LEDColor = [3]uint8{r, g, 50}
+
+	// Highlight global best in gold
+	if idx == st.BestIdx {
+		bot.LEDColor = [3]uint8{255, 215, 0}
+	}
+
+	// Direct position update (needed for benchmark mode where applySwarmPhysics
+	// is not called). Set Speed=0 after to prevent double-movement in GUI mode.
+	bfoMovBot(bot, ss)
+}
+
+// bfoMovBot applies bot movement based on speed/angle and clamps to arena bounds.
+func bfoMovBot(bot *SwarmBot, ss *SwarmState) {
+	if bot.Speed > 0 {
+		bot.X += math.Cos(bot.Angle) * bot.Speed
+		bot.Y += math.Sin(bot.Angle) * bot.Speed
+		bot.Speed = 0 // prevent double-move in GUI physics step
+	}
+	// Clamp to arena
+	if bot.X < 0 {
+		bot.X = 0
+	}
+	if bot.X > ss.ArenaW {
+		bot.X = ss.ArenaW
+	}
+	if bot.Y < 0 {
+		bot.Y = 0
+	}
+	if bot.Y > ss.ArenaH {
+		bot.Y = ss.ArenaH
+	}
 }

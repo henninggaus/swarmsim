@@ -158,6 +158,13 @@ func TestAlgorithmNames(t *testing.T) {
 func TestInitAndTickGWO(t *testing.T) {
 	rng := rand.New(rand.NewSource(42))
 	ss := NewSwarmState(rng, 15)
+	// Record initial positions
+	initX := make([]float64, len(ss.Bots))
+	initY := make([]float64, len(ss.Bots))
+	for i := range ss.Bots {
+		initX[i] = ss.Bots[i].X
+		initY[i] = ss.Bots[i].Y
+	}
 	InitSwarmAlgorithm(ss, AlgoGWO)
 	if ss.GWO == nil {
 		t.Fatal("GWO state should be initialized")
@@ -165,15 +172,17 @@ func TestInitAndTickGWO(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		TickSwarmAlgorithm(ss)
 	}
-	moving := false
-	for _, bot := range ss.Bots {
-		if bot.Speed > 0 {
-			moving = true
+	// With direct movement (Eigenbewegung), bots move directly and set Speed=0.
+	// Check that positions changed instead of checking speed.
+	moved := false
+	for i := range ss.Bots {
+		if ss.Bots[i].X != initX[i] || ss.Bots[i].Y != initY[i] {
+			moved = true
 			break
 		}
 	}
-	if !moving {
-		t.Fatal("bots should be moving after GWO ticks")
+	if !moved {
+		t.Fatal("bots should have moved after GWO ticks")
 	}
 	ClearSwarmAlgorithm(ss)
 	if ss.GWO != nil {

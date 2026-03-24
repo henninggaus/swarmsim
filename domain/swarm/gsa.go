@@ -21,8 +21,8 @@ import "math"
 const (
 	gsaG0          = 100.0  // initial gravitational constant
 	gsaAlphaDecay  = 20.0   // G decay rate
-	gsaMaxTicks    = 600    // full cycle length
-	gsaSteerRate   = 0.2    // max steering change per tick (radians)
+	gsaMaxTicks    = 3000   // full cycle length (matches benchmark length)
+	gsaSteerRate   = 0.30   // max steering change per tick (radians)
 	gsaEps         = 1.0    // softening constant to avoid division by zero
 	gsaMaxAccel    = 3.0    // acceleration clamp
 )
@@ -34,23 +34,28 @@ type GSAState struct {
 	AccX    []float64 // acceleration X per bot
 	AccY    []float64 // acceleration Y per bot
 	Tick    int       // current tick in cycle
-	BestIdx int       // index of heaviest agent
-	BestX   float64   // position of heaviest agent
+	BestIdx int       // index of heaviest agent (current tick)
+	BestX   float64   // position of heaviest agent (current tick)
 	BestY   float64
-	G       float64   // current gravitational constant
-	sortBuf []float64 // reusable buffer for K-best partial sort (avoids per-tick allocation)
-	kBest   []bool    // reusable boolean mask for K-best agents
+	G       float64 // current gravitational constant
+	// Persistent global best across entire run
+	GlobalBestF float64
+	GlobalBestX float64
+	GlobalBestY float64
+	sortBuf     []float64 // reusable buffer for K-best partial sort (avoids per-tick allocation)
+	kBest       []bool    // reusable boolean mask for K-best agents
 }
 
 // InitGSA allocates Gravitational Search Algorithm state.
 func InitGSA(ss *SwarmState) {
 	n := len(ss.Bots)
 	ss.GSA = &GSAState{
-		Mass:    make([]float64, n),
-		Fitness: make([]float64, n),
-		AccX:    make([]float64, n),
-		AccY:    make([]float64, n),
-		G:       gsaG0,
+		Mass:        make([]float64, n),
+		Fitness:     make([]float64, n),
+		AccX:        make([]float64, n),
+		AccY:        make([]float64, n),
+		G:           gsaG0,
+		GlobalBestF: -1e18,
 	}
 	ss.GSAOn = true
 }
@@ -115,6 +120,12 @@ func TickGSA(ss *SwarmState) {
 		}
 		if st.Fitness[i] < worstFit {
 			worstFit = st.Fitness[i]
+		}
+		// Update persistent global best
+		if st.Fitness[i] > st.GlobalBestF {
+			st.GlobalBestF = st.Fitness[i]
+			st.GlobalBestX = ss.Bots[i].X
+			st.GlobalBestY = ss.Bots[i].Y
 		}
 	}
 
@@ -238,7 +249,26 @@ func TickGSA(ss *SwarmState) {
 	}
 }
 
-// ApplyGSA steers a bot according to gravitational acceleration.
+// gsaMovBot moves a bot directly by (dx, dy), clamps to arena, and sets Speed=0
+// to prevent double-movement when applySwarmPhysics runs in GUI mode.
+func gsaMovBot(bot *SwarmBot, dx, dy, arenaW, arenaH float64) {
+	bot.X += dx
+	bot.Y += dy
+	if bot.X < 0 {
+		bot.X = 0
+	} else if bot.X > arenaW {
+		bot.X = arenaW
+	}
+	if bot.Y < 0 {
+		bot.Y = 0
+	} else if bot.Y > arenaH {
+		bot.Y = arenaH
+	}
+	bot.Speed = 0
+}
+
+// ApplyGSA moves a bot according to gravitational acceleration with direct
+// position updates. Adds adaptive global-best attraction for convergence.
 func ApplyGSA(bot *SwarmBot, ss *SwarmState, idx int) {
 	if ss.GSA == nil || idx >= len(ss.GSA.AccX) {
 		bot.Speed = SwarmBotSpeed
@@ -247,14 +277,37 @@ func ApplyGSA(bot *SwarmBot, ss *SwarmState, idx int) {
 	st := ss.GSA
 
 	ax, ay := st.AccX[idx], st.AccY[idx]
-	if ax != 0 || ay != 0 {
-		desired := math.Atan2(ay, ax)
-		steerToward(bot, desired, gsaSteerRate)
+
+	// Compute movement from gravitational acceleration
+	accMag := math.Sqrt(ax*ax + ay*ay)
+	moveSpeed := SwarmBotSpeed * (0.5 + math.Min(accMag, 2.0)/2.0)
+	dx, dy := 0.0, 0.0
+	if accMag > 1e-10 {
+		dx = ax / accMag * moveSpeed
+		dy = ay / accMag * moveSpeed
 	}
 
-	// Speed proportional to acceleration magnitude
-	accMag := math.Sqrt(ax*ax + ay*ay)
-	bot.Speed = SwarmBotSpeed * (0.5 + math.Min(accMag, 2.0)/2.0)
+	// Adaptive global-best attraction: weight increases from 5% to 20% over time
+	progress := float64(st.Tick) / float64(gsaMaxTicks)
+	gbWeight := 0.05 + 0.15*progress
+	if st.GlobalBestF > -1e17 {
+		gbDx := st.GlobalBestX - bot.X
+		gbDy := st.GlobalBestY - bot.Y
+		gbDist := math.Sqrt(gbDx*gbDx + gbDy*gbDy)
+		if gbDist > 1.0 {
+			gbStep := SwarmBotSpeed * gbWeight
+			dx += gbDx / gbDist * gbStep
+			dy += gbDy / gbDist * gbStep
+		}
+	}
+
+	// Update angle for visual consistency
+	if dx != 0 || dy != 0 {
+		bot.Angle = math.Atan2(dy, dx)
+	}
+
+	// Direct position update
+	gsaMovBot(bot, dx, dy, ss.ArenaW, ss.ArenaH)
 
 	// LED: mass as color intensity (heavy = bright red, light = dim blue)
 	mass01 := st.Mass[idx] * float64(len(ss.Bots)) // denormalise

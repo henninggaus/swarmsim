@@ -95,25 +95,50 @@ func TestApplySSA(t *testing.T) {
 	for tick := 0; tick < 10; tick++ {
 		TickSSA(ss)
 	}
-	// Apply to a leader
+	// Apply to a leader — should move via position update, Speed=0
 	for i := range ss.Bots {
 		if ss.SSA.Role[i] == 0 {
+			oldX, oldY := ss.Bots[i].X, ss.Bots[i].Y
 			ApplySSA(&ss.Bots[i], ss, i)
-			if ss.Bots[i].Speed <= 0 {
-				t.Fatal("leader speed should be positive")
+			if ss.Bots[i].Speed != 0 {
+				t.Fatal("leader speed should be 0 (direct movement)")
+			}
+			if ss.Bots[i].X == oldX && ss.Bots[i].Y == oldY {
+				t.Fatal("leader should have moved")
 			}
 			break
 		}
 	}
-	// Apply to a follower
+	// Apply to a follower — should move via position update, Speed=0
 	for i := range ss.Bots {
 		if ss.SSA.Role[i] == 1 {
+			oldX, oldY := ss.Bots[i].X, ss.Bots[i].Y
 			ApplySSA(&ss.Bots[i], ss, i)
-			if ss.Bots[i].Speed <= 0 {
-				t.Fatal("follower speed should be positive")
+			if ss.Bots[i].Speed != 0 {
+				t.Fatal("follower speed should be 0 (direct movement)")
+			}
+			dx := ss.Bots[i].X - oldX
+			dy := ss.Bots[i].Y - oldY
+			if dx == 0 && dy == 0 {
+				t.Fatal("follower should have moved")
 			}
 			break
 		}
+	}
+}
+
+func TestSSAGlobalBest(t *testing.T) {
+	ss := makeSSAState(20)
+	InitSSA(ss)
+	for tick := 0; tick < 100; tick++ {
+		TickSSA(ss)
+	}
+	st := ss.SSA
+	if st.FoodFit <= -1e9 {
+		t.Fatal("FoodFit should have been updated from initial -1e9")
+	}
+	if st.FoodX == 0 && st.FoodY == 0 {
+		t.Fatal("FoodX/FoodY should have been set")
 	}
 }
 

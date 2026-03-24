@@ -96,16 +96,21 @@ func TestApplyGWO(t *testing.T) {
 	for tick := 0; tick < 10; tick++ {
 		TickGWO(ss)
 	}
-	// Apply to omega wolf
+	// Apply to omega wolf — with direct movement, speed is set to 0
+	// after position update, so check that position changed instead.
 	for i := range ss.Bots {
 		if ss.GWO.Rank[i] == 3 { // omega
-			oldAngle := ss.Bots[i].Angle
+			oldX := ss.Bots[i].X
+			oldY := ss.Bots[i].Y
 			ApplyGWO(&ss.Bots[i], ss, i)
-			if ss.Bots[i].Speed <= 0 {
-				t.Fatal("omega wolf speed should be positive")
+			// Position should have changed (direct movement)
+			if ss.Bots[i].X == oldX && ss.Bots[i].Y == oldY {
+				t.Fatal("omega wolf should have moved after ApplyGWO")
 			}
-			// Angle may have changed
-			_ = oldAngle
+			// Speed should be 0 (prevents double movement in GUI)
+			if ss.Bots[i].Speed != 0 {
+				t.Fatalf("omega wolf speed should be 0 after direct move, got %f", ss.Bots[i].Speed)
+			}
 			break
 		}
 	}

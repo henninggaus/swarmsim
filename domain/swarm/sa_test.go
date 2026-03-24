@@ -104,18 +104,36 @@ func TestApplySA_NilSafe(t *testing.T) {
 	}
 }
 
-func TestApplySA_SteeringTowardTarget(t *testing.T) {
+func TestApplySA_DirectMovement(t *testing.T) {
 	ss := makeTestSwarmStateSA(10)
 	InitSA(ss)
 	TickSA(ss) // generate targets
 
-	bot := &ss.Bots[0]
-	ApplySA(bot, ss, 0)
-
-	if ss.SA.Moving[0] {
-		if bot.Speed < SwarmBotSpeed*0.2 {
-			t.Fatal("bot should be moving when it has a target")
+	// Find a bot that is moving.
+	movIdx := -1
+	for i := range ss.Bots {
+		if ss.SA.Moving[i] {
+			movIdx = i
+			break
 		}
+	}
+	if movIdx < 0 {
+		t.Skip("no bot accepted a move this tick")
+	}
+
+	bot := &ss.Bots[movIdx]
+	origX, origY := bot.X, bot.Y
+	ApplySA(bot, ss, movIdx)
+
+	// Bot should have moved via direct position update.
+	dx := bot.X - origX
+	dy := bot.Y - origY
+	if dx*dx+dy*dy < 0.01 {
+		t.Fatal("bot with Moving=true should have changed position directly")
+	}
+	// Speed should be 0 to prevent double movement.
+	if bot.Speed != 0 {
+		t.Fatalf("expected Speed=0 after direct move, got %f", bot.Speed)
 	}
 }
 

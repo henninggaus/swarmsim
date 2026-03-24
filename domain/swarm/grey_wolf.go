@@ -18,8 +18,9 @@ import "math"
 
 const (
 	gwoRadius       = 100.0 // neighbor detection radius
-	gwoMaxTicks     = 600   // full hunt cycle length
-	gwoSteerRate    = 0.15  // max steering change per tick (radians)
+	gwoMaxTicks     = 3000  // full hunt cycle length (matches benchmark)
+	gwoSteerRate    = 0.30  // max steering change per tick (radians)
+	gwoSpeedMult    = 3.0   // movement speed multiplier for direct movement
 	gwoEncircleWt   = 0.6   // weight for encircling behavior
 	gwoCohesionWt   = 0.3   // weight for pack cohesion
 	gwoMinNeighbors = 3     // minimum neighbors to form a pack
@@ -27,30 +28,46 @@ const (
 
 // GWOState holds Grey Wolf Optimizer state for the swarm.
 type GWOState struct {
-	Rank      []int     // 0=alpha, 1=beta, 2=delta, 3=omega
-	Fitness   []float64 // current fitness per bot (higher = better)
-	HuntTick  int       // ticks into current hunt cycle
-	AlphaIdx  int       // index of alpha wolf
-	BetaIdx   int       // index of beta wolf
-	DeltaIdx  int       // index of delta wolf
-	AlphaX    float64   // alpha position
-	AlphaY    float64
-	BetaX     float64   // beta position
-	BetaY     float64
-	DeltaX    float64   // delta position
-	DeltaY    float64
+	Rank         []int     // 0=alpha, 1=beta, 2=delta, 3=omega
+	Fitness      []float64 // current fitness per bot (higher = better)
+	HuntTick     int       // ticks into current hunt cycle
+	AlphaIdx     int       // index of alpha wolf
+	BetaIdx      int       // index of beta wolf
+	DeltaIdx     int       // index of delta wolf
+	AlphaX       float64   // alpha position
+	AlphaY       float64
+	BetaX        float64 // beta position
+	BetaY        float64
+	DeltaX       float64 // delta position
+	DeltaY       float64
+	GlobalBestF  float64 // persistent global best fitness
+	GlobalBestX  float64 // global best X position
+	GlobalBestY  float64 // global best Y position
+	GlobalBestIdx int    // index of global best bot
 }
 
 // InitGWO allocates Grey Wolf Optimizer state for all bots.
 func InitGWO(ss *SwarmState) {
 	n := len(ss.Bots)
 	ss.GWO = &GWOState{
-		Rank:    make([]int, n),
-		Fitness: make([]float64, n),
+		Rank:        make([]int, n),
+		Fitness:     make([]float64, n),
+		GlobalBestF: -1e18,
 	}
 	// Initially all omega; leaders determined by fitness
 	for i := range ss.GWO.Rank {
 		ss.GWO.Rank[i] = 3
+	}
+	// Evaluate initial fitness and set global best
+	for i := range ss.Bots {
+		f := distanceFitness(&ss.Bots[i], ss)
+		ss.GWO.Fitness[i] = f
+		if f > ss.GWO.GlobalBestF {
+			ss.GWO.GlobalBestF = f
+			ss.GWO.GlobalBestX = ss.Bots[i].X
+			ss.GWO.GlobalBestY = ss.Bots[i].Y
+			ss.GWO.GlobalBestIdx = i
+		}
 	}
 	ss.GWOOn = true
 }
@@ -59,6 +76,33 @@ func InitGWO(ss *SwarmState) {
 func ClearGWO(ss *SwarmState) {
 	ss.GWO = nil
 	ss.GWOOn = false
+}
+
+// gwoMovBot moves a bot directly toward the target position.
+// This ensures bots move even in headless benchmark mode (no physics step).
+func gwoMovBot(bot *SwarmBot, targetX, targetY, arenaW, arenaH float64) {
+	dx := targetX - bot.X
+	dy := targetY - bot.Y
+	dist := math.Sqrt(dx*dx + dy*dy)
+	if dist < 2 {
+		bot.X = targetX
+		bot.Y = targetY
+		bot.Speed = 0
+		return
+	}
+	maxStep := SwarmBotSpeed * gwoSpeedMult
+	if dist <= maxStep {
+		bot.X = targetX
+		bot.Y = targetY
+	} else {
+		ratio := maxStep / dist
+		bot.X += dx * ratio
+		bot.Y += dy * ratio
+	}
+	// Clamp to arena
+	bot.X = math.Max(5, math.Min(arenaW-5, bot.X))
+	bot.Y = math.Max(5, math.Min(arenaH-5, bot.Y))
+	bot.Speed = 0 // prevent double movement in GUI mode
 }
 
 // TickGWO updates the Grey Wolf Optimizer for all bots.
@@ -82,7 +126,15 @@ func TickGWO(ss *SwarmState) {
 
 	// Compute fitness using the shared fitness landscape.
 	for i := range ss.Bots {
-		st.Fitness[i] = distanceFitness(&ss.Bots[i], ss)
+		f := distanceFitness(&ss.Bots[i], ss)
+		st.Fitness[i] = f
+		// Update persistent global best
+		if f > st.GlobalBestF {
+			st.GlobalBestF = f
+			st.GlobalBestX = ss.Bots[i].X
+			st.GlobalBestY = ss.Bots[i].Y
+			st.GlobalBestIdx = i
+		}
 	}
 
 	// Find top 3 fitness indices (alpha, beta, delta)
@@ -144,9 +196,9 @@ func TickGWO(ss *SwarmState) {
 }
 
 // ApplyGWO steers a bot according to Grey Wolf hunting behavior.
-// Omega wolves move toward the average position of alpha, beta, and delta.
-// The convergence coefficient 'a' decreases over the hunt cycle, transitioning
-// from wide exploration to tight encirclement.
+// All wolves compute target position from alpha/beta/delta encirclement,
+// then move directly toward the target. Adaptive global-best attraction
+// increases over time to strengthen convergence.
 func ApplyGWO(bot *SwarmBot, ss *SwarmState, idx int) {
 	if ss.GWO == nil {
 		bot.Speed = SwarmBotSpeed
@@ -158,19 +210,16 @@ func ApplyGWO(bot *SwarmBot, ss *SwarmState, idx int) {
 		return
 	}
 
-	// Alpha, beta, delta keep their natural behavior (they lead)
-	if st.Rank[idx] <= 2 {
-		bot.Speed = SwarmBotSpeed
-		// Leaders get bright LED colors to indicate rank
-		switch st.Rank[idx] {
-		case 0: // alpha — gold
-			bot.LEDColor = [3]uint8{255, 215, 0}
-		case 1: // beta — silver
-			bot.LEDColor = [3]uint8{192, 192, 192}
-		case 2: // delta — bronze
-			bot.LEDColor = [3]uint8{205, 127, 50}
-		}
-		return
+	// Set LED colors by rank
+	switch st.Rank[idx] {
+	case 0: // alpha — gold
+		bot.LEDColor = [3]uint8{255, 215, 0}
+	case 1: // beta — silver
+		bot.LEDColor = [3]uint8{192, 192, 192}
+	case 2: // delta — bronze
+		bot.LEDColor = [3]uint8{205, 127, 50}
+	default: // omega — dark grey
+		bot.LEDColor = [3]uint8{100, 100, 100}
 	}
 
 	// Linearly decreasing convergence coefficient: a = 2 * (1 - t/T)
@@ -179,17 +228,16 @@ func ApplyGWO(bot *SwarmBot, ss *SwarmState, idx int) {
 		a = 0
 	}
 
-	// Random coefficients for stochastic exploration
-	r1 := ss.Rng.Float64()
-	r2 := ss.Rng.Float64()
-	A := 2.0*a*r1 - a // coefficient vector A ∈ [-a, a]
-	C := 2.0 * r2      // coefficient vector C ∈ [0, 2]
-
 	// Compute target position as weighted average of alpha, beta, delta positions
+	// using the standard GWO encircling formula per leader.
 	targetX, targetY := 0.0, 0.0
 	leaders := 0
 
 	if st.AlphaIdx >= 0 {
+		r1 := ss.Rng.Float64()
+		r2 := ss.Rng.Float64()
+		A := 2.0*a*r1 - a
+		C := 2.0 * r2
 		dAlpha := C*st.AlphaX - bot.X
 		targetX += st.AlphaX - A*dAlpha
 		dAlphaY := C*st.AlphaY - bot.Y
@@ -197,8 +245,8 @@ func ApplyGWO(bot *SwarmBot, ss *SwarmState, idx int) {
 		leaders++
 	}
 	if st.BetaIdx >= 0 {
-		r1 = ss.Rng.Float64()
-		r2 = ss.Rng.Float64()
+		r1 := ss.Rng.Float64()
+		r2 := ss.Rng.Float64()
 		A2 := 2.0*a*r1 - a
 		C2 := 2.0 * r2
 		dBeta := C2*st.BetaX - bot.X
@@ -208,8 +256,8 @@ func ApplyGWO(bot *SwarmBot, ss *SwarmState, idx int) {
 		leaders++
 	}
 	if st.DeltaIdx >= 0 {
-		r1 = ss.Rng.Float64()
-		r2 = ss.Rng.Float64()
+		r1 := ss.Rng.Float64()
+		r2 := ss.Rng.Float64()
 		A3 := 2.0*a*r1 - a
 		C3 := 2.0 * r2
 		dDelta := C3*st.DeltaX - bot.X
@@ -227,11 +275,18 @@ func ApplyGWO(bot *SwarmBot, ss *SwarmState, idx int) {
 	targetX /= float64(leaders)
 	targetY /= float64(leaders)
 
-	// Steer toward target
-	desired := math.Atan2(targetY-bot.Y, targetX-bot.X)
-	steerToward(bot, desired, gwoSteerRate)
-	bot.Speed = SwarmBotSpeed
+	// Adaptive global-best attraction: weight increases 5%→25% over time
+	progress := float64(st.HuntTick) / float64(gwoMaxTicks)
+	gbWeight := 0.05 + 0.20*progress
+	targetX = targetX*(1-gbWeight) + st.GlobalBestX*gbWeight
+	targetY = targetY*(1-gbWeight) + st.GlobalBestY*gbWeight
 
-	// Omega wolves: dark grey LED
-	bot.LEDColor = [3]uint8{100, 100, 100}
+	// Direct position update (works in both GUI and headless benchmark mode)
+	aw := float64(ss.ArenaW)
+	ah := float64(ss.ArenaH)
+	gwoMovBot(bot, targetX, targetY, aw, ah)
+
+	// Also set steering for GUI mode visual consistency
+	desired := math.Atan2(targetY-bot.Y, targetX-bot.X)
+	bot.Angle = desired
 }

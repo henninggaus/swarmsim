@@ -23,12 +23,12 @@ import "math"
 //   Knowledge-Based Systems 191, 105190.
 
 const (
-	eoPoolSize  = 5     // number of best solutions in equilibrium pool
-	eoMaxTicks  = 800   // full cycle length
-	eoSteerRate = 0.20  // max steering per tick (radians)
-	eoA1        = 2.0   // exploration control constant
-	eoA2        = 1.0   // exploitation control constant
-	eoGP        = 0.5   // generation probability
+	eoPoolSize  = 5      // number of best solutions in equilibrium pool
+	eoMaxTicks  = 3000   // full cycle length (matches benchmark length)
+	eoSteerRate = 0.30   // max steering per tick (radians)
+	eoA1        = 2.0    // exploration control constant
+	eoA2        = 1.0    // exploitation control constant
+	eoGP        = 0.5    // generation probability
 )
 
 // EOState holds Equilibrium Optimizer state for the swarm.
@@ -43,6 +43,8 @@ type EOState struct {
 	CycleTick int         // ticks into current cycle
 	BestIdx   int         // index of overall best bot
 	BestFit   float64     // best fitness found
+	BestX     float64     // persistent global best X position
+	BestY     float64     // persistent global best Y position
 	Phase     []int       // per-bot phase: 0=exploration, 1=exploitation
 }
 
@@ -170,10 +172,12 @@ func TickEO(ss *SwarmState) {
 	st.PoolY[lastIdx] = avgY
 	st.PoolF[lastIdx] = avgF
 
-	// Track overall best
+	// Track overall best (persistent across entire run)
 	for k := 0; k < poolCount; k++ {
 		if st.PoolF[k] > st.BestFit {
 			st.BestFit = st.PoolF[k]
+			st.BestX = st.PoolX[k]
+			st.BestY = st.PoolY[k]
 		}
 	}
 	st.BestIdx = candidates[0].idx
@@ -244,23 +248,44 @@ func ApplyEO(bot *SwarmBot, ss *SwarmState, idx int) {
 	targetX := ceqX + (bot.X-ceqX)*F + GX*(1.0-F)
 	targetY := ceqY + (bot.Y-ceqY)*F + GY*(1.0-F)
 
+	// Adaptive global-best attraction: weight increases from 5% to 20% over time
+	if st.BestFit > -1e8 {
+		gbWeight := 0.05 + 0.15*t
+		targetX = targetX*(1-gbWeight) + st.BestX*gbWeight
+		targetY = targetY*(1-gbWeight) + st.BestY*gbWeight
+	}
+
 	// Clamp to arena
 	targetX = math.Max(SwarmEdgeMargin, math.Min(ss.ArenaW-SwarmEdgeMargin, targetX))
 	targetY = math.Max(SwarmEdgeMargin, math.Min(ss.ArenaH-SwarmEdgeMargin, targetY))
 
-	// Steer toward target
-	desired := math.Atan2(targetY-bot.Y, targetX-bot.X)
-	steerToward(bot, desired, eoSteerRate)
-
-	// Speed scales with distance to target
+	// Move bot directly toward target (Eigenbewegung)
 	dx := targetX - bot.X
 	dy := targetY - bot.Y
 	dist := math.Sqrt(dx*dx + dy*dy)
-	if dist > 5.0 {
-		bot.Speed = SwarmBotSpeed
+
+	maxStep := SwarmBotSpeed * 1.5
+	if dist > maxStep {
+		// Move at max speed toward target
+		ratio := maxStep / dist
+		bot.X += dx * ratio
+		bot.Y += dy * ratio
 	} else {
-		bot.Speed = SwarmBotSpeed * 0.5
+		// Snap to target when close
+		bot.X = targetX
+		bot.Y = targetY
 	}
+
+	// Update angle to match movement direction
+	if dist > 1.0 {
+		bot.Angle = math.Atan2(dy, dx)
+	}
+
+	// Set Speed=0 to prevent double-move in GUI physics step
+	bot.Speed = 0
+
+	// Arena clamping
+	eoClampArena(bot, ss)
 
 	// LED visualization
 	if idx == st.BestIdx {
@@ -278,5 +303,21 @@ func ApplyEO(bot *SwarmBot, ss *SwarmState, idx int) {
 		progress := t
 		g := uint8(100 + progress*155)
 		bot.LEDColor = [3]uint8{30, g, uint8(80 + progress*80)}
+	}
+}
+
+// eoClampArena clamps bot position to arena bounds.
+func eoClampArena(bot *SwarmBot, ss *SwarmState) {
+	if bot.X < SwarmEdgeMargin {
+		bot.X = SwarmEdgeMargin
+	}
+	if bot.X > ss.ArenaW-SwarmEdgeMargin {
+		bot.X = ss.ArenaW - SwarmEdgeMargin
+	}
+	if bot.Y < SwarmEdgeMargin {
+		bot.Y = SwarmEdgeMargin
+	}
+	if bot.Y > ss.ArenaH-SwarmEdgeMargin {
+		bot.Y = ss.ArenaH - SwarmEdgeMargin
 	}
 }

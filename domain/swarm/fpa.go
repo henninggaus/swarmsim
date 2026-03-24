@@ -17,9 +17,9 @@ import "math"
 //            Optimization", Unconventional Computation and Natural Computation.
 
 const (
-	fpaMaxTicks   = 800   // full pollination cycle
-	fpaSwitchProb = 0.8   // probability of global pollination (exploration)
-	fpaSteerRate  = 0.20  // max steering per tick (radians)
+	fpaMaxTicks   = 3000  // full pollination cycle (matches benchmark length)
+	fpaSwitchProb = 0.65  // probability of global pollination (exploration)
+	fpaSteerRate  = 0.30  // max steering per tick (radians)
 	fpaLevyBeta   = 1.5   // Lévy exponent (1 < beta <= 2)
 	fpaStepScale  = 0.5   // scale factor for Lévy steps
 	fpaLocalScale = 0.3   // scale factor for local pollination
@@ -142,6 +142,12 @@ func ApplyFPA(bot *SwarmBot, ss *SwarmState, idx int) {
 		return
 	}
 
+	// Adaptive progress: 0 at start, 1 at end of cycle
+	progress := float64(st.PollTick) / float64(fpaMaxTicks)
+	if progress > 1 {
+		progress = 1
+	}
+
 	var dx, dy float64
 
 	if st.IsGlobal[idx] {
@@ -165,6 +171,11 @@ func ApplyFPA(bot *SwarmBot, ss *SwarmState, idx int) {
 		dy = epsilon * (ss.Bots[j].Y - ss.Bots[k].Y) * fpaLocalScale
 	}
 
+	// Personal-best attraction (increases from 5% to 15% over time)
+	pbWeight := 0.05 + 0.10*progress
+	dx += pbWeight * (st.BestX[idx] - bot.X)
+	dy += pbWeight * (st.BestY[idx] - bot.Y)
+
 	if dx != 0 || dy != 0 {
 		desired := math.Atan2(dy, dx)
 		steerToward(bot, desired, fpaSteerRate)
@@ -181,6 +192,9 @@ func ApplyFPA(bot *SwarmBot, ss *SwarmState, idx int) {
 		bot.Angle += (ss.Rng.Float64() - 0.5) * 0.4
 		bot.Speed = SwarmBotSpeed * 0.5
 	}
+
+	// Direct movement: move bot and zero speed to prevent double-move in GUI
+	fpaMovBot(bot, ss)
 
 	// LED visualization:
 	// Global pollination = warm colors (yellow/orange based on fitness)
@@ -206,6 +220,30 @@ func ApplyFPA(bot *SwarmBot, ss *SwarmState, idx int) {
 			fit01 = 1
 		}
 		bot.LEDColor = [3]uint8{uint8(50 * (1 - fit01)), uint8(200 * fit01), 255}
+	}
+}
+
+// fpaMovBot applies bot movement based on speed/angle and clamps to arena bounds.
+// We move the bot directly here and then zero out Speed so that the GUI physics
+// step (applySwarmPhysics) does not duplicate the movement.
+func fpaMovBot(bot *SwarmBot, ss *SwarmState) {
+	if bot.Speed > 0 {
+		bot.X += math.Cos(bot.Angle) * bot.Speed
+		bot.Y += math.Sin(bot.Angle) * bot.Speed
+		bot.Speed = 0 // prevent double-move in GUI physics step
+	}
+	// Clamp to arena
+	if bot.X < SwarmEdgeMargin {
+		bot.X = SwarmEdgeMargin
+	}
+	if bot.X > ss.ArenaW-SwarmEdgeMargin {
+		bot.X = ss.ArenaW - SwarmEdgeMargin
+	}
+	if bot.Y < SwarmEdgeMargin {
+		bot.Y = SwarmEdgeMargin
+	}
+	if bot.Y > ss.ArenaH-SwarmEdgeMargin {
+		bot.Y = ss.ArenaH - SwarmEdgeMargin
 	}
 }
 

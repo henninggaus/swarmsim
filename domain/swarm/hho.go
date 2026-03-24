@@ -22,30 +22,38 @@ import "math"
 //	"Harris hawks optimization: Algorithm and applications",
 //	Future Generation Computer Systems.
 const (
-	hhoMaxTicks  = 600   // full hunt cycle
-	hhoSteerRate = 0.2   // max steering change per tick (radians)
+	hhoMaxTicks  = 3000  // full hunt cycle (matches benchmark length)
+	hhoSteerRate = 0.25  // max steering change per tick (radians)
 	hhoLevyBeta  = 1.5   // Lévy flight exponent
+	hhoSpeedMult = 3.0   // movement speed multiplier (3x = 4.5 px/tick)
 )
 
 // HHOState holds Harris Hawks Optimization state for the swarm.
 type HHOState struct {
-	Fitness  []float64 // current fitness per hawk
-	Phase    []int     // 0=explore, 1=soft besiege, 2=hard besiege, 3=rapid dive
-	HuntTick int       // ticks into current hunt cycle
-	BestIdx  int       // index of rabbit (best hawk)
-	BestX    float64   // rabbit position
-	BestY    float64
-	BestF    float64   // rabbit fitness
+	Fitness      []float64 // current fitness per hawk
+	Phase        []int     // 0=explore, 1=soft besiege, 2=hard besiege, 3=rapid dive
+	HuntTick     int       // ticks into current hunt cycle
+	BestIdx      int       // index of rabbit (best hawk) this tick
+	BestX        float64   // current tick-best rabbit position
+	BestY        float64
+	BestF        float64   // current tick-best rabbit fitness
+	GlobalBestF  float64   // persistent global best fitness
+	GlobalBestX  float64   // persistent global best position X
+	GlobalBestY  float64   // persistent global best position Y
+	GlobalBestIdx int      // persistent global best index
+	CurBestIdx   int       // current tick's best (for LED display)
 }
 
 // InitHHO allocates Harris Hawks Optimization state for all bots.
 func InitHHO(ss *SwarmState) {
 	n := len(ss.Bots)
 	ss.HHO = &HHOState{
-		Fitness: make([]float64, n),
-		Phase:   make([]int, n),
-		BestIdx: -1,
-		BestF:   -1e18,
+		Fitness:      make([]float64, n),
+		Phase:        make([]int, n),
+		BestIdx:      -1,
+		BestF:        -1e18,
+		GlobalBestF:  -1e18,
+		GlobalBestIdx: -1,
 	}
 	ss.HHOOn = true
 }
@@ -54,6 +62,33 @@ func InitHHO(ss *SwarmState) {
 func ClearHHO(ss *SwarmState) {
 	ss.HHO = nil
 	ss.HHOOn = false
+}
+
+// hhoMovBot moves a bot directly toward a target position (Eigenbewegung).
+// This ensures bots move in benchmark mode where applySwarmPhysics is not called.
+func hhoMovBot(bot *SwarmBot, targetX, targetY, arenaW, arenaH float64) {
+	dx := targetX - bot.X
+	dy := targetY - bot.Y
+	dist := math.Sqrt(dx*dx + dy*dy)
+	if dist < 2 {
+		bot.X = targetX
+		bot.Y = targetY
+		bot.Speed = 0
+		return
+	}
+	maxStep := SwarmBotSpeed * hhoSpeedMult
+	if dist <= maxStep {
+		bot.X = targetX
+		bot.Y = targetY
+	} else {
+		ratio := maxStep / dist
+		bot.X += dx * ratio
+		bot.Y += dy * ratio
+	}
+	// Clamp to arena
+	bot.X = math.Max(5, math.Min(arenaW-5, bot.X))
+	bot.Y = math.Max(5, math.Min(arenaH-5, bot.Y))
+	bot.Speed = 0 // prevent double movement in GUI mode
 }
 
 // TickHHO updates the Harris Hawks Optimization for all bots.
@@ -72,7 +107,7 @@ func TickHHO(ss *SwarmState) {
 	st.HuntTick++
 	if st.HuntTick > hhoMaxTicks {
 		st.HuntTick = 1
-		st.BestF = -1e18 // reset for new cycle
+		st.BestF = -1e18 // reset cycle-local best
 	}
 
 	// Compute fitness for each hawk
@@ -80,7 +115,7 @@ func TickHHO(ss *SwarmState) {
 		st.Fitness[i] = distanceFitness(&ss.Bots[i], ss)
 	}
 
-	// Find rabbit (best fitness)
+	// Find rabbit (best fitness) — cycle-local
 	for i := range ss.Bots {
 		if st.Fitness[i] > st.BestF {
 			st.BestF = st.Fitness[i]
@@ -90,9 +125,18 @@ func TickHHO(ss *SwarmState) {
 		}
 	}
 
+	// Update persistent global best
+	st.CurBestIdx = st.BestIdx
+	for i := range ss.Bots {
+		if st.Fitness[i] > st.GlobalBestF {
+			st.GlobalBestF = st.Fitness[i]
+			st.GlobalBestX = ss.Bots[i].X
+			st.GlobalBestY = ss.Bots[i].Y
+			st.GlobalBestIdx = i
+		}
+	}
+
 	// Escaping energy: E = 2 * E0 * (1 - t/T), where E0 ∈ [-1, 1]
-	// This linearly decreases the energy magnitude over the hunt cycle.
-	// |E| ≥ 1 → exploration; |E| < 1 → exploitation
 	tRatio := float64(st.HuntTick) / float64(hhoMaxTicks)
 
 	// Assign phases and update sensor cache
@@ -117,9 +161,9 @@ func TickHHO(ss *SwarmState) {
 		// Update sensor cache
 		ss.Bots[i].HHOPhase = st.Phase[i]
 		ss.Bots[i].HHOFitness = int(st.Fitness[i])
-		if st.BestIdx >= 0 {
-			dx := st.BestX - ss.Bots[i].X
-			dy := st.BestY - ss.Bots[i].Y
+		if st.GlobalBestIdx >= 0 {
+			dx := st.GlobalBestX - ss.Bots[i].X
+			dy := st.GlobalBestY - ss.Bots[i].Y
 			ss.Bots[i].HHOBestDist = int(math.Sqrt(dx*dx + dy*dy))
 		} else {
 			ss.Bots[i].HHOBestDist = 9999
@@ -139,10 +183,15 @@ func ApplyHHO(bot *SwarmBot, ss *SwarmState, idx int) {
 		return
 	}
 
-	// The rabbit itself just moves normally
-	if idx == st.BestIdx {
-		bot.Speed = SwarmBotSpeed
+	// The rabbit itself also participates (no exclusion of best bot)
+	if idx == st.CurBestIdx {
 		bot.LEDColor = [3]uint8{255, 215, 0} // gold = rabbit/prey
+		// Best bot does a small random walk to explore nearby
+		targetX := bot.X + (ss.Rng.Float64()-0.5)*40
+		targetY := bot.Y + (ss.Rng.Float64()-0.5)*40
+		targetX = math.Max(10, math.Min(ss.ArenaW-10, targetX))
+		targetY = math.Max(10, math.Min(ss.ArenaH-10, targetY))
+		hhoMovBot(bot, targetX, targetY, ss.ArenaW, ss.ArenaH)
 		return
 	}
 
@@ -154,7 +203,6 @@ func ApplyHHO(bot *SwarmBot, ss *SwarmState, idx int) {
 
 	switch st.Phase[idx] {
 	case 0: // Exploration
-		// Strategy: q < 0.5 → perch near random hawk, else near rabbit with random offset
 		q := ss.Rng.Float64()
 		if q < 0.5 {
 			// Random hawk position with perturbation
@@ -169,7 +217,6 @@ func ApplyHHO(bot *SwarmBot, ss *SwarmState, idx int) {
 		bot.LEDColor = [3]uint8{80, 130, 200} // blue = exploring
 
 	case 1: // Soft besiege
-		// Hawks encircle prey with gradually tightening spiral
 		J := 2 * (1 - ss.Rng.Float64()) // random jump strength
 		dx := st.BestX - bot.X
 		dy := st.BestY - bot.Y
@@ -181,13 +228,11 @@ func ApplyHHO(bot *SwarmBot, ss *SwarmState, idx int) {
 		bot.LEDColor = [3]uint8{255, 165, 0} // orange = soft besiege
 
 	case 2: // Hard besiege
-		// Hawks converge directly on prey with tight radius
 		targetX = st.BestX - E*math.Abs(st.BestX-bot.X)
 		targetY = st.BestY - E*math.Abs(st.BestY-bot.Y)
 		bot.LEDColor = [3]uint8{255, 50, 50} // red = hard besiege
 
 	case 3: // Rapid dive (Lévy flight)
-		// Surprise attack: Lévy flight toward prey
 		levy := MantegnaLevy(ss.Rng, 1.5)
 		dx := st.BestX - bot.X
 		dy := st.BestY - bot.Y
@@ -202,14 +247,21 @@ func ApplyHHO(bot *SwarmBot, ss *SwarmState, idx int) {
 		bot.LEDColor = [3]uint8{200, 50, 200} // purple = rapid dive
 	}
 
+	// Adaptive Global-Best attraction: weight increases 5% → 25% over time
+	gbWeight := 0.05 + 0.20*tRatio
+	targetX = targetX*(1-gbWeight) + st.GlobalBestX*gbWeight
+	targetY = targetY*(1-gbWeight) + st.GlobalBestY*gbWeight
+
 	// Clamp to arena
 	targetX = math.Max(10, math.Min(ss.ArenaW-10, targetX))
 	targetY = math.Max(10, math.Min(ss.ArenaH-10, targetY))
 
-	// Steer toward target
+	// Steer toward target (for GUI angle display)
 	desired := math.Atan2(targetY-bot.Y, targetX-bot.X)
 	steerToward(bot, desired, hhoSteerRate)
-	bot.Speed = SwarmBotSpeed
+
+	// Direct movement (Eigenbewegung) — ensures movement in benchmark mode
+	hhoMovBot(bot, targetX, targetY, ss.ArenaW, ss.ArenaH)
 }
 
 // levyStep generates a Lévy-flight step using the shared Mantegna algorithm.

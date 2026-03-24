@@ -93,12 +93,26 @@ func TestApplyEO(t *testing.T) {
 	for tick := 0; tick < 10; tick++ {
 		TickEO(ss)
 	}
+	// Record positions before Apply
+	oldX := make([]float64, len(ss.Bots))
+	oldY := make([]float64, len(ss.Bots))
+	for i := range ss.Bots {
+		oldX[i] = ss.Bots[i].X
+		oldY[i] = ss.Bots[i].Y
+	}
 	// Apply to each bot
+	moved := 0
 	for i := range ss.Bots {
 		ApplyEO(&ss.Bots[i], ss, i)
-		if ss.Bots[i].Speed <= 0 {
-			t.Fatalf("bot %d: speed should be positive", i)
+		if ss.Bots[i].Speed != 0 {
+			t.Fatalf("bot %d: speed should be 0 after direct move, got %f", i, ss.Bots[i].Speed)
 		}
+		if ss.Bots[i].X != oldX[i] || ss.Bots[i].Y != oldY[i] {
+			moved++
+		}
+	}
+	if moved == 0 {
+		t.Fatal("no bots moved after ApplyEO — Eigenbewegung broken")
 	}
 }
 
@@ -107,8 +121,8 @@ func TestApplyEONil(t *testing.T) {
 	// Should not panic when EO is nil
 	bot := &ss.Bots[0]
 	ApplyEO(bot, ss, 0)
-	if bot.Speed <= 0 {
-		t.Fatal("speed should be positive even with nil EO")
+	if bot.Speed != SwarmBotSpeed {
+		t.Fatalf("speed should be SwarmBotSpeed with nil EO, got %f", bot.Speed)
 	}
 }
 
@@ -196,6 +210,21 @@ func TestEOPersonalBest(t *testing.T) {
 	// Personal best X should match bot position
 	if ss.EO.PersonalX[0] != ss.Bots[0].X {
 		t.Fatalf("personal best X should match bot X after first tick")
+	}
+}
+
+func TestEOGlobalBest(t *testing.T) {
+	ss := makeEOState(10)
+	InitEO(ss)
+	for tick := 0; tick < 100; tick++ {
+		TickEO(ss)
+	}
+	if ss.EO.BestFit <= -1e8 {
+		t.Fatal("global best fitness should be updated after 100 ticks")
+	}
+	// BestX/BestY should be within arena
+	if ss.EO.BestX < 0 || ss.EO.BestX > 800 || ss.EO.BestY < 0 || ss.EO.BestY > 800 {
+		t.Fatalf("global best position out of bounds: (%f, %f)", ss.EO.BestX, ss.EO.BestY)
 	}
 }
 

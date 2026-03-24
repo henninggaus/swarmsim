@@ -29,26 +29,27 @@ import "math"
 //            Neural Computing and Applications.
 
 const (
-	daMaxTicks   = 600  // full optimisation cycle
-	daSteerRate  = 0.2  // max steering change per tick (radians)
+	daMaxTicks   = 3000 // full optimisation cycle (matches benchmark length)
+	daSteerRate  = 0.3  // max steering change per tick (radians)
 	daNeighDist  = 80.0 // neighbourhood radius
 )
 
 // DAState holds Dragonfly Algorithm state for the swarm.
 type DAState struct {
-	Fitness  []float64 // current fitness per bot
-	StepX    []float64 // step vector X per bot (velocity carry-over)
-	StepY    []float64 // step vector Y per bot
-	BestX    float64   // food source (global best position) X
-	BestY    float64   // food source (global best position) Y
-	BestF    float64   // global best fitness
-	BestIdx  int       // index of best bot
-	WorstX   float64   // enemy (global worst position) X
-	WorstY   float64   // enemy (global worst position) Y
-	WorstF   float64   // global worst fitness
-	WorstIdx int       // index of worst bot
-	Tick     int       // ticks into current cycle
-	Role     []int     // 0=static(feeding), 1=dynamic(migratory), 2=levy per bot
+	Fitness    []float64 // current fitness per bot
+	StepX      []float64 // step vector X per bot (velocity carry-over)
+	StepY      []float64 // step vector Y per bot
+	BestX      float64   // food source (historical global best position) X
+	BestY      float64   // food source (historical global best position) Y
+	BestF      float64   // historical global best fitness
+	BestIdx    int       // index of historical best bot
+	CurBestIdx int       // index of current tick's best bot (for LED)
+	WorstX     float64   // enemy (global worst position) X
+	WorstY     float64   // enemy (global worst position) Y
+	WorstF     float64   // global worst fitness
+	WorstIdx   int       // index of worst bot
+	Tick       int       // ticks into current cycle
+	Role       []int     // 0=static(feeding), 1=dynamic(migratory), 2=levy per bot
 }
 
 // InitDA allocates Dragonfly Algorithm state for all bots.
@@ -98,25 +99,30 @@ func TickDA(ss *SwarmState) {
 		st.Fitness[i] = distanceFitness(&ss.Bots[i], ss)
 	}
 
-	// Find global best (food) and worst (enemy)
-	st.BestIdx = -1
-	st.BestF = -1e18
+	// Find current tick's best/worst and update historical global best
+	curBestIdx := -1
+	curBestF := -1e18
 	st.WorstIdx = -1
 	st.WorstF = 1e18
 	for i := range ss.Bots {
-		if st.Fitness[i] > st.BestF {
-			st.BestF = st.Fitness[i]
-			st.BestIdx = i
+		if st.Fitness[i] > curBestF {
+			curBestF = st.Fitness[i]
+			curBestIdx = i
 		}
 		if st.Fitness[i] < st.WorstF {
 			st.WorstF = st.Fitness[i]
 			st.WorstIdx = i
 		}
 	}
-	if st.BestIdx >= 0 {
-		st.BestX = ss.Bots[st.BestIdx].X
-		st.BestY = ss.Bots[st.BestIdx].Y
+	// Update historical global best (persistent across ticks)
+	if curBestIdx >= 0 && curBestF > st.BestF {
+		st.BestF = curBestF
+		st.BestIdx = curBestIdx
+		st.BestX = ss.Bots[curBestIdx].X
+		st.BestY = ss.Bots[curBestIdx].Y
 	}
+	// Track current tick's best index for gold LED
+	st.CurBestIdx = curBestIdx
 	if st.WorstIdx >= 0 {
 		st.WorstX = ss.Bots[st.WorstIdx].X
 		st.WorstY = ss.Bots[st.WorstIdx].Y
@@ -151,8 +157,8 @@ func ApplyDA(bot *SwarmBot, ss *SwarmState, idx int) {
 		return
 	}
 
-	// Best bot keeps natural behaviour
-	if idx == st.BestIdx {
+	// Current best bot keeps natural behaviour (gold LED)
+	if idx == st.CurBestIdx {
 		bot.Speed = SwarmBotSpeed
 		bot.LEDColor = [3]uint8{255, 215, 0} // gold for food source
 		st.Role[idx] = 0
@@ -268,7 +274,24 @@ func ApplyDA(bot *SwarmBot, ss *SwarmState, idx int) {
 		desired := math.Atan2(st.StepY[idx], st.StepX[idx])
 		steerToward(bot, desired, daSteerRate)
 	}
-	bot.Speed = SwarmBotSpeed
+
+	// Direct position update (Eigenbewegung) — required for benchmark mode
+	bot.X += st.StepX[idx]
+	bot.Y += st.StepY[idx]
+	// Clamp to arena
+	if bot.X < 0 {
+		bot.X = 0
+	}
+	if bot.X > ss.ArenaW {
+		bot.X = ss.ArenaW
+	}
+	if bot.Y < 0 {
+		bot.Y = 0
+	}
+	if bot.Y > ss.ArenaH {
+		bot.Y = ss.ArenaH
+	}
+	bot.Speed = 0 // prevent double-move in GUI physics step
 
 	// LED colour by role
 	switch st.Role[idx] {

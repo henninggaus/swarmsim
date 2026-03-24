@@ -16,11 +16,13 @@ import "math"
 //            "Moth-flame optimization algorithm", Knowledge-Based Systems.
 
 const (
-	mfoRadius     = 80.0  // flame detection radius
-	mfoSteerRate  = 0.14  // max steering per tick
-	mfoSpiralB    = 1.0   // spiral shape constant
-	mfoMaxFlames  = 10    // maximum number of flames
+	mfoRadius    = 80.0  // flame detection radius
+	mfoSteerRate = 0.25  // max steering per tick (was 0.14)
+	mfoSpiralB   = 1.0   // spiral shape constant
+	mfoMaxFlames = 12    // maximum number of flames (was 10)
 	mfoFlameDecay = 0.998 // flame intensity decay per tick
+	mfoMergeDist  = 900   // flame merge distance squared (30px, was 20px)
+	mfoMaxTicks   = 3000  // total ticks for adaptive t-range
 )
 
 // FlamePoint represents a flame (best-known position) in MFO.
@@ -36,6 +38,10 @@ type MFOState struct {
 	MothFlame  []int        // index of assigned flame per bot (-1 = none)
 	SpiralT    []float64    // spiral parameter t per bot ∈ [-1, 1]
 	BotFitness []float64    // current fitness per bot
+	Tick       int          // iteration counter
+	BestF      float64      // global best fitness
+	BestX      float64      // global best X
+	BestY      float64      // global best Y
 }
 
 // InitMFO allocates Moth-Flame Optimization state.
@@ -66,6 +72,7 @@ func TickMFO(ss *SwarmState) {
 		return
 	}
 	st := ss.MFO
+	st.Tick++
 
 	// Grow slices if bots were added
 	for len(st.MothFlame) < len(ss.Bots) {
@@ -76,12 +83,18 @@ func TickMFO(ss *SwarmState) {
 
 	// Compute fitness using the shared fitness landscape.
 	for i := range ss.Bots {
-		st.BotFitness[i] = distanceFitness(&ss.Bots[i], ss)
+		f := distanceFitness(&ss.Bots[i], ss)
+		st.BotFitness[i] = f
+		if f > st.BestF {
+			st.BestF = f
+			st.BestX = ss.Bots[i].X
+			st.BestY = ss.Bots[i].Y
+		}
 	}
 
 	// Update flames: add current best positions, merge nearby, cull weak
 	for i := range ss.Bots {
-		if st.BotFitness[i] > 10 { // only good positions become flames
+		if st.BotFitness[i] > 10 {
 			mfoAddFlame(st, ss.Bots[i].X, ss.Bots[i].Y, st.BotFitness[i])
 		}
 	}
@@ -103,34 +116,42 @@ func TickMFO(ss *SwarmState) {
 		}
 	}
 
-	// The number of active flames decreases linearly with iterations.
-	// In our swarm context, we use a fraction of available flames.
+	// Cap active flames
 	numFlames := len(st.Flames)
 	if numFlames > mfoMaxFlames {
 		numFlames = mfoMaxFlames
 	}
+
+	// Adaptive t-range: t ∈ [-1, tMax] where tMax shrinks from 1 to -1 over time.
+	// This is the key Mirjalili mechanism: early on moths orbit widely (t>0),
+	// later they approach directly (t<0).
+	progress := float64(st.Tick) / float64(mfoMaxTicks)
+	if progress > 1.0 {
+		progress = 1.0
+	}
+	tMax := 1.0 - 2.0*progress // tMax goes from 1.0 → -1.0
+
 	if numFlames == 0 {
 		for i := range ss.Bots {
 			st.MothFlame[i] = -1
 		}
 	} else {
-		// Assign each moth to a flame (round-robin or nearest)
 		for i := range ss.Bots {
-			// Assign to nearest flame within radius
+			// Assign to nearest flame
 			bestDist := math.MaxFloat64
 			bestF := -1
 			for f := 0; f < numFlames; f++ {
 				dx := st.Flames[f].X - ss.Bots[i].X
 				dy := st.Flames[f].Y - ss.Bots[i].Y
-				d := math.Sqrt(dx*dx + dy*dy)
+				d := dx*dx + dy*dy
 				if d < bestDist {
 					bestDist = d
 					bestF = f
 				}
 			}
 			st.MothFlame[i] = bestF
-			// Randomize spiral parameter t ∈ [-1, 1]
-			st.SpiralT[i] = ss.Rng.Float64()*2.0 - 1.0
+			// Randomize spiral parameter t ∈ [-1, tMax] (range shrinks over time)
+			st.SpiralT[i] = -1.0 + ss.Rng.Float64()*(tMax+1.0)
 		}
 	}
 
@@ -155,8 +176,7 @@ func mfoAddFlame(st *MFOState, x, y, fitness float64) {
 	for i := range st.Flames {
 		dx := st.Flames[i].X - x
 		dy := st.Flames[i].Y - y
-		if dx*dx+dy*dy < 400 { // within 20px
-			// Strengthen existing flame
+		if dx*dx+dy*dy < mfoMergeDist { // within 30px
 			if fitness > st.Flames[i].Fitness {
 				st.Flames[i].X = x
 				st.Flames[i].Y = y
@@ -191,12 +211,17 @@ func ApplyMFO(bot *SwarmBot, ss *SwarmState, idx int) {
 
 	flameIdx := st.MothFlame[idx]
 	if flameIdx < 0 || flameIdx >= len(st.Flames) {
-		// No flame assigned — random exploration
-		if ss.Rng.Float64() < 0.05 {
-			bot.Angle += (ss.Rng.Float64() - 0.5) * math.Pi * 0.5
+		// No flame assigned — random exploration with slight pull toward best
+		if ss.Rng.Float64() < 0.08 {
+			bot.Angle += (ss.Rng.Float64() - 0.5) * math.Pi
+		}
+		if st.BestF > 0 {
+			desired := math.Atan2(st.BestY-bot.Y, st.BestX-bot.X)
+			steerToward(bot, desired, mfoSteerRate*0.15)
 		}
 		bot.Speed = SwarmBotSpeed
-		bot.LEDColor = [3]uint8{80, 80, 80} // dim grey
+		bot.LEDColor = [3]uint8{80, 80, 80}
+		mfoMovBot(bot, ss)
 		return
 	}
 
@@ -208,16 +233,19 @@ func ApplyMFO(bot *SwarmBot, ss *SwarmState, idx int) {
 		dist = 1.0
 	}
 
-	// Logarithmic spiral: position = dist * e^(bt) * cos(2πt) + flame
+	// Logarithmic spiral (Mirjalili 2015).
+	// t < 0 → moth approaches flame; t > 0 → moth orbits flame.
+	// As tMax shrinks over time, more moths approach directly.
 	t := st.SpiralT[idx]
-	spiralAngle := math.Atan2(dy, dx) + 2*math.Pi*t*0.15
-	spiralDist := dist * math.Exp(mfoSpiralB*t) * 0.02
+	angleToFlame := math.Atan2(dy, dx)
 
-	// Combine spiral direction with direct approach
-	desired := spiralAngle
-	if spiralDist > dist {
-		// Close to flame: circle tighter
-		desired = math.Atan2(dy, dx) + math.Pi*0.4*float64(sign(t))
+	// Spiral offset: t=0 → direct approach, |t|=1 → full orbit
+	spiralOffset := 2 * math.Pi * t * 0.2
+	desired := angleToFlame + spiralOffset
+
+	// Close to flame: steer directly for precision
+	if dist < 12 {
+		desired = angleToFlame
 	}
 
 	steerToward(bot, desired, mfoSteerRate)
@@ -225,9 +253,39 @@ func ApplyMFO(bot *SwarmBot, ss *SwarmState, idx int) {
 	// Speed varies with spiral phase
 	bot.Speed = SwarmBotSpeed * (0.8 + 0.4*math.Abs(math.Cos(2*math.Pi*t)))
 
-	// LED: orange-yellow (like a moth near flame)
+	// LED: orange-yellow, gold for best flame
 	intensity := uint8(math.Min(255, flame.Intensity*255))
-	bot.LEDColor = [3]uint8{255, intensity, 30}
+	if flameIdx == 0 {
+		bot.LEDColor = [3]uint8{255, 215, 0}
+	} else {
+		bot.LEDColor = [3]uint8{255, intensity, 30}
+	}
+
+	mfoMovBot(bot, ss)
+}
+
+// mfoMovBot applies bot movement based on speed/angle and clamps to arena bounds.
+// We move the bot directly here and then zero out Speed so that the GUI physics
+// step (applySwarmPhysics) does not duplicate the movement.
+func mfoMovBot(bot *SwarmBot, ss *SwarmState) {
+	if bot.Speed > 0 {
+		bot.X += math.Cos(bot.Angle) * bot.Speed
+		bot.Y += math.Sin(bot.Angle) * bot.Speed
+		bot.Speed = 0 // prevent double-move in GUI physics step
+	}
+	// Clamp to arena
+	if bot.X < SwarmEdgeMargin {
+		bot.X = SwarmEdgeMargin
+	}
+	if bot.X > ss.ArenaW-SwarmEdgeMargin {
+		bot.X = ss.ArenaW - SwarmEdgeMargin
+	}
+	if bot.Y < SwarmEdgeMargin {
+		bot.Y = SwarmEdgeMargin
+	}
+	if bot.Y > ss.ArenaH-SwarmEdgeMargin {
+		bot.Y = ss.ArenaH - SwarmEdgeMargin
+	}
 }
 
 // sign returns -1, 0, or 1 for the sign of a float.

@@ -723,6 +723,27 @@ func ReinitFitnessLandscape(ss *SwarmState) {
 	// Non-Gaussian landscapes use analytical formulas; nothing to reinit.
 }
 
+// ReinitActiveAlgorithm clears and re-initializes the active algorithm's
+// internal state (e.g. cached fitness values) without recreating the
+// SwarmAlgorithmState. Use this after changing FitnessFunc so that all
+// algorithms recompute their initial fitness against the correct landscape.
+func ReinitActiveAlgorithm(ss *SwarmState) {
+	if ss.SwarmAlgo == nil {
+		return
+	}
+	algo := ss.SwarmAlgo.ActiveAlgo
+	h, ok := algoRegistry[algo]
+	if !ok {
+		return
+	}
+	if h.clear != nil {
+		h.clear(ss)
+	}
+	if h.init != nil {
+		h.init(ss)
+	}
+}
+
 // archiveConvergenceCurve copies the current algorithm's best-fitness
 // convergence history into the archive on SwarmState. Replaces an existing
 // entry for the same algo+fitness combo. Evicts the oldest entry when full.
@@ -1203,6 +1224,35 @@ func distanceFitnessPt(ss *SwarmState, x, y float64) float64 {
 // ─── FIREFLY ───────────────────────────────────────────
 
 const fireflyMaxTicks = 3000 // cycle length for alpha decay and exploration ratio
+const fireflySpeedMult = 3.0 // 3x movement speed for faster convergence
+
+// fireflyMovBot moves a bot directly via position updates and sets Speed=0
+// to prevent double movement in GUI mode.
+func fireflyMovBot(bot *SwarmBot, ss *SwarmState, tx, ty float64) {
+	dx := tx - bot.X
+	dy := ty - bot.Y
+	dist := math.Sqrt(dx*dx + dy*dy)
+
+	maxStep := SwarmBotSpeed * fireflySpeedMult
+	if dist < 2.0 {
+		bot.X = tx
+		bot.Y = ty
+	} else if dist <= maxStep {
+		bot.X = tx
+		bot.Y = ty
+	} else {
+		ratio := maxStep / dist
+		bot.X += dx * ratio
+		bot.Y += dy * ratio
+	}
+
+	// Clamp to arena
+	bot.X = math.Max(SwarmEdgeMargin, math.Min(ss.ArenaW-SwarmEdgeMargin, bot.X))
+	bot.Y = math.Max(SwarmEdgeMargin, math.Min(ss.ArenaH-SwarmEdgeMargin, bot.Y))
+
+	bot.Angle = math.Atan2(dy, dx)
+	bot.Speed = 0 // prevent double movement in GUI mode
+}
 
 // InitFireflyAlgo allocates per-bot brightness and initialises global best tracking.
 func InitFireflyAlgo(ss *SwarmState) {
@@ -1267,6 +1317,11 @@ func tickFirefly(ss *SwarmState, sa *SwarmAlgorithmState) {
 		cutoff = math.Min(cutoff, math.Sqrt(-math.Log(0.01)/sa.FireflyGamma))
 	}
 
+	// Adaptive global-best attraction: weight increases from 5% to 25% over the cycle.
+	// Early ticks: firefly attraction dominates (exploration).
+	// Late ticks: global-best attraction strengthens (exploitation).
+	gbWeight := 0.05 + 0.20*tRatio
+
 	for i := range ss.Bots {
 		bot := &ss.Bots[i]
 		moveX, moveY := 0.0, 0.0
@@ -1299,14 +1354,18 @@ func tickFirefly(ss *SwarmState, sa *SwarmAlgorithmState) {
 		moveX += sa.FireflyAlpha * (ss.Rng.Float64() - 0.5) * 2
 		moveY += sa.FireflyAlpha * (ss.Rng.Float64() - 0.5) * 2
 
-		if moveX != 0 || moveY != 0 {
-			// Use smooth steering rather than snapping the heading instantly.
-			// The rate limit of 0.3 rad/tick gives fireflies a natural, gentle
-			// turning arc while still tracking brighter neighbours closely.
-			desired := math.Atan2(moveY, moveX)
-			steerToward(bot, desired, 0.3)
-			bot.Speed = math.Min(math.Sqrt(moveX*moveX+moveY*moveY), SwarmBotSpeed*1.5)
+		// Compute target position
+		targetX := bot.X + moveX
+		targetY := bot.Y + moveY
+
+		// Adaptive global-best attraction
+		if sa.FireflyBestF > -1e17 {
+			targetX += gbWeight * (sa.FireflyBestX - targetX)
+			targetY += gbWeight * (sa.FireflyBestY - targetY)
 		}
+
+		// Move bot directly to target (works in both GUI and benchmark mode)
+		fireflyMovBot(bot, ss, targetX, targetY)
 
 		// LED: warm-to-cool gradient based on fitness; gold for global best
 		if i == sa.FireflyBestIdx {
