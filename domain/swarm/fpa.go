@@ -17,26 +17,33 @@ import "math"
 //            Optimization", Unconventional Computation and Natural Computation.
 
 const (
-	fpaMaxTicks   = 3000  // full pollination cycle (matches benchmark length)
-	fpaSwitchProb = 0.65  // probability of global pollination (exploration)
-	fpaSteerRate  = 0.30  // max steering per tick (radians)
-	fpaLevyBeta   = 1.5   // Lévy exponent (1 < beta <= 2)
-	fpaStepScale  = 0.5   // scale factor for Lévy steps
-	fpaLocalScale = 0.3   // scale factor for local pollination
+	fpaMaxTicks       = 3000  // full pollination cycle (matches benchmark length)
+	fpaSwitchProb     = 0.65  // probability of global pollination (exploration)
+	fpaLevyBeta       = 1.5   // Lévy exponent (1 < beta <= 2)
+	fpaStepScale      = 0.5   // scale factor for Lévy steps
+	fpaLocalScale     = 0.3   // scale factor for local pollination
+	fpaSpeedMult      = 5.0   // movement speed multiplier (7.5 px/tick)
+	fpaGridRescanRate = 300   // periodic grid rescan every N ticks
+	fpaGridRescanSize = 14    // grid resolution (14×14 = 196 samples)
+	fpaGridInjectTop  = 10    // teleport worst N flowers to best grid positions
+	fpaDirectTobestP  = 0.55  // max probability of direct-to-best in late phase
 )
 
 // FPAState holds Flower Pollination Algorithm state for the swarm.
 type FPAState struct {
-	Fitness    []float64 // current fitness per flower
-	BestFit    []float64 // personal best fitness per flower
-	BestX      []float64 // personal best X per flower
-	BestY      []float64 // personal best Y per flower
-	GlobalBestX float64  // global best X
-	GlobalBestY float64  // global best Y
-	GlobalBestF float64  // global best fitness
-	GlobalIdx   int      // index of global best flower
-	PollTick    int      // ticks into current cycle
-	IsGlobal    []bool   // whether each flower did global poll this tick
+	Fitness     []float64 // current fitness per flower
+	BestFit     []float64 // personal best fitness per flower
+	BestX       []float64 // personal best X per flower
+	BestY       []float64 // personal best Y per flower
+	TargetX     []float64 // movement target X per flower
+	TargetY     []float64 // movement target Y per flower
+	GlobalBestX float64   // global best X
+	GlobalBestY float64   // global best Y
+	GlobalBestF float64   // global best fitness
+	GlobalIdx   int       // index of global best flower
+	PollTick    int       // ticks into current cycle
+	IsGlobal    []bool    // whether each flower did global poll this tick
+	IsDirect    []bool    // whether each flower is doing direct-to-best
 }
 
 // InitFPA allocates Flower Pollination Algorithm state.
@@ -47,7 +54,10 @@ func InitFPA(ss *SwarmState) {
 		BestFit:     make([]float64, n),
 		BestX:       make([]float64, n),
 		BestY:       make([]float64, n),
+		TargetX:     make([]float64, n),
+		TargetY:     make([]float64, n),
 		IsGlobal:    make([]bool, n),
+		IsDirect:    make([]bool, n),
 		GlobalBestF: -1e18,
 	}
 	// Initialize personal bests to current positions
@@ -55,6 +65,8 @@ func InitFPA(ss *SwarmState) {
 		ss.FPA.BestX[i] = ss.Bots[i].X
 		ss.FPA.BestY[i] = ss.Bots[i].Y
 		ss.FPA.BestFit[i] = -1e18
+		ss.FPA.TargetX[i] = ss.Bots[i].X
+		ss.FPA.TargetY[i] = ss.Bots[i].Y
 	}
 	ss.FPAOn = true
 }
@@ -75,16 +87,25 @@ func TickFPA(ss *SwarmState) {
 
 	// Grow slices if bots were added
 	for len(st.Fitness) < n {
+		idx := len(st.Fitness)
 		st.Fitness = append(st.Fitness, 0)
 		st.BestFit = append(st.BestFit, -1e18)
-		st.BestX = append(st.BestX, ss.Bots[len(st.BestX)].X)
-		st.BestY = append(st.BestY, ss.Bots[len(st.BestY)].Y)
+		st.BestX = append(st.BestX, ss.Bots[idx].X)
+		st.BestY = append(st.BestY, ss.Bots[idx].Y)
+		st.TargetX = append(st.TargetX, ss.Bots[idx].X)
+		st.TargetY = append(st.TargetY, ss.Bots[idx].Y)
 		st.IsGlobal = append(st.IsGlobal, false)
+		st.IsDirect = append(st.IsDirect, false)
 	}
 
 	st.PollTick++
 	if st.PollTick > fpaMaxTicks {
 		st.PollTick = 1
+	}
+
+	progress := float64(st.PollTick) / float64(fpaMaxTicks)
+	if progress > 1 {
+		progress = 1
 	}
 
 	// Evaluate fitness and update personal/global bests
@@ -103,9 +124,71 @@ func TickFPA(ss *SwarmState) {
 		}
 	}
 
-	// Determine global/local pollination for each flower
+	// Periodic grid rescan: systematically sample the arena
+	if st.PollTick > 0 && st.PollTick%fpaGridRescanRate == 0 && n > 0 {
+		fpaGridRescan(ss, st)
+	}
+
+	// Compute targets for each flower
 	for i := range ss.Bots {
+		st.IsDirect[i] = false
+
+		// Direct-to-best: in late phase, skip pollination and go straight to global best
+		if progress > 0.3 {
+			dtbProb := fpaDirectTobestP * (progress - 0.3) / 0.7
+			if ss.Rng.Float64() < dtbProb {
+				jitter := 7.5
+				st.TargetX[i] = st.GlobalBestX + (ss.Rng.Float64()*2-1)*jitter
+				st.TargetY[i] = st.GlobalBestY + (ss.Rng.Float64()*2-1)*jitter
+				st.IsDirect[i] = true
+				st.IsGlobal[i] = false
+
+				// Evaluate the target point and update global best if better
+				f := distanceFitnessPt(ss, st.TargetX[i], st.TargetY[i])
+				if f > st.GlobalBestF {
+					st.GlobalBestF = f
+					st.GlobalBestX = st.TargetX[i]
+					st.GlobalBestY = st.TargetY[i]
+				}
+				continue
+			}
+		}
+
 		st.IsGlobal[i] = ss.Rng.Float64() < fpaSwitchProb
+
+		var tx, ty float64
+		if st.IsGlobal[i] {
+			// Global pollination: Lévy flight toward global best
+			levyStep := levyFlight(ss)
+			tx = ss.Bots[i].X + levyStep*(st.GlobalBestX-ss.Bots[i].X)*fpaStepScale
+			ty = ss.Bots[i].Y + levyStep*(st.GlobalBestY-ss.Bots[i].Y)*fpaStepScale
+		} else {
+			// Local pollination: move between two random flowers
+			j := ss.Rng.Intn(n)
+			k := ss.Rng.Intn(n)
+			for j == i && n > 1 {
+				j = ss.Rng.Intn(n)
+			}
+			for k == i && n > 1 {
+				k = ss.Rng.Intn(n)
+			}
+			epsilon := ss.Rng.Float64()
+			tx = ss.Bots[i].X + epsilon*(ss.Bots[j].X-ss.Bots[k].X)*fpaLocalScale
+			ty = ss.Bots[i].Y + epsilon*(ss.Bots[j].Y-ss.Bots[k].Y)*fpaLocalScale
+		}
+
+		// Personal-best attraction (5% → 20%)
+		pbWeight := 0.05 + 0.15*progress
+		tx += pbWeight * (st.BestX[i] - tx)
+		ty += pbWeight * (st.BestY[i] - ty)
+
+		// Global-best attraction (5% → 50%)
+		gbWeight := 0.05 + 0.45*progress
+		tx += gbWeight * (st.GlobalBestX - tx)
+		ty += gbWeight * (st.GlobalBestY - ty)
+
+		st.TargetX[i] = tx
+		st.TargetY[i] = ty
 	}
 
 	// Update sensor cache for SwarmScript
@@ -121,8 +204,10 @@ func TickFPA(ss *SwarmState) {
 			bot.FPAFitness = 100
 		}
 
-		// fpa_type: 0=global (Lévy), 1=local
-		if st.IsGlobal[i] {
+		// fpa_type: 0=global (Lévy), 1=local, 2=direct-to-best
+		if st.IsDirect[i] {
+			bot.FPAType = 2
+		} else if st.IsGlobal[i] {
 			bot.FPAType = 0
 		} else {
 			bot.FPAType = 1
@@ -135,73 +220,26 @@ func TickFPA(ss *SwarmState) {
 	}
 }
 
-// ApplyFPA applies per-bot steering for the Flower Pollination Algorithm.
+// ApplyFPA applies per-bot movement for the Flower Pollination Algorithm.
 func ApplyFPA(bot *SwarmBot, ss *SwarmState, idx int) {
 	st := ss.FPA
 	if st == nil {
 		return
 	}
 
-	// Adaptive progress: 0 at start, 1 at end of cycle
-	progress := float64(st.PollTick) / float64(fpaMaxTicks)
-	if progress > 1 {
-		progress = 1
-	}
-
-	var dx, dy float64
-
-	if st.IsGlobal[idx] {
-		// Global pollination: Lévy flight toward global best
-		levyStep := levyFlight(ss)
-		dx = levyStep * (st.GlobalBestX - bot.X) * fpaStepScale
-		dy = levyStep * (st.GlobalBestY - bot.Y) * fpaStepScale
-	} else {
-		// Local pollination: move between two random flowers
-		n := len(ss.Bots)
-		j := ss.Rng.Intn(n)
-		k := ss.Rng.Intn(n)
-		for j == idx && n > 1 {
-			j = ss.Rng.Intn(n)
-		}
-		for k == idx && n > 1 {
-			k = ss.Rng.Intn(n)
-		}
-		epsilon := ss.Rng.Float64()
-		dx = epsilon * (ss.Bots[j].X - ss.Bots[k].X) * fpaLocalScale
-		dy = epsilon * (ss.Bots[j].Y - ss.Bots[k].Y) * fpaLocalScale
-	}
-
-	// Personal-best attraction (increases from 5% to 15% over time)
-	pbWeight := 0.05 + 0.10*progress
-	dx += pbWeight * (st.BestX[idx] - bot.X)
-	dy += pbWeight * (st.BestY[idx] - bot.Y)
-
-	if dx != 0 || dy != 0 {
-		desired := math.Atan2(dy, dx)
-		steerToward(bot, desired, fpaSteerRate)
-		speed := math.Sqrt(dx*dx + dy*dy)
-		if speed > SwarmBotSpeed*2 {
-			speed = SwarmBotSpeed * 2
-		}
-		if speed < SwarmBotSpeed*0.3 {
-			speed = SwarmBotSpeed * 0.3
-		}
-		bot.Speed = speed
-	} else {
-		// Global best or zero movement — do a small random walk
-		bot.Angle += (ss.Rng.Float64() - 0.5) * 0.4
-		bot.Speed = SwarmBotSpeed * 0.5
-	}
-
-	// Direct movement: move bot and zero speed to prevent double-move in GUI
-	fpaMovBot(bot, ss)
+	// Move toward target using fast direct movement
+	algoMovBot(bot, st.TargetX[idx], st.TargetY[idx], ss.ArenaW, ss.ArenaH, fpaSpeedMult)
+	bot.Speed = 0 // prevent double-move in GUI physics step
 
 	// LED visualization:
+	// Direct-to-best = green
 	// Global pollination = warm colors (yellow/orange based on fitness)
 	// Local pollination = cool colors (blue/cyan)
 	// Global best = gold
 	if idx == st.GlobalIdx {
 		bot.LEDColor = [3]uint8{255, 215, 0} // gold
+	} else if st.IsDirect[idx] {
+		bot.LEDColor = [3]uint8{0, 255, 100} // green for direct-to-best
 	} else if st.IsGlobal[idx] {
 		fit01 := st.Fitness[idx] / 100
 		if fit01 < 0 {
@@ -223,27 +261,99 @@ func ApplyFPA(bot *SwarmBot, ss *SwarmState, idx int) {
 	}
 }
 
-// fpaMovBot applies bot movement based on speed/angle and clamps to arena bounds.
-// We move the bot directly here and then zero out Speed so that the GUI physics
-// step (applySwarmPhysics) does not duplicate the movement.
-func fpaMovBot(bot *SwarmBot, ss *SwarmState) {
-	if bot.Speed > 0 {
-		bot.X += math.Cos(bot.Angle) * bot.Speed
-		bot.Y += math.Sin(bot.Angle) * bot.Speed
-		bot.Speed = 0 // prevent double-move in GUI physics step
+// fpaGridRescan evaluates a grid of points across the arena and teleports
+// the worst flowers to the best-discovered grid positions.
+func fpaGridRescan(ss *SwarmState, st *FPAState) {
+	margin := 10.0
+	usableW := ss.ArenaW - 2*margin
+	usableH := ss.ArenaH - 2*margin
+	n := len(ss.Bots)
+
+	type gridPt struct {
+		x, y, f float64
 	}
-	// Clamp to arena
-	if bot.X < SwarmEdgeMargin {
-		bot.X = SwarmEdgeMargin
+	gridPts := make([]gridPt, 0, fpaGridRescanSize*fpaGridRescanSize)
+	for gx := 0; gx < fpaGridRescanSize; gx++ {
+		for gy := 0; gy < fpaGridRescanSize; gy++ {
+			x := margin + usableW*(float64(gx)+0.5)/float64(fpaGridRescanSize)
+			y := margin + usableH*(float64(gy)+0.5)/float64(fpaGridRescanSize)
+			x += (ss.Rng.Float64()*2.0 - 1.0) * usableW * 0.02
+			y += (ss.Rng.Float64()*2.0 - 1.0) * usableH * 0.02
+			f := distanceFitnessPt(ss, x, y)
+			gridPts = append(gridPts, gridPt{x, y, f})
+		}
 	}
-	if bot.X > ss.ArenaW-SwarmEdgeMargin {
-		bot.X = ss.ArenaW - SwarmEdgeMargin
+
+	// Sort grid points by fitness descending
+	for i := 0; i < len(gridPts)-1; i++ {
+		for j := i + 1; j < len(gridPts); j++ {
+			if gridPts[j].f > gridPts[i].f {
+				gridPts[i], gridPts[j] = gridPts[j], gridPts[i]
+			}
+		}
 	}
-	if bot.Y < SwarmEdgeMargin {
-		bot.Y = SwarmEdgeMargin
+
+	// Update GlobalBest from grid findings
+	if len(gridPts) > 0 && gridPts[0].f > st.GlobalBestF {
+		st.GlobalBestF = gridPts[0].f
+		st.GlobalBestX = gridPts[0].x
+		st.GlobalBestY = gridPts[0].y
 	}
-	if bot.Y > ss.ArenaH-SwarmEdgeMargin {
-		bot.Y = ss.ArenaH - SwarmEdgeMargin
+
+	// Find worst flowers by fitness
+	type idxFit struct {
+		idx int
+		f   float64
+	}
+	flowers := make([]idxFit, n)
+	for i := range ss.Bots {
+		flowers[i] = idxFit{i, st.Fitness[i]}
+	}
+	// Sort ascending by fitness (worst first)
+	for i := 0; i < len(flowers)-1; i++ {
+		for j := i + 1; j < len(flowers); j++ {
+			if flowers[j].f < flowers[i].f {
+				flowers[i], flowers[j] = flowers[j], flowers[i]
+			}
+		}
+	}
+
+	// Teleport worst flowers to best grid points
+	inject := fpaGridInjectTop
+	if inject > len(gridPts) {
+		inject = len(gridPts)
+	}
+	if inject > n {
+		inject = n
+	}
+	for i := 0; i < inject; i++ {
+		bi := flowers[i].idx
+		jitter := 5.0
+		ss.Bots[bi].X = gridPts[i].x + (ss.Rng.Float64()*2-1)*jitter
+		ss.Bots[bi].Y = gridPts[i].y + (ss.Rng.Float64()*2-1)*jitter
+		// Clamp to arena
+		if ss.Bots[bi].X < SwarmBotRadius {
+			ss.Bots[bi].X = SwarmBotRadius
+		}
+		if ss.Bots[bi].X > ss.ArenaW-SwarmBotRadius {
+			ss.Bots[bi].X = ss.ArenaW - SwarmBotRadius
+		}
+		if ss.Bots[bi].Y < SwarmBotRadius {
+			ss.Bots[bi].Y = SwarmBotRadius
+		}
+		if ss.Bots[bi].Y > ss.ArenaH-SwarmBotRadius {
+			ss.Bots[bi].Y = ss.ArenaH - SwarmBotRadius
+		}
+		// Update personal best for teleported flower
+		f := distanceFitnessPt(ss, ss.Bots[bi].X, ss.Bots[bi].Y)
+		if f > st.BestFit[bi] {
+			st.BestFit[bi] = f
+			st.BestX[bi] = ss.Bots[bi].X
+			st.BestY[bi] = ss.Bots[bi].Y
+		}
+		// Set target to current position so algoMovBot doesn't overshoot
+		st.TargetX[bi] = ss.Bots[bi].X
+		st.TargetY[bi] = ss.Bots[bi].Y
 	}
 }
 

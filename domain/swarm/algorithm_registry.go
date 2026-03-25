@@ -623,14 +623,19 @@ var algoRegistry = map[SwarmAlgorithmType]algoHandler{
 		tick:  TickJaya,
 		apply: ApplyJaya,
 		bestFitness: func(ss *SwarmState) float64 {
-			if ss.Jaya != nil { return ss.Jaya.BestF }
-			return 0
+			if ss.Jaya == nil { return 0 }
+			f := ss.Jaya.BestF
+			if ss.Jaya.GlobalBestF > f { f = ss.Jaya.GlobalBestF }
+			return f
 		},
 		avgFitnessVals: func(ss *SwarmState) []float64 {
 			if ss.Jaya != nil { return ss.Jaya.Fitness }
 			return nil
 		},
 		bestPos: func(ss *SwarmState) (float64, float64, bool) {
+			if ss.Jaya != nil && ss.Jaya.GlobalBestIdx >= 0 {
+				return ss.Jaya.GlobalBestX, ss.Jaya.GlobalBestY, true
+			}
 			if ss.Jaya != nil && ss.Jaya.BestIdx >= 0 {
 				return ss.Jaya.BestX, ss.Jaya.BestY, true
 			}

@@ -28,19 +28,23 @@ import "math"
 //	SIMULATION, 76(2), pp. 60-68.
 
 const (
-	hsoSteerRate        = 0.25  // max steering change per tick (radians)
-	hsoHMCR             = 0.92  // Harmony Memory Considering Rate — probability of picking from HM
-	hsoPAR              = 0.45  // Pitch Adjusting Rate — probability of perturbing a HM note
-	hsoBWMax            = 60.0  // initial bandwidth — maximum pitch adjustment distance (pixels)
-	hsoBWMin            = 8.0   // final bandwidth — decreases over time for finer exploitation
-	hsoHMSize           = 50    // Harmony Memory size (number of stored solutions)
-	hsoEliteBias        = 0.25  // probability of biasing toward best known solution
-	hsoArrivalDist      = 3.0   // distance threshold for considering bot arrived at target
-	hsoBWDecayTicks     = 2500  // ticks over which bandwidth decays from max to min
-	hsoSpeedMult        = 5.0   // movement speed multiplier over SwarmBotSpeed
-	hsoDivCheckInterval = 200   // ticks between HM diversity checks
-	hsoDivThreshold     = 30.0  // minimum RMS spread in HM before diversity injection
-	hsoDivInjectFrac    = 0.2   // fraction of HM entries to replace with random when too clustered
+	hsoSteerRate          = 0.25  // max steering change per tick (radians)
+	hsoHMCR               = 0.92  // Harmony Memory Considering Rate
+	hsoPAR                = 0.45  // Pitch Adjusting Rate
+	hsoBWMax              = 60.0  // initial bandwidth (pixels)
+	hsoBWMin              = 8.0   // final bandwidth
+	hsoHMSize             = 50    // Harmony Memory size
+	hsoEliteBias          = 0.25  // probability of biasing toward best
+	hsoArrivalDist        = 3.0   // distance threshold for arrival
+	hsoBWDecayTicks       = 2500  // ticks for bandwidth decay
+	hsoSpeedMult          = 5.0   // movement speed multiplier
+	hsoDivCheckInterval   = 150   // ticks between diversity checks
+	hsoDivThreshold       = 50.0  // min RMS spread before injection
+	hsoDivInjectFrac      = 0.3   // fraction of HM to replace when clustered
+	hsoGridRescanInterval = 300   // ticks between grid re-scans
+	hsoGridRescanSide     = 14    // grid side for re-scan (14x14=196)
+	hsoGridInjectCount    = 15    // best grid positions to inject per rescan
+	hsoDirectTobestStart  = 0.15  // progress threshold for direct-to-best
 )
 
 // HSOHarmony stores one solution in the Harmony Memory.
@@ -220,6 +224,34 @@ func TickHSO(ss *SwarmState) {
 			continue
 		}
 
+		// ── Late-phase direct-to-best: send bot directly to global best
+		// with small jitter. Two-stage ramp: 0→40% during exploration (progress 0.15→0.6),
+		// then 40→80% during exploitation (progress 0.6→1.0).
+		// This aggressive late-phase convergence is critical for deceptive landscapes
+		// like Schwefel where HM is populated with many local optima.
+		var directProb float64
+		if progress > 0.6 {
+			directProb = 0.40 + 0.40*(progress-0.6)/0.4 // 40% → 80%
+		} else {
+			directProb = 0.40 * progress // 0% → 24% at progress=0.6
+		}
+		if progress > hsoDirectTobestStart && st.BestF > -1e8 && ss.Rng.Float64() < directProb {
+			jx := st.BestX + (ss.Rng.Float64()*2.0-1.0)*bw*0.5
+			jy := st.BestY + (ss.Rng.Float64()*2.0-1.0)*bw*0.5
+			jx = math.Max(margin, math.Min(ss.ArenaW-margin, jx))
+			jy = math.Max(margin, math.Min(ss.ArenaH-margin, jy))
+			st.TargetX[i] = jx
+			st.TargetY[i] = jy
+			st.Phase[i] = 0
+			jf := distanceFitnessPt(ss, jx, jy)
+			if jf > st.BestF {
+				st.BestF = jf
+				st.BestX = jx
+				st.BestY = jy
+			}
+			continue
+		}
+
 		// ── Improvise a new harmony ──
 
 		var newX, newY float64
@@ -257,9 +289,9 @@ func TickHSO(ss *SwarmState) {
 		}
 
 		// Adaptive global-best attraction: pull new harmonies toward the
-		// best known position. Weight increases from 10% to 45% over time.
+		// best known position. Weight increases from 10% to 65% over time.
 		if st.BestF > -1e8 {
-			gbWeight := 0.10 + 0.35*progress
+			gbWeight := 0.10 + 0.55*progress
 			newX += gbWeight * (st.BestX - newX)
 			newY += gbWeight * (st.BestY - newY)
 		}
@@ -344,6 +376,65 @@ func TickHSO(ss *SwarmState) {
 					st.BestX = rx
 					st.BestY = ry
 				}
+			}
+		}
+	}
+
+	// Periodic grid re-scan: systematically evaluate a grid across the arena
+	// and inject the best discoveries into the HM. Critical for deceptive
+	// landscapes like Schwefel where the global optimum is far from local optima.
+	if ss.Tick > 0 && ss.Tick%hsoGridRescanInterval == 0 {
+		usableW := ss.ArenaW - 2*margin
+		usableH := ss.ArenaH - 2*margin
+
+		type gridPt struct {
+			x, y, f float64
+		}
+		gridPts := make([]gridPt, 0, hsoGridRescanSide*hsoGridRescanSide)
+		for gx := 0; gx < hsoGridRescanSide; gx++ {
+			for gy := 0; gy < hsoGridRescanSide; gy++ {
+				x := margin + usableW*(float64(gx)+0.5)/float64(hsoGridRescanSide)
+				y := margin + usableH*(float64(gy)+0.5)/float64(hsoGridRescanSide)
+				x += (ss.Rng.Float64()*2.0 - 1.0) * usableW * 0.02
+				y += (ss.Rng.Float64()*2.0 - 1.0) * usableH * 0.02
+				x = math.Max(margin, math.Min(ss.ArenaW-margin, x))
+				y = math.Max(margin, math.Min(ss.ArenaH-margin, y))
+				f := distanceFitnessPt(ss, x, y)
+				gridPts = append(gridPts, gridPt{x, y, f})
+			}
+		}
+
+		// Partial selection sort for top entries.
+		for i := 0; i < len(gridPts) && i < hsoGridInjectCount; i++ {
+			best := i
+			for j := i + 1; j < len(gridPts); j++ {
+				if gridPts[j].f > gridPts[best].f {
+					best = j
+				}
+			}
+			if best != i {
+				gridPts[i], gridPts[best] = gridPts[best], gridPts[i]
+			}
+		}
+
+		// Inject top grid points, replacing worst HM entries if better.
+		for i := 0; i < hsoGridInjectCount && i < len(gridPts); i++ {
+			gp := gridPts[i]
+			worstIdx := 0
+			worstF := st.HM[0].Fitness
+			for j := 1; j < len(st.HM); j++ {
+				if st.HM[j].Fitness < worstF {
+					worstF = st.HM[j].Fitness
+					worstIdx = j
+				}
+			}
+			if gp.f > worstF {
+				st.HM[worstIdx] = HSOHarmony{X: gp.x, Y: gp.y, Fitness: gp.f}
+			}
+			if gp.f > st.BestF {
+				st.BestF = gp.f
+				st.BestX = gp.x
+				st.BestY = gp.y
 			}
 		}
 	}

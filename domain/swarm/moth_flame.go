@@ -16,13 +16,15 @@ import "math"
 //            "Moth-flame optimization algorithm", Knowledge-Based Systems.
 
 const (
-	mfoRadius    = 80.0  // flame detection radius
-	mfoSteerRate = 0.25  // max steering per tick (was 0.14)
-	mfoSpiralB   = 1.0   // spiral shape constant
-	mfoMaxFlames = 12    // maximum number of flames (was 10)
-	mfoFlameDecay = 0.998 // flame intensity decay per tick
-	mfoMergeDist  = 900   // flame merge distance squared (30px, was 20px)
-	mfoMaxTicks   = 3000  // total ticks for adaptive t-range
+	mfoRadius      = 80.0  // flame detection radius
+	mfoSteerRate   = 0.25  // max steering per tick (was 0.14)
+	mfoSpiralB     = 1.0   // spiral shape constant
+	mfoMaxFlames   = 12    // maximum number of flames (was 10)
+	mfoFlameDecay  = 0.998 // flame intensity decay per tick
+	mfoMergeDist   = 900   // flame merge distance squared (30px, was 20px)
+	mfoMaxTicks    = 3000  // total ticks for adaptive t-range
+	mfoFlameMinFit = 25.0  // minimum fitness to create a flame (avoid bad local optima)
+	mfoEliteRate   = 0.2   // fraction of moths assigned to best flame instead of nearest
 )
 
 // FlamePoint represents a flame (best-known position) in MFO.
@@ -34,14 +36,16 @@ type FlamePoint struct {
 
 // MFOState holds Moth-Flame Optimization state.
 type MFOState struct {
-	Flames     []FlamePoint // sorted by fitness (best first)
-	MothFlame  []int        // index of assigned flame per bot (-1 = none)
-	SpiralT    []float64    // spiral parameter t per bot ∈ [-1, 1]
-	BotFitness []float64    // current fitness per bot
-	Tick       int          // iteration counter
-	BestF      float64      // global best fitness
-	BestX      float64      // global best X
-	BestY      float64      // global best Y
+	Flames       []FlamePoint // sorted by fitness (best first)
+	MothFlame    []int        // index of assigned flame per bot (-1 = none)
+	SpiralT      []float64    // spiral parameter t per bot ∈ [-1, 1]
+	BotFitness   []float64    // current fitness per bot
+	Tick         int          // iteration counter
+	BestF        float64      // global best fitness
+	BestX        float64      // global best X
+	BestY        float64      // global best Y
+	StagnCounter int          // ticks since last best improvement
+	LastBestF    float64      // best fitness at last improvement
 }
 
 // InitMFO allocates Moth-Flame Optimization state.
@@ -82,6 +86,7 @@ func TickMFO(ss *SwarmState) {
 	}
 
 	// Compute fitness using the shared fitness landscape.
+	improved := false
 	for i := range ss.Bots {
 		f := distanceFitness(&ss.Bots[i], ss)
 		st.BotFitness[i] = f
@@ -89,12 +94,21 @@ func TickMFO(ss *SwarmState) {
 			st.BestF = f
 			st.BestX = ss.Bots[i].X
 			st.BestY = ss.Bots[i].Y
+			improved = true
 		}
+	}
+	// Track stagnation
+	if improved {
+		st.StagnCounter = 0
+		st.LastBestF = st.BestF
+	} else {
+		st.StagnCounter++
 	}
 
 	// Update flames: add current best positions, merge nearby, cull weak
+	// Use higher threshold to avoid creating flames at poor local optima
 	for i := range ss.Bots {
-		if st.BotFitness[i] > 10 {
+		if st.BotFitness[i] > mfoFlameMinFit {
 			mfoAddFlame(st, ss.Bots[i].X, ss.Bots[i].Y, st.BotFitness[i])
 		}
 	}
@@ -131,25 +145,41 @@ func TickMFO(ss *SwarmState) {
 	}
 	tMax := 1.0 - 2.0*progress // tMax goes from 1.0 → -1.0
 
+	// Stagnation-triggered flame injection: when stuck, replace the weakest
+	// flame with one at a random position to guide moths to unexplored areas.
+	// Moths stay in spiral mode (preserving avg) but explore new territory.
+	if st.StagnCounter > 40 && numFlames >= 2 && st.StagnCounter%20 == 0 {
+		// Replace last (worst) flame with a random position
+		rx := SwarmEdgeMargin + ss.Rng.Float64()*(ss.ArenaW-2*SwarmEdgeMargin)
+		ry := SwarmEdgeMargin + ss.Rng.Float64()*(ss.ArenaH-2*SwarmEdgeMargin)
+		rf := distanceFitness(&SwarmBot{X: rx, Y: ry}, ss)
+		st.Flames[numFlames-1] = FlamePoint{X: rx, Y: ry, Fitness: rf, Intensity: 1.0}
+	}
+
 	if numFlames == 0 {
 		for i := range ss.Bots {
 			st.MothFlame[i] = -1
 		}
 	} else {
 		for i := range ss.Bots {
-			// Assign to nearest flame
-			bestDist := math.MaxFloat64
-			bestF := -1
-			for f := 0; f < numFlames; f++ {
-				dx := st.Flames[f].X - ss.Bots[i].X
-				dy := st.Flames[f].Y - ss.Bots[i].Y
-				d := dx*dx + dy*dy
-				if d < bestDist {
-					bestDist = d
-					bestF = f
+			if ss.Rng.Float64() < mfoEliteRate {
+				// Elite moth: assigned to best flame (index 0)
+				st.MothFlame[i] = 0
+			} else {
+				// Standard moth: assign to nearest flame
+				bestDist := math.MaxFloat64
+				bestF := -1
+				for f := 0; f < numFlames; f++ {
+					dx := st.Flames[f].X - ss.Bots[i].X
+					dy := st.Flames[f].Y - ss.Bots[i].Y
+					d := dx*dx + dy*dy
+					if d < bestDist {
+						bestDist = d
+						bestF = f
+					}
 				}
+				st.MothFlame[i] = bestF
 			}
-			st.MothFlame[i] = bestF
 			// Randomize spiral parameter t ∈ [-1, tMax] (range shrinks over time)
 			st.SpiralT[i] = -1.0 + ss.Rng.Float64()*(tMax+1.0)
 		}
@@ -211,8 +241,8 @@ func ApplyMFO(bot *SwarmBot, ss *SwarmState, idx int) {
 
 	flameIdx := st.MothFlame[idx]
 	if flameIdx < 0 || flameIdx >= len(st.Flames) {
-		// No flame assigned — random exploration with slight pull toward best
-		if ss.Rng.Float64() < 0.08 {
+		// No flame assigned — random exploration with pull toward best
+		if ss.Rng.Float64() < 0.1 {
 			bot.Angle += (ss.Rng.Float64() - 0.5) * math.Pi
 		}
 		if st.BestF > 0 {

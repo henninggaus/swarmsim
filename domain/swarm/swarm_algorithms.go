@@ -996,6 +996,47 @@ func initFitnessLandscape(ss *SwarmState) {
 	}
 }
 
+// GaussianPeaks holds a saved set of Gaussian peaks for benchmark reproducibility.
+type GaussianPeaks struct {
+	X, Y, H, S []float64
+}
+
+// SaveGaussianPeaks returns a copy of the current Gaussian peak configuration.
+// Returns nil if no peaks are initialised.
+func SaveGaussianPeaks(ss *SwarmState) *GaussianPeaks {
+	sa := ss.SwarmAlgo
+	if sa == nil || len(sa.FitPeakX) == 0 {
+		return nil
+	}
+	gp := &GaussianPeaks{
+		X: make([]float64, len(sa.FitPeakX)),
+		Y: make([]float64, len(sa.FitPeakY)),
+		H: make([]float64, len(sa.FitPeakH)),
+		S: make([]float64, len(sa.FitPeakS)),
+	}
+	copy(gp.X, sa.FitPeakX)
+	copy(gp.Y, sa.FitPeakY)
+	copy(gp.H, sa.FitPeakH)
+	copy(gp.S, sa.FitPeakS)
+	return gp
+}
+
+// RestoreGaussianPeaks overwrites the current peaks with a saved configuration.
+func RestoreGaussianPeaks(ss *SwarmState, gp *GaussianPeaks) {
+	sa := ss.SwarmAlgo
+	if sa == nil || gp == nil {
+		return
+	}
+	sa.FitPeakX = make([]float64, len(gp.X))
+	sa.FitPeakY = make([]float64, len(gp.Y))
+	sa.FitPeakH = make([]float64, len(gp.H))
+	sa.FitPeakS = make([]float64, len(gp.S))
+	copy(sa.FitPeakX, gp.X)
+	copy(sa.FitPeakY, gp.Y)
+	copy(sa.FitPeakH, gp.H)
+	copy(sa.FitPeakS, gp.S)
+}
+
 // TickDynamicLandscape moves the Gaussian fitness peaks when dynamic mode is
 // active. Each peak drifts with a per-peak velocity vector, bouncing off the
 // arena boundaries. Peak heights oscillate slowly within [30, 100] and sigmas

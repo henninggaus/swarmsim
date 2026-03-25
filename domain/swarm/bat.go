@@ -24,8 +24,14 @@ const (
 	batSteerRate = 0.25  // max steering change per tick (radians)
 	batMaxSpeed  = 2.5   // max bot speed under BA
 	batLocalStep = 15.0  // local random walk step size
-	batSpeedMult = 3.0   // movement speed multiplier for eigenbewegung
+	batSpeedMult = 5.0   // movement speed multiplier for eigenbewegung (was 3.0)
 	batMaxTicks  = 3000  // full benchmark length
+
+	batGridRescanRate = 300 // periodic grid rescan every N ticks
+	batGridRescanSize = 14  // grid resolution (14×14 = 196 samples)
+	batGridInjectTop  = 10  // top grid points injected into worst bats
+	batDirectToBestStart = 0.3 // progress threshold to start direct-to-best
+	batDirectToBestMax   = 0.55 // max probability of direct-to-best
 )
 
 // BatState holds per-bot echolocation state for the Bat Algorithm.
@@ -49,6 +55,9 @@ type BatState struct {
 	PBestX   []float64
 	PBestY   []float64
 	PBestF   []float64
+	// Stagnation tracking for grid rescan triggering
+	StagnCounter int
+	LastBestF    float64
 }
 
 // InitBat allocates Bat Algorithm state.
@@ -138,6 +147,21 @@ func TickBat(ss *SwarmState) {
 		}
 	}
 
+	// Track stagnation for grid rescan
+	if st.GlobalBestF > st.LastBestF+0.01 {
+		st.LastBestF = st.GlobalBestF
+		st.StagnCounter = 0
+	} else {
+		st.StagnCounter++
+	}
+
+	// Periodic grid rescan: systematically sample the arena to find the
+	// global optimum on deceptive landscapes like Schwefel.
+	n := len(ss.Bots)
+	if st.Tick > 0 && st.Tick%batGridRescanRate == 0 && n > 0 {
+		batGridRescan(ss, st)
+	}
+
 	// Precompute average loudness once per tick (O(n)).
 	// Previously this was computed inside ApplyBat per bot → O(n²).
 	loudSum := 0.0
@@ -181,6 +205,32 @@ func ApplyBat(bot *SwarmBot, ss *SwarmState, idx int) {
 		progress = 1
 	}
 
+	// Direct-to-best: in late phase, some bats skip normal dynamics
+	// and move directly to GlobalBest with jitter — critical for Schwefel convergence.
+	if progress > batDirectToBestStart && st.GlobalBestF > -1e18 {
+		dtbProb := batDirectToBestMax * (progress - batDirectToBestStart) / (1.0 - batDirectToBestStart)
+		if ss.Rng.Float64() < dtbProb {
+			jitter := 7.5
+			tX := st.GlobalBestX + (ss.Rng.Float64()*2-1)*jitter
+			tY := st.GlobalBestY + (ss.Rng.Float64()*2-1)*jitter
+			// Clamp
+			if tX < SwarmBotRadius { tX = SwarmBotRadius }
+			if tX > ss.ArenaW-SwarmBotRadius { tX = ss.ArenaW - SwarmBotRadius }
+			if tY < SwarmBotRadius { tY = SwarmBotRadius }
+			if tY > ss.ArenaH-SwarmBotRadius { tY = ss.ArenaH - SwarmBotRadius }
+			// Evaluate and accept if better
+			f := distanceFitnessPt(ss, tX, tY)
+			if f > st.GlobalBestF {
+				st.GlobalBestF = f
+				st.GlobalBestX = tX
+				st.GlobalBestY = tY
+			}
+			algoMovBot(bot, tX, tY, ss.ArenaW, ss.ArenaH, batSpeedMult)
+			bot.LEDColor = [3]uint8{0, 200, 100} // green for direct-to-best
+			return
+		}
+	}
+
 	// Update frequency: f_i = fMin + (fMax - fMin) * beta, beta ∈ [0,1]
 	beta := ss.Rng.Float64()
 	st.Freq[idx] = batFMin + (batFMax-batFMin)*beta
@@ -211,9 +261,9 @@ func ApplyBat(bot *SwarmBot, ss *SwarmState, idx int) {
 	}
 
 	// Adaptive global-best attraction: shift target toward global best
-	// Weight increases from 5% to 25% over batMaxTicks
+	// Weight increases from 5% to 55% over batMaxTicks (was 5%→25%)
 	if st.GlobalBestF > -1e18 {
-		gbWeight := 0.05 + 0.20*progress
+		gbWeight := 0.05 + 0.50*progress
 		newX = newX*(1-gbWeight) + st.GlobalBestX*gbWeight
 		newY = newY*(1-gbWeight) + st.GlobalBestY*gbWeight
 	}
@@ -261,4 +311,99 @@ func ApplyBat(bot *SwarmBot, ss *SwarmState, idx int) {
 		r, g, b = 0, 255, 255
 	}
 	bot.LEDColor = [3]uint8{r, g, b}
+}
+
+// batGridRescan evaluates a grid of points across the arena and teleports
+// the worst bats to the best-discovered grid positions. Critical for
+// deceptive landscapes like Schwefel where the global optimum is far
+// from local optima.
+func batGridRescan(ss *SwarmState, st *BatState) {
+	margin := 10.0
+	usableW := ss.ArenaW - 2*margin
+	usableH := ss.ArenaH - 2*margin
+	n := len(ss.Bots)
+
+	type gridPt struct {
+		x, y, f float64
+	}
+	gridPts := make([]gridPt, 0, batGridRescanSize*batGridRescanSize)
+	for gx := 0; gx < batGridRescanSize; gx++ {
+		for gy := 0; gy < batGridRescanSize; gy++ {
+			x := margin + usableW*(float64(gx)+0.5)/float64(batGridRescanSize)
+			y := margin + usableH*(float64(gy)+0.5)/float64(batGridRescanSize)
+			// Small jitter
+			x += (ss.Rng.Float64()*2.0 - 1.0) * usableW * 0.02
+			y += (ss.Rng.Float64()*2.0 - 1.0) * usableH * 0.02
+			f := distanceFitnessPt(ss, x, y)
+			gridPts = append(gridPts, gridPt{x, y, f})
+		}
+	}
+
+	// Sort grid points by fitness descending
+	for i := 0; i < len(gridPts)-1; i++ {
+		for j := i + 1; j < len(gridPts); j++ {
+			if gridPts[j].f > gridPts[i].f {
+				gridPts[i], gridPts[j] = gridPts[j], gridPts[i]
+			}
+		}
+	}
+
+	// Update GlobalBest from grid findings
+	if len(gridPts) > 0 && gridPts[0].f > st.GlobalBestF {
+		st.GlobalBestF = gridPts[0].f
+		st.GlobalBestX = gridPts[0].x
+		st.GlobalBestY = gridPts[0].y
+	}
+
+	// Find worst bats by fitness
+	type idxFit struct {
+		idx int
+		f   float64
+	}
+	bats := make([]idxFit, n)
+	for i := range ss.Bots {
+		bats[i] = idxFit{i, st.Fitness[i]}
+	}
+	// Sort ascending by fitness (worst first)
+	for i := 0; i < len(bats)-1; i++ {
+		for j := i + 1; j < len(bats); j++ {
+			if bats[j].f < bats[i].f {
+				bats[i], bats[j] = bats[j], bats[i]
+			}
+		}
+	}
+
+	// Teleport worst bats to best grid points
+	inject := batGridInjectTop
+	if inject > len(gridPts) {
+		inject = len(gridPts)
+	}
+	if inject > n {
+		inject = n
+	}
+	for i := 0; i < inject; i++ {
+		bi := bats[i].idx
+		jitter := 5.0
+		ss.Bots[bi].X = gridPts[i].x + (ss.Rng.Float64()*2-1)*jitter
+		ss.Bots[bi].Y = gridPts[i].y + (ss.Rng.Float64()*2-1)*jitter
+		// Clamp to arena
+		if ss.Bots[bi].X < SwarmBotRadius {
+			ss.Bots[bi].X = SwarmBotRadius
+		}
+		if ss.Bots[bi].X > ss.ArenaW-SwarmBotRadius {
+			ss.Bots[bi].X = ss.ArenaW - SwarmBotRadius
+		}
+		if ss.Bots[bi].Y < SwarmBotRadius {
+			ss.Bots[bi].Y = SwarmBotRadius
+		}
+		if ss.Bots[bi].Y > ss.ArenaH-SwarmBotRadius {
+			ss.Bots[bi].Y = ss.ArenaH - SwarmBotRadius
+		}
+		// Reset velocity for teleported bats
+		st.Vel[0][bi] = 0
+		st.Vel[1][bi] = 0
+		// Reset loudness high and pulse rate low for fresh exploration
+		st.Loud[bi] = 0.8
+		st.Pulse[bi] = 0.1
+	}
 }

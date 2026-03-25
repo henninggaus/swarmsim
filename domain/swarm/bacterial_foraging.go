@@ -19,7 +19,6 @@ import "math"
 const (
 	bfoChemoSteps     = 6     // consecutive swim steps before re-evaluation
 	bfoTumbleRate     = 0.15  // probability of tumbling each step
-	bfoSwimSteerRate  = 0.35  // max angle change during swim (radians)
 	bfoSwarmRadius    = 80.0  // swarming signal radius
 	bfoReproInterval  = 150   // ticks between reproduction events
 	bfoElimProb       = 0.003 // probability of elimination-dispersal per bot per cycle
@@ -27,8 +26,14 @@ const (
 	bfoMaxTicks       = 3000  // total ticks for adaptive parameter scheduling
 	bfoProbeDistStart = 40.0  // gradient probe distance at start (exploration)
 	bfoProbeDistEnd   = 8.0   // gradient probe distance at end (exploitation)
-	bfoGBestWStart    = 0.10  // global-best attraction weight at start
-	bfoGBestWEnd      = 0.45  // global-best attraction weight at end
+	bfoGBestWStart    = 0.05  // global-best attraction weight at start
+	bfoGBestWEnd      = 0.60  // global-best attraction weight at end
+	bfoSpeedMult      = 5.0   // movement speed multiplier (5x = 7.5 px/tick)
+	bfoGridRescanRate = 300   // periodic grid rescan every N ticks
+	bfoGridRescanSide = 14    // grid resolution (14x14 = 196 samples)
+	bfoGridInjectTop  = 10    // best grid positions to inject
+	bfoDtbStartProg   = 0.3   // direct-to-best starts at this progress
+	bfoDtbMaxProb     = 0.50  // max probability of direct-to-best
 )
 
 // BFOState holds Bacterial Foraging Optimization state.
@@ -41,6 +46,8 @@ type BFOState struct {
 	PBestF     []float64 // personal best fitness per bot
 	PBestX     []float64 // personal best X per bot
 	PBestY     []float64 // personal best Y per bot
+	TargetX    []float64 // current movement target X per bot
+	TargetY    []float64 // current movement target Y per bot
 	CycleTimer int       // ticks since last reproduction
 	Tick       int       // total ticks elapsed (for adaptive scheduling)
 	BestF      float64   // global best fitness found
@@ -61,6 +68,8 @@ func InitBFO(ss *SwarmState) {
 		PBestF:    make([]float64, n),
 		PBestX:    make([]float64, n),
 		PBestY:    make([]float64, n),
+		TargetX:   make([]float64, n),
+		TargetY:   make([]float64, n),
 		BestF:     -1e18,
 		BestIdx:   -1,
 	}
@@ -73,6 +82,8 @@ func InitBFO(ss *SwarmState) {
 		st.PBestF[i] = f
 		st.PBestX[i] = ss.Bots[i].X
 		st.PBestY[i] = ss.Bots[i].Y
+		st.TargetX[i] = ss.Bots[i].X
+		st.TargetY[i] = ss.Bots[i].Y
 		if f > st.BestF {
 			st.BestF = f
 			st.BestX = ss.Bots[i].X
@@ -109,9 +120,13 @@ func TickBFO(ss *SwarmState) {
 		if idx < len(ss.Bots) {
 			st.PBestX = append(st.PBestX, ss.Bots[idx].X)
 			st.PBestY = append(st.PBestY, ss.Bots[idx].Y)
+			st.TargetX = append(st.TargetX, ss.Bots[idx].X)
+			st.TargetY = append(st.TargetY, ss.Bots[idx].Y)
 		} else {
 			st.PBestX = append(st.PBestX, 0)
 			st.PBestY = append(st.PBestY, 0)
+			st.TargetX = append(st.TargetX, 0)
+			st.TargetY = append(st.TargetY, 0)
 		}
 	}
 
@@ -126,7 +141,7 @@ func TickBFO(ss *SwarmState) {
 	// Adaptive gradient probe distance: large early, small late
 	probeDist := bfoProbeDistStart + (bfoProbeDistEnd-bfoProbeDistStart)*progress
 
-	// Phase 1: Chemotaxis with gradient-guided tumble
+	// Phase 1: Chemotaxis with gradient-guided tumble — compute targets
 	for i := range ss.Bots {
 		bot := &ss.Bots[i]
 		fit := distanceFitness(bot, ss)
@@ -150,6 +165,20 @@ func TickBFO(ss *SwarmState) {
 		// Accumulate health for reproduction (faster EMA for better responsiveness)
 		st.Health[i] = st.Health[i]*0.95 + fit*0.05
 
+		// Direct-to-best: in late phase, some bots skip chemotaxis and go
+		// directly to global best with small jitter
+		if progress > bfoDtbStartProg && st.BestF > 0 {
+			dtbProb := bfoDtbMaxProb * (progress - bfoDtbStartProg) / (1.0 - bfoDtbStartProg)
+			if ss.Rng.Float64() < dtbProb {
+				jitter := probeDist * 0.5
+				st.TargetX[i] = st.BestX + (ss.Rng.Float64()-0.5)*2*jitter
+				st.TargetY[i] = st.BestY + (ss.Rng.Float64()-0.5)*2*jitter
+				st.SwimCount[i] = bfoChemoSteps
+				st.PrevFit[i] = fit
+				continue
+			}
+		}
+
 		// Chemotaxis decision
 		if st.SwimCount[i] <= 0 {
 			if fit > st.PrevFit[i] {
@@ -169,7 +198,34 @@ func TickBFO(ss *SwarmState) {
 			st.SwimDir[i] += (ss.Rng.Float64() - 0.5) * 0.6
 		}
 
+		// Compute chemotaxis target from swim direction
+		stepDist := probeDist * 0.5
+		tx := bot.X + math.Cos(st.SwimDir[i])*stepDist
+		ty := bot.Y + math.Sin(st.SwimDir[i])*stepDist
+
+		// Blend target toward global best (adaptive strength)
+		gbestW := bfoGBestWStart + (bfoGBestWEnd-bfoGBestWStart)*progress
+		if st.BestIdx >= 0 && st.BestF > 0 {
+			tx = tx*(1-gbestW) + st.BestX*gbestW
+			ty = ty*(1-gbestW) + st.BestY*gbestW
+		}
+
+		// Blend toward personal best (cognitive component)
+		if st.PBestF[i] > -1e17 {
+			pW := 0.05 + 0.15*progress
+			tx = tx*(1-pW) + st.PBestX[i]*pW
+			ty = ty*(1-pW) + st.PBestY[i]*pW
+		}
+
+		st.TargetX[i] = tx
+		st.TargetY[i] = ty
 		st.PrevFit[i] = fit
+	}
+
+	// Periodic grid rescan: systematically sample the landscape to find
+	// the global optimum, critical for deceptive landscapes like Schwefel.
+	if st.Tick > 0 && st.Tick%bfoGridRescanRate == 0 {
+		bfoGridRescan(ss)
 	}
 
 	// Phase 3: Reproduction — fittest half clones replace least fit half
@@ -186,6 +242,8 @@ func TickBFO(ss *SwarmState) {
 			st.Health[i] = 0
 			st.PrevFit[i] = 0
 			st.SwimDir[i] = ss.Rng.Float64() * 2 * math.Pi
+			st.TargetX[i] = ss.Bots[i].X
+			st.TargetY[i] = ss.Bots[i].Y
 			if i < len(st.PBestF) {
 				st.PBestF[i] = -1e18
 				st.PBestX[i] = ss.Bots[i].X
@@ -316,88 +374,10 @@ func ApplyBFO(bot *SwarmBot, ss *SwarmState, idx int) {
 		return
 	}
 	st := ss.BFO
-	if idx >= len(st.SwimDir) {
+	if idx >= len(st.TargetX) {
 		bot.Speed = SwarmBotSpeed
 		return
 	}
-
-	// Phase 2: Swarming — attract toward nearby high-fitness bacteria
-	swarmAngle := st.SwimDir[idx]
-	if ss.Hash != nil {
-		nearIDs := ss.Hash.Query(bot.X, bot.Y, bfoSwarmRadius)
-		sx, sy := 0.0, 0.0
-		totalW := 0.0
-		for _, j := range nearIDs {
-			if j == idx || j < 0 || j >= len(ss.Bots) {
-				continue
-			}
-			nb := &ss.Bots[j]
-			dx := nb.X - bot.X
-			dy := nb.Y - bot.Y
-			distSq := dx*dx + dy*dy
-			if distSq < 1.0 || distSq > bfoSwarmRadius*bfoSwarmRadius {
-				continue
-			}
-			dist := math.Sqrt(distSq)
-			// Weight attraction by neighbor fitness
-			w := 1.0
-			if j < len(st.Fitness) {
-				w = math.Max(0, st.Fitness[j]) * 0.01
-			}
-			sx += (dx / dist) * w
-			sy += (dy / dist) * w
-			totalW += w
-		}
-		if totalW > 0 {
-			// Blend swim direction with swarming signal
-			swarmAngle = math.Atan2(
-				math.Sin(st.SwimDir[idx])+sy*0.4,
-				math.Cos(st.SwimDir[idx])+sx*0.4,
-			)
-		}
-	}
-
-	// Adaptive progress for exploitation scaling
-	progress := float64(st.Tick) / float64(bfoMaxTicks)
-	if progress > 1.0 {
-		progress = 1.0
-	}
-
-	// Attract toward personal best (cognitive component)
-	if idx < len(st.PBestF) && st.PBestF[idx] > -1e17 {
-		dx := st.PBestX[idx] - bot.X
-		dy := st.PBestY[idx] - bot.Y
-		distSq := dx*dx + dy*dy
-		if distSq > 1.0 {
-			pbestAngle := math.Atan2(dy, dx)
-			pbestW := 0.05 + 0.10*progress // 0.05 → 0.15
-			swimW := 1.0 - pbestW
-			swarmAngle = math.Atan2(
-				math.Sin(swarmAngle)*swimW+math.Sin(pbestAngle)*pbestW,
-				math.Cos(swarmAngle)*swimW+math.Cos(pbestAngle)*pbestW,
-			)
-		}
-	}
-
-	// Attract toward global best (social component, adaptive strength)
-	gbestW := bfoGBestWStart + (bfoGBestWEnd-bfoGBestWStart)*progress
-	if st.BestIdx >= 0 && st.BestF > 0 {
-		dx := st.BestX - bot.X
-		dy := st.BestY - bot.Y
-		distSq := dx*dx + dy*dy
-		if distSq > 1.0 {
-			bestAngle := math.Atan2(dy, dx)
-			swimW := 1.0 - gbestW
-			swarmAngle = math.Atan2(
-				math.Sin(swarmAngle)*swimW+math.Sin(bestAngle)*gbestW,
-				math.Cos(swarmAngle)*swimW+math.Cos(bestAngle)*gbestW,
-			)
-		}
-	}
-
-	// Steer toward computed direction
-	steerToward(bot, swarmAngle, bfoSwimSteerRate)
-	bot.Speed = SwarmBotSpeed
 
 	// LED color based on fitness: green (high) → red (low)
 	fit := st.Fitness[idx]
@@ -416,29 +396,104 @@ func ApplyBFO(bot *SwarmBot, ss *SwarmState, idx int) {
 		bot.LEDColor = [3]uint8{255, 215, 0}
 	}
 
-	// Direct position update (needed for benchmark mode where applySwarmPhysics
-	// is not called). Set Speed=0 after to prevent double-movement in GUI mode.
-	bfoMovBot(bot, ss)
+	// Move toward target using shared movement function (5x speed)
+	algoMovBot(bot, st.TargetX[idx], st.TargetY[idx], ss.ArenaW, ss.ArenaH, bfoSpeedMult)
 }
 
-// bfoMovBot applies bot movement based on speed/angle and clamps to arena bounds.
-func bfoMovBot(bot *SwarmBot, ss *SwarmState) {
-	if bot.Speed > 0 {
-		bot.X += math.Cos(bot.Angle) * bot.Speed
-		bot.Y += math.Sin(bot.Angle) * bot.Speed
-		bot.Speed = 0 // prevent double-move in GUI physics step
+// bfoGridRescan systematically evaluates a grid across the arena and injects
+// the best positions into the worst bots. Critical for deceptive landscapes.
+func bfoGridRescan(ss *SwarmState) {
+	st := ss.BFO
+	n := len(ss.Bots)
+	if n < 4 {
+		return
 	}
-	// Clamp to arena
-	if bot.X < 0 {
-		bot.X = 0
+
+	aw := ss.ArenaW
+	ah := ss.ArenaH
+
+	type gridPt struct {
+		x, y, f float64
 	}
-	if bot.X > ss.ArenaW {
-		bot.X = ss.ArenaW
+	topPts := make([]gridPt, 0, bfoGridInjectTop)
+
+	for gx := 0; gx < bfoGridRescanSide; gx++ {
+		for gy := 0; gy < bfoGridRescanSide; gy++ {
+			px := (float64(gx) + 0.5) * aw / float64(bfoGridRescanSide)
+			py := (float64(gy) + 0.5) * ah / float64(bfoGridRescanSide)
+			f := distanceFitnessPt(ss, px, py)
+
+			// Update global best from grid
+			if f > st.BestF {
+				st.BestF = f
+				st.BestX = px
+				st.BestY = py
+			}
+
+			// Insert into top list (sorted descending)
+			inserted := false
+			for ti := range topPts {
+				if f > topPts[ti].f {
+					topPts = append(topPts, gridPt{})
+					copy(topPts[ti+1:], topPts[ti:])
+					topPts[ti] = gridPt{px, py, f}
+					inserted = true
+					break
+				}
+			}
+			if !inserted && len(topPts) < bfoGridInjectTop {
+				topPts = append(topPts, gridPt{px, py, f})
+			}
+			if len(topPts) > bfoGridInjectTop {
+				topPts = topPts[:bfoGridInjectTop]
+			}
+		}
 	}
-	if bot.Y < 0 {
-		bot.Y = 0
+
+	if len(topPts) == 0 {
+		return
 	}
-	if bot.Y > ss.ArenaH {
-		bot.Y = ss.ArenaH
+
+	// Find worst-fitness bots to replace
+	type idxFit struct {
+		idx int
+		f   float64
+	}
+	worst := make([]idxFit, 0, n)
+	for i := range ss.Bots {
+		if i < len(st.Fitness) {
+			worst = append(worst, idxFit{i, st.Fitness[i]})
+		}
+	}
+	// Sort ascending by fitness (simple insertion sort for small n)
+	for i := 1; i < len(worst); i++ {
+		key := worst[i]
+		j := i - 1
+		for j >= 0 && worst[j].f > key.f {
+			worst[j+1] = worst[j]
+			j--
+		}
+		worst[j+1] = key
+	}
+
+	// Inject top grid points into worst bots
+	injectCount := bfoGridInjectTop
+	if injectCount > len(worst) {
+		injectCount = len(worst)
+	}
+	if injectCount > len(topPts) {
+		injectCount = len(topPts)
+	}
+	for k := 0; k < injectCount; k++ {
+		bi := worst[k].idx
+		jitterX := (ss.Rng.Float64() - 0.5) * 10
+		jitterY := (ss.Rng.Float64() - 0.5) * 10
+		ss.Bots[bi].X = topPts[k].x + jitterX
+		ss.Bots[bi].Y = topPts[k].y + jitterY
+		st.TargetX[bi] = topPts[k].x
+		st.TargetY[bi] = topPts[k].y
+		st.Health[bi] = 0
+		st.PrevFit[bi] = 0
+		st.SwimDir[bi] = ss.Rng.Float64() * 2 * math.Pi
 	}
 }

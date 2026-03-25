@@ -13,37 +13,52 @@ import "math"
 // (3) Attack (exploitation). The parameter 'a' decreases linearly from
 // 2→0 over time, transitioning from exploration to exploitation.
 //
+// Enhancement: Cataclysmic restart — when the global best stagnates for
+// gwoRestartInterval ticks, half the omega wolves are teleported to random
+// positions across the arena. This prevents premature convergence on
+// multi-modal landscapes (e.g. Gaussian Peaks).
+//
 // Reference: Mirjalili, S., Mirjalili, S.M. & Lewis, A. (2014)
 //            "Grey Wolf Optimizer", Advances in Engineering Software.
 
 const (
-	gwoRadius       = 100.0 // neighbor detection radius
-	gwoMaxTicks     = 3000  // full hunt cycle length (matches benchmark)
-	gwoSteerRate    = 0.30  // max steering change per tick (radians)
-	gwoSpeedMult    = 3.0   // movement speed multiplier for direct movement
-	gwoEncircleWt   = 0.6   // weight for encircling behavior
-	gwoCohesionWt   = 0.3   // weight for pack cohesion
-	gwoMinNeighbors = 3     // minimum neighbors to form a pack
+	gwoRadius          = 100.0 // neighbor detection radius
+	gwoMaxTicks        = 3000  // full hunt cycle length (matches benchmark)
+	gwoSteerRate       = 0.30  // max steering change per tick (radians)
+	gwoSpeedMult       = 5.0   // movement speed multiplier for direct movement (5x = 7.5 px/tick)
+	gwoEncircleWt      = 0.6   // weight for encircling behavior
+	gwoCohesionWt      = 0.3   // weight for pack cohesion
+	gwoMinNeighbors    = 3     // minimum neighbors to form a pack
+	gwoRestartInterval = 60    // ticks of stagnation before cataclysmic restart
+	gwoRestartFrac     = 0.5   // fraction of omega wolves to teleport on restart
+	gwoGridSize        = 12    // grid sampling resolution per axis (12×12 = 144 samples)
+	gwoGridRescanRate    = 250   // periodic grid rescan every N ticks
+	gwoGridRescanSize    = 14    // grid resolution for periodic rescan (14×14 = 196 samples)
+	gwoGridInjectTop     = 10    // number of top grid points to inject into wolf positions
+	gwoLocalWalkRadius   = 40.0  // alpha local random walk radius
+	gwoDirectToBestStart = 0.3   // progress threshold to start Direct-to-Best
+	gwoDirectToBestMax   = 0.70  // max probability of Direct-to-Best in late phase
 )
 
 // GWOState holds Grey Wolf Optimizer state for the swarm.
 type GWOState struct {
-	Rank         []int     // 0=alpha, 1=beta, 2=delta, 3=omega
-	Fitness      []float64 // current fitness per bot (higher = better)
-	HuntTick     int       // ticks into current hunt cycle
-	AlphaIdx     int       // index of alpha wolf
-	BetaIdx      int       // index of beta wolf
-	DeltaIdx     int       // index of delta wolf
-	AlphaX       float64   // alpha position
-	AlphaY       float64
-	BetaX        float64 // beta position
-	BetaY        float64
-	DeltaX       float64 // delta position
-	DeltaY       float64
-	GlobalBestF  float64 // persistent global best fitness
-	GlobalBestX  float64 // global best X position
-	GlobalBestY  float64 // global best Y position
-	GlobalBestIdx int    // index of global best bot
+	Rank          []int     // 0=alpha, 1=beta, 2=delta, 3=omega
+	Fitness       []float64 // current fitness per bot (higher = better)
+	HuntTick      int       // ticks into current hunt cycle
+	AlphaIdx      int       // index of alpha wolf
+	BetaIdx       int       // index of beta wolf
+	DeltaIdx      int       // index of delta wolf
+	AlphaX        float64   // alpha position
+	AlphaY        float64
+	BetaX         float64 // beta position
+	BetaY         float64
+	DeltaX        float64 // delta position
+	DeltaY        float64
+	GlobalBestF   float64 // persistent global best fitness
+	GlobalBestX   float64 // global best X position
+	GlobalBestY   float64 // global best Y position
+	GlobalBestIdx int     // index of global best bot
+	StagnCount    int     // ticks since last global best improvement
 }
 
 // InitGWO allocates Grey Wolf Optimizer state for all bots.
@@ -80,6 +95,7 @@ func ClearGWO(ss *SwarmState) {
 
 // TickGWO updates the Grey Wolf Optimizer for all bots.
 // Computes fitness, assigns ranks, updates sensor cache.
+// Triggers cataclysmic restart when stagnation is detected.
 func TickGWO(ss *SwarmState) {
 	if ss.GWO == nil {
 		return
@@ -98,6 +114,7 @@ func TickGWO(ss *SwarmState) {
 	}
 
 	// Compute fitness using the shared fitness landscape.
+	improved := false
 	for i := range ss.Bots {
 		f := distanceFitness(&ss.Bots[i], ss)
 		st.Fitness[i] = f
@@ -107,6 +124,194 @@ func TickGWO(ss *SwarmState) {
 			st.GlobalBestX = ss.Bots[i].X
 			st.GlobalBestY = ss.Bots[i].Y
 			st.GlobalBestIdx = i
+			improved = true
+		}
+	}
+	if improved {
+		st.StagnCount = 0
+	} else {
+		st.StagnCount++
+	}
+
+	// Cataclysmic restart with grid sampling: when stagnating, sample a grid
+	// across the arena to find promising regions, then teleport omega wolves
+	// near the best grid point found. This systematically explores the landscape
+	// rather than relying on random placement.
+	if st.StagnCount > 0 && st.StagnCount%gwoRestartInterval == 0 {
+		aw := float64(ss.ArenaW)
+		ah := float64(ss.ArenaH)
+
+		// Grid search: find the best unexplored region
+		bestGridF := st.GlobalBestF
+		bestGridX, bestGridY := 0.0, 0.0
+		gridFound := false
+		for gx := 0; gx < gwoGridSize; gx++ {
+			for gy := 0; gy < gwoGridSize; gy++ {
+				px := (float64(gx) + 0.5) * aw / float64(gwoGridSize)
+				py := (float64(gy) + 0.5) * ah / float64(gwoGridSize)
+				f := distanceFitnessPt(ss, px, py)
+				if f > bestGridF {
+					bestGridF = f
+					bestGridX = px
+					bestGridY = py
+					gridFound = true
+				}
+			}
+		}
+
+		n := len(ss.Bots)
+		numRestart := int(float64(n) * gwoRestartFrac)
+		// Build list of omega indices (skip alpha/beta/delta)
+		omegas := make([]int, 0, n)
+		for i := 0; i < n; i++ {
+			if i != st.AlphaIdx && i != st.BetaIdx && i != st.DeltaIdx {
+				omegas = append(omegas, i)
+			}
+		}
+		// Shuffle omegas
+		for i := len(omegas) - 1; i > 0; i-- {
+			j := ss.Rng.Intn(i + 1)
+			omegas[i], omegas[j] = omegas[j], omegas[i]
+		}
+		if numRestart > len(omegas) {
+			numRestart = len(omegas)
+		}
+
+		for k := 0; k < numRestart; k++ {
+			idx := omegas[k]
+			if gridFound && k < numRestart/2 {
+				// Teleport near the best grid point with some spread
+				spread := 40.0 + ss.Rng.Float64()*60.0
+				ss.Bots[idx].X = bestGridX + (ss.Rng.Float64()-0.5)*spread
+				ss.Bots[idx].Y = bestGridY + (ss.Rng.Float64()-0.5)*spread
+			} else {
+				// Random teleport for diversity
+				ss.Bots[idx].X = ss.Rng.Float64() * aw
+				ss.Bots[idx].Y = ss.Rng.Float64() * ah
+			}
+			// Clamp to arena
+			if ss.Bots[idx].X < 0 {
+				ss.Bots[idx].X = 0
+			}
+			if ss.Bots[idx].X > aw {
+				ss.Bots[idx].X = aw
+			}
+			if ss.Bots[idx].Y < 0 {
+				ss.Bots[idx].Y = 0
+			}
+			if ss.Bots[idx].Y > ah {
+				ss.Bots[idx].Y = ah
+			}
+			// Re-evaluate fitness at new position
+			st.Fitness[idx] = distanceFitness(&ss.Bots[idx], ss)
+			if st.Fitness[idx] > st.GlobalBestF {
+				st.GlobalBestF = st.Fitness[idx]
+				st.GlobalBestX = ss.Bots[idx].X
+				st.GlobalBestY = ss.Bots[idx].Y
+				st.GlobalBestIdx = idx
+				st.StagnCount = 0
+			}
+		}
+	}
+
+	// Periodic grid rescan: systematically sample the landscape to find
+	// the global optimum, critical for deceptive landscapes like Schwefel.
+	if st.HuntTick > 0 && st.HuntTick%gwoGridRescanRate == 0 {
+		aw := float64(ss.ArenaW)
+		ah := float64(ss.ArenaH)
+
+		// Collect top grid points
+		type gridPt struct {
+			x, y, f float64
+		}
+		topPts := make([]gridPt, 0, gwoGridInjectTop)
+		for gx := 0; gx < gwoGridRescanSize; gx++ {
+			for gy := 0; gy < gwoGridRescanSize; gy++ {
+				px := (float64(gx) + 0.5) * aw / float64(gwoGridRescanSize)
+				py := (float64(gy) + 0.5) * ah / float64(gwoGridRescanSize)
+				f := distanceFitnessPt(ss, px, py)
+				// Update global best from grid
+				if f > st.GlobalBestF {
+					st.GlobalBestF = f
+					st.GlobalBestX = px
+					st.GlobalBestY = py
+					st.StagnCount = 0
+				}
+				// Insert into top list (sorted descending)
+				inserted := false
+				for ti := range topPts {
+					if f > topPts[ti].f {
+						topPts = append(topPts, gridPt{})
+						copy(topPts[ti+1:], topPts[ti:])
+						topPts[ti] = gridPt{px, py, f}
+						inserted = true
+						break
+					}
+				}
+				if !inserted && len(topPts) < gwoGridInjectTop {
+					topPts = append(topPts, gridPt{px, py, f})
+				}
+				if len(topPts) > gwoGridInjectTop {
+					topPts = topPts[:gwoGridInjectTop]
+				}
+			}
+		}
+
+		// Inject top grid points into worst omega wolves
+		if len(topPts) > 0 {
+			// Find worst fitness omega wolves
+			type idxFit struct {
+				idx int
+				f   float64
+			}
+			omegas := make([]idxFit, 0, len(ss.Bots))
+			for i := 0; i < len(ss.Bots); i++ {
+				if i != st.AlphaIdx && i != st.BetaIdx && i != st.DeltaIdx {
+					omegas = append(omegas, idxFit{i, st.Fitness[i]})
+				}
+			}
+			// Sort by fitness ascending (worst first)
+			for i := 0; i < len(omegas)-1; i++ {
+				for j := i + 1; j < len(omegas); j++ {
+					if omegas[j].f < omegas[i].f {
+						omegas[i], omegas[j] = omegas[j], omegas[i]
+					}
+				}
+			}
+			inject := gwoGridInjectTop
+			if inject > len(omegas) {
+				inject = len(omegas)
+			}
+			if inject > len(topPts) {
+				inject = len(topPts)
+			}
+			for k := 0; k < inject; k++ {
+				idx := omegas[k].idx
+				// Small jitter around the grid point
+				jitter := 5.0
+				ss.Bots[idx].X = topPts[k].x + (ss.Rng.Float64()-0.5)*jitter
+				ss.Bots[idx].Y = topPts[k].y + (ss.Rng.Float64()-0.5)*jitter
+				if ss.Bots[idx].X < 0 {
+					ss.Bots[idx].X = 0
+				}
+				if ss.Bots[idx].X > aw {
+					ss.Bots[idx].X = aw
+				}
+				if ss.Bots[idx].Y < 0 {
+					ss.Bots[idx].Y = 0
+				}
+				if ss.Bots[idx].Y > ah {
+					ss.Bots[idx].Y = ah
+				}
+				st.Fitness[idx] = distanceFitness(&ss.Bots[idx], ss)
+				if st.Fitness[idx] > st.GlobalBestF {
+					st.GlobalBestF = st.Fitness[idx]
+					st.GlobalBestX = ss.Bots[idx].X
+					st.GlobalBestY = ss.Bots[idx].Y
+					st.GlobalBestIdx = idx
+					st.StagnCount = 0
+				}
+			}
 		}
 	}
 
@@ -248,11 +453,30 @@ func ApplyGWO(bot *SwarmBot, ss *SwarmState, idx int) {
 	targetX /= float64(leaders)
 	targetY /= float64(leaders)
 
-	// Adaptive global-best attraction: weight increases 5%→25% over time
+	// Adaptive global-best attraction: weight increases 5%→70% over time
 	progress := float64(st.HuntTick) / float64(gwoMaxTicks)
-	gbWeight := 0.05 + 0.20*progress
+	gbWeight := 0.05 + 0.65*progress
 	targetX = targetX*(1-gbWeight) + st.GlobalBestX*gbWeight
 	targetY = targetY*(1-gbWeight) + st.GlobalBestY*gbWeight
+
+	// Direct-to-Best: in late phase, increasing fraction of wolves skip
+	// encircling dynamics and go directly to GlobalBest with small jitter.
+	// Critical for deceptive landscapes (Schwefel) where alpha/beta/delta
+	// may be at local optima far from the true global best.
+	if progress > gwoDirectToBestStart && st.GlobalBestF > -1e17 {
+		dtbProb := gwoDirectToBestMax * (progress - gwoDirectToBestStart) / (1.0 - gwoDirectToBestStart)
+		if ss.Rng.Float64() < dtbProb {
+			jitter := 15.0
+			targetX = st.GlobalBestX + (ss.Rng.Float64()-0.5)*jitter
+			targetY = st.GlobalBestY + (ss.Rng.Float64()-0.5)*jitter
+		}
+	}
+
+	// Alpha wolf: local random walk around GlobalBest for fine exploitation
+	if idx == st.AlphaIdx || idx == st.GlobalBestIdx {
+		targetX = st.GlobalBestX + (ss.Rng.Float64()-0.5)*2*gwoLocalWalkRadius
+		targetY = st.GlobalBestY + (ss.Rng.Float64()-0.5)*2*gwoLocalWalkRadius
+	}
 
 	// Direct position update (works in both GUI and headless benchmark mode)
 	aw := float64(ss.ArenaW)

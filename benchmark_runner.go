@@ -37,6 +37,11 @@ func runBenchmark() {
 	runIdx := 0
 
 	for _, fitFunc := range landscapes {
+		// For Gaussian Peaks: generate peaks once using the first algorithm,
+		// then reuse the SAME peaks for all subsequent algorithms so the
+		// comparison is fair (all algorithms optimise the same landscape).
+		var savedPeaks *swarm.GaussianPeaks
+
 		for _, algo := range algos {
 			runIdx++
 			algoName := swarm.SwarmAlgorithmName(algo)
@@ -44,16 +49,21 @@ func runBenchmark() {
 			fmt.Printf("[%d/%d] %s auf %s ... ", runIdx, totalRuns, algoName, fitName)
 
 			// Init algorithm with this fitness landscape.
-			// InitSwarmAlgorithm creates a SwarmAlgorithmState with default
-			// FitGaussian and evaluates initial fitness against Gaussian peaks.
-			// We then set the actual fitness function and re-init the algorithm
-			// so all cached fitness values are evaluated against the correct
-			// landscape (fixes stale Gaussian fitness leaking into other landscapes).
 			swarm.InitSwarmAlgorithm(ss, algo)
 			if ss.SwarmAlgo != nil {
 				ss.SwarmAlgo.FitnessFunc = fitFunc
-				swarm.ReinitFitnessLandscape(ss)
+				if fitFunc == swarm.FitGaussian && savedPeaks != nil {
+					// Restore the same peaks generated for the first algorithm
+					swarm.RestoreGaussianPeaks(ss, savedPeaks)
+				} else {
+					swarm.ReinitFitnessLandscape(ss)
+				}
 				swarm.ReinitActiveAlgorithm(ss)
+
+				// Save peaks after first algorithm generates them
+				if fitFunc == swarm.FitGaussian && savedPeaks == nil {
+					savedPeaks = swarm.SaveGaussianPeaks(ss)
+				}
 			}
 
 			start := time.Now()

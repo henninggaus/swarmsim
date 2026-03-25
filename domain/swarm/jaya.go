@@ -25,25 +25,36 @@ import "math"
 //	 and unconstrained optimization problems",
 //	 International Journal of Industrial Engineering Computations, 7(1), 19-34.
 const (
-	jayaMaxTicks  = 600  // full optimization cycle
-	jayaSteerRate = 0.15 // max steering change per tick (radians)
+	jayaMaxTicks       = 3000 // full optimization cycle (matches benchmark length)
+	jayaSteerRate      = 0.25 // max steering change per tick (radians)
+	jayaSpeedMult      = 5.0  // movement speed multiplier (7.5 px/tick)
+	jayaGBWeightMin    = 0.05 // initial global-best attraction weight
+	jayaGBWeightMax    = 0.40 // final global-best attraction weight
+	jayaBestWalkRadius = 40.0 // random walk radius for best bot
+	jayaGridInterval   = 400  // ticks between systematic grid re-scans
+	jayaGridSide       = 12   // grid side for periodic re-scan (12x12=144 candidates)
+	jayaGridInject     = 10   // number of grid points to teleport bots to
 )
 
 // JayaState holds Jaya Algorithm state for the swarm.
 type JayaState struct {
-	Fitness  []float64 // current fitness per bot
+	Fitness       []float64 // current fitness per bot
 	PersonalBestX []float64 // personal best position X
 	PersonalBestY []float64 // personal best position Y
 	PersonalBestF []float64 // personal best fitness
-	BestX    float64   // global best position X
-	BestY    float64   // global best position Y
-	BestF    float64   // global best fitness
-	BestIdx  int       // index of best bot
-	WorstX   float64   // worst position X
-	WorstY   float64   // worst position Y
-	WorstF   float64   // worst fitness
-	WorstIdx int       // index of worst bot
-	Tick     int       // ticks into current cycle
+	BestX         float64   // current tick best position X
+	BestY         float64   // current tick best position Y
+	BestF         float64   // current tick best fitness
+	BestIdx       int       // index of best bot this tick
+	WorstX        float64   // worst position X
+	WorstY        float64   // worst position Y
+	WorstF        float64   // worst fitness
+	WorstIdx      int       // index of worst bot
+	GlobalBestF   float64   // persistent global best fitness (never resets)
+	GlobalBestX   float64   // persistent global best position X
+	GlobalBestY   float64   // persistent global best position Y
+	GlobalBestIdx int       // index of bot that found global best
+	Tick          int       // ticks into current cycle
 }
 
 // InitJaya allocates Jaya state for all bots.
@@ -58,6 +69,8 @@ func InitJaya(ss *SwarmState) {
 		BestIdx:       -1,
 		WorstF:        1e18,
 		WorstIdx:      -1,
+		GlobalBestF:   -1e18,
+		GlobalBestIdx: -1,
 	}
 	// Initialize personal bests to current positions
 	for i := range ss.Bots {
@@ -109,28 +122,45 @@ func TickJaya(ss *SwarmState) {
 		}
 	}
 
-	// Find best and worst individuals
-	st.BestIdx = -1
-	st.BestF = -1e18
+	// Find best and worst individuals this tick
+	tickBestF := -1e18
+	tickBestIdx := -1
 	st.WorstIdx = -1
 	st.WorstF = 1e18
 	for i := 0; i < n; i++ {
-		if st.Fitness[i] > st.BestF {
-			st.BestF = st.Fitness[i]
-			st.BestIdx = i
+		if st.Fitness[i] > tickBestF {
+			tickBestF = st.Fitness[i]
+			tickBestIdx = i
 		}
 		if st.Fitness[i] < st.WorstF {
 			st.WorstF = st.Fitness[i]
 			st.WorstIdx = i
 		}
 	}
-	if st.BestIdx >= 0 {
-		st.BestX = ss.Bots[st.BestIdx].X
-		st.BestY = ss.Bots[st.BestIdx].Y
+	st.BestF = tickBestF
+	st.BestIdx = tickBestIdx
+	if tickBestIdx >= 0 {
+		st.BestX = ss.Bots[tickBestIdx].X
+		st.BestY = ss.Bots[tickBestIdx].Y
 	}
 	if st.WorstIdx >= 0 {
 		st.WorstX = ss.Bots[st.WorstIdx].X
 		st.WorstY = ss.Bots[st.WorstIdx].Y
+	}
+
+	// Update persistent global best
+	if tickBestF > st.GlobalBestF && tickBestIdx >= 0 {
+		st.GlobalBestF = tickBestF
+		st.GlobalBestX = ss.Bots[tickBestIdx].X
+		st.GlobalBestY = ss.Bots[tickBestIdx].Y
+		st.GlobalBestIdx = tickBestIdx
+	}
+
+	// Periodic grid rescan: systematically scan the arena to find regions
+	// that random exploration missed. Critical for deceptive landscapes
+	// like Schwefel where the global optimum is far from local optima.
+	if st.Tick > 1 && st.Tick%jayaGridInterval == 0 && n > 0 {
+		jayaGridRescan(ss, st)
 	}
 
 	// Update sensor cache
@@ -139,19 +169,106 @@ func TickJaya(ss *SwarmState) {
 		if ss.Bots[i].JayaFitness > 100 {
 			ss.Bots[i].JayaFitness = 100
 		}
-		if st.BestIdx >= 0 {
-			dx := st.BestX - ss.Bots[i].X
-			dy := st.BestY - ss.Bots[i].Y
-			ss.Bots[i].JayaBestDist = int(math.Sqrt(dx*dx + dy*dy))
-		} else {
-			ss.Bots[i].JayaBestDist = 9999
+		gbx, gby := st.GlobalBestX, st.GlobalBestY
+		if st.GlobalBestIdx < 0 {
+			gbx, gby = st.BestX, st.BestY
 		}
+		dx := gbx - ss.Bots[i].X
+		dy := gby - ss.Bots[i].Y
+		ss.Bots[i].JayaBestDist = int(math.Sqrt(dx*dx + dy*dy))
+
 		if st.WorstIdx >= 0 {
-			dx := st.WorstX - ss.Bots[i].X
-			dy := st.WorstY - ss.Bots[i].Y
-			ss.Bots[i].JayaWorstDist = int(math.Sqrt(dx*dx + dy*dy))
+			dx2 := st.WorstX - ss.Bots[i].X
+			dy2 := st.WorstY - ss.Bots[i].Y
+			ss.Bots[i].JayaWorstDist = int(math.Sqrt(dx2*dx2 + dy2*dy2))
 		} else {
 			ss.Bots[i].JayaWorstDist = 9999
+		}
+	}
+}
+
+// jayaGridRescan evaluates a grid of points across the arena and teleports
+// the worst bots to the best-discovered grid positions.
+func jayaGridRescan(ss *SwarmState, st *JayaState) {
+	margin := 10.0
+	usableW := ss.ArenaW - 2*margin
+	usableH := ss.ArenaH - 2*margin
+	if usableW < 10 || usableH < 10 {
+		return
+	}
+
+	type gridPt struct {
+		x, y, f float64
+	}
+	gridPts := make([]gridPt, 0, jayaGridSide*jayaGridSide)
+	for gx := 0; gx < jayaGridSide; gx++ {
+		for gy := 0; gy < jayaGridSide; gy++ {
+			x := margin + usableW*(float64(gx)+0.5)/float64(jayaGridSide)
+			y := margin + usableH*(float64(gy)+0.5)/float64(jayaGridSide)
+			// Small jitter
+			x += (ss.Rng.Float64()*2.0 - 1.0) * usableW * 0.02
+			y += (ss.Rng.Float64()*2.0 - 1.0) * usableH * 0.02
+			x = math.Max(margin, math.Min(ss.ArenaW-margin, x))
+			y = math.Max(margin, math.Min(ss.ArenaH-margin, y))
+			f := distanceFitnessPt(ss, x, y)
+			gridPts = append(gridPts, gridPt{x, y, f})
+
+			// Update global best from grid scan
+			if f > st.GlobalBestF {
+				st.GlobalBestF = f
+				st.GlobalBestX = x
+				st.GlobalBestY = y
+			}
+		}
+	}
+
+	// Sort grid points by fitness (best first) — simple selection of top N
+	n := len(ss.Bots)
+	injCount := jayaGridInject
+	if injCount > n/2 {
+		injCount = n / 2
+	}
+	if injCount < 1 {
+		injCount = 1
+	}
+
+	// Find the top injCount grid points
+	for k := 0; k < injCount; k++ {
+		bestGIdx := k
+		for j := k + 1; j < len(gridPts); j++ {
+			if gridPts[j].f > gridPts[bestGIdx].f {
+				bestGIdx = j
+			}
+		}
+		gridPts[k], gridPts[bestGIdx] = gridPts[bestGIdx], gridPts[k]
+	}
+
+	// Find the worst bots and teleport them to the best grid positions
+	worstBots := make([]int, 0, injCount)
+	used := make(map[int]bool)
+	for k := 0; k < injCount; k++ {
+		worstIdx := -1
+		worstFit := 1e18
+		for i := 0; i < n; i++ {
+			if !used[i] && i != st.GlobalBestIdx && st.Fitness[i] < worstFit {
+				worstFit = st.Fitness[i]
+				worstIdx = i
+			}
+		}
+		if worstIdx >= 0 {
+			worstBots = append(worstBots, worstIdx)
+			used[worstIdx] = true
+		}
+	}
+
+	for k, bi := range worstBots {
+		if k < len(gridPts) {
+			ss.Bots[bi].X = gridPts[k].x
+			ss.Bots[bi].Y = gridPts[k].y
+			st.Fitness[bi] = gridPts[k].f
+			st.PersonalBestX[bi] = gridPts[k].x
+			st.PersonalBestY[bi] = gridPts[k].y
+			st.PersonalBestF[bi] = gridPts[k].f
 		}
 	}
 }
@@ -168,11 +285,17 @@ func ApplyJaya(bot *SwarmBot, ss *SwarmState, idx int) {
 		return
 	}
 
-	// Best bot does small random walk
-	if idx == st.BestIdx {
-		rx := bot.X + (ss.Rng.Float64()-0.5)*10
-		ry := bot.Y + (ss.Rng.Float64()-0.5)*10
-		algoMovBot(bot, rx, ry, ss.ArenaW, ss.ArenaH, 1.0)
+	// Determine global best position to use
+	gbx, gby := st.GlobalBestX, st.GlobalBestY
+	if st.GlobalBestIdx < 0 {
+		gbx, gby = st.BestX, st.BestY
+	}
+
+	// Best bot does random walk to explore local neighborhood
+	if idx == st.BestIdx || idx == st.GlobalBestIdx {
+		rx := gbx + (ss.Rng.Float64()-0.5)*2*jayaBestWalkRadius
+		ry := gby + (ss.Rng.Float64()-0.5)*2*jayaBestWalkRadius
+		algoMovBot(bot, rx, ry, ss.ArenaW, ss.ArenaH, jayaSpeedMult)
 		bot.LEDColor = [3]uint8{255, 215, 0} // gold for best
 		return
 	}
@@ -193,8 +316,17 @@ func ApplyJaya(bot *SwarmBot, ss *SwarmState, idx int) {
 	targetX := bot.X + r1*(st.BestX-absX) - r2*(st.WorstX-absX)
 	targetY := bot.Y + r1*(st.BestY-absY) - r2*(st.WorstY-absY)
 
-	// Move directly toward target (eigenbewegung)
-	algoMovBot(bot, targetX, targetY, ss.ArenaW, ss.ArenaH, 3.0)
+	// Adaptive global-best attraction: increases over time
+	progress := float64(st.Tick) / float64(jayaMaxTicks)
+	if progress > 1 {
+		progress = 1
+	}
+	gbWeight := jayaGBWeightMin + (jayaGBWeightMax-jayaGBWeightMin)*progress
+	targetX = targetX*(1-gbWeight) + gbx*gbWeight
+	targetY = targetY*(1-gbWeight) + gby*gbWeight
+
+	// Move directly toward target
+	algoMovBot(bot, targetX, targetY, ss.ArenaW, ss.ArenaH, jayaSpeedMult)
 
 	// LED color: brightness proportional to fitness
 	intensity := uint8(80 + st.Fitness[idx]*175)

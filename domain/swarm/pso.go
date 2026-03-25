@@ -1,6 +1,9 @@
 package swarm
 
-import "math"
+import (
+	"math"
+	"sort"
+)
 
 // Particle Swarm Optimization (PSO): Bots act as particles searching for
 // an optimum on a fitness landscape. Each bot remembers its personal best
@@ -11,8 +14,12 @@ const (
 	psoInertia    = 0.7   // velocity damping (momentum)
 	psoCognitive  = 1.5   // attraction toward personal best
 	psoSocial     = 2.0   // attraction toward global best
-	psoMaxVel     = 3.0   // max velocity component
-	psoUpdateRate = 5     // ticks between fitness evaluations
+	psoMaxVel     = 7.5   // max velocity component (was 3.0)
+	psoUpdateRate = 1     // ticks between fitness evaluations (was 5)
+
+	psoGridRescanRate = 400 // periodic grid rescan every N ticks
+	psoGridRescanSize = 14  // grid resolution for periodic rescan (14×14 = 196 samples)
+	psoGridInjectTop  = 10  // number of top grid points to inject into worst particles
 )
 
 // PSOState holds per-bot PSO optimization state.
@@ -110,14 +117,21 @@ func TickPSO(ss *SwarmState) {
 		return
 	}
 	st := ss.PSO
+	n := len(ss.Bots)
 
 	// Grow slices if bots added
-	for len(st.VelX) < len(ss.Bots) {
+	for len(st.VelX) < n {
 		st.VelX = append(st.VelX, 0)
 		st.VelY = append(st.VelY, 0)
 		st.BestX = append(st.BestX, ss.Bots[len(st.BestX)].X)
 		st.BestY = append(st.BestY, ss.Bots[len(st.BestY)].Y)
 		st.BestFit = append(st.BestFit, 0)
+	}
+
+	// Periodic grid rescan: systematically sample the arena to find the
+	// global optimum on deceptive landscapes like Schwefel.
+	if ss.Tick > 0 && ss.Tick%psoGridRescanRate == 0 && n > 0 {
+		psoGridRescan(ss, st)
 	}
 
 	evaluate := ss.Tick%psoUpdateRate == 0
@@ -170,6 +184,78 @@ func TickPSO(ss *SwarmState) {
 		dx := st.GlobalX - bot.X
 		dy := st.GlobalY - bot.Y
 		bot.PSOGlobalDist = int(math.Min(9999, math.Sqrt(dx*dx+dy*dy)))
+	}
+}
+
+// psoGridRescan evaluates a grid of points across the arena and teleports
+// the worst particles to the best-discovered grid positions. This is
+// critical for Schwefel where the global optimum is far from local optima.
+func psoGridRescan(ss *SwarmState, st *PSOState) {
+	margin := 10.0
+	usableW := ss.ArenaW - 2*margin
+	usableH := ss.ArenaH - 2*margin
+	n := len(ss.Bots)
+
+	type gridPt struct {
+		x, y, f float64
+	}
+	gridPts := make([]gridPt, 0, psoGridRescanSize*psoGridRescanSize)
+	for gx := 0; gx < psoGridRescanSize; gx++ {
+		for gy := 0; gy < psoGridRescanSize; gy++ {
+			x := margin + usableW*(float64(gx)+0.5)/float64(psoGridRescanSize)
+			y := margin + usableH*(float64(gy)+0.5)/float64(psoGridRescanSize)
+			// Small jitter
+			x += (ss.Rng.Float64()*2.0 - 1.0) * usableW * 0.02
+			y += (ss.Rng.Float64()*2.0 - 1.0) * usableH * 0.02
+			f := distanceFitnessPt(ss, x, y)
+			gridPts = append(gridPts, gridPt{x, y, f})
+			// Update global best from grid
+			if f > st.GlobalFit {
+				st.GlobalFit = f
+				st.GlobalX = x
+				st.GlobalY = y
+			}
+		}
+	}
+
+	// Sort grid points by fitness descending
+	sort.Slice(gridPts, func(i, j int) bool { return gridPts[i].f > gridPts[j].f })
+
+	// Find worst particles by personal best fitness
+	type idxFit struct {
+		idx int
+		fit float64
+	}
+	worst := make([]idxFit, n)
+	for i := 0; i < n; i++ {
+		worst[i] = idxFit{i, st.BestFit[i]}
+	}
+	sort.Slice(worst, func(i, j int) bool { return worst[i].fit < worst[j].fit })
+
+	// Inject top grid points into worst particles
+	injectCount := psoGridInjectTop
+	if injectCount > n {
+		injectCount = n
+	}
+	if injectCount > len(gridPts) {
+		injectCount = len(gridPts)
+	}
+	for k := 0; k < injectCount; k++ {
+		bi := worst[k].idx
+		gp := gridPts[k]
+		jx := (ss.Rng.Float64()*2 - 1) * 5
+		jy := (ss.Rng.Float64()*2 - 1) * 5
+		ss.Bots[bi].X = gp.x + jx
+		ss.Bots[bi].Y = gp.y + jy
+		// Reset velocity
+		st.VelX[bi] = 0
+		st.VelY[bi] = 0
+		// Update personal best if grid position is better
+		if gp.f > st.BestFit[bi] {
+			st.BestFit[bi] = gp.f
+			st.BestX[bi] = gp.x
+			st.BestY[bi] = gp.y
+		}
 	}
 }
 
