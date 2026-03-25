@@ -27,13 +27,14 @@ const (
 	bfoProbeDistStart = 40.0  // gradient probe distance at start (exploration)
 	bfoProbeDistEnd   = 8.0   // gradient probe distance at end (exploitation)
 	bfoGBestWStart    = 0.05  // global-best attraction weight at start
-	bfoGBestWEnd      = 0.60  // global-best attraction weight at end
+	bfoGBestWEnd      = 0.75  // global-best attraction weight at end
 	bfoSpeedMult      = 5.0   // movement speed multiplier (5x = 7.5 px/tick)
-	bfoGridRescanRate = 300   // periodic grid rescan every N ticks
-	bfoGridRescanSide = 14    // grid resolution (14x14 = 196 samples)
+	bfoGridRescanRate = 150   // periodic grid rescan every N ticks
+	bfoGridRescanSide = 18    // grid resolution (18x18 = 324 samples)
 	bfoGridInjectTop  = 10    // best grid positions to inject
-	bfoDtbStartProg   = 0.3   // direct-to-best starts at this progress
-	bfoDtbMaxProb     = 0.50  // max probability of direct-to-best
+	bfoDtbStartProg   = 0.15  // direct-to-best starts at this progress
+	bfoDtbMaxProb     = 0.75  // max probability of direct-to-best
+	bfoLocalWalkR     = 40.0  // best-bot local random walk radius
 )
 
 // BFOState holds Bacterial Foraging Optimization state.
@@ -220,6 +221,33 @@ func TickBFO(ss *SwarmState) {
 		st.TargetX[i] = tx
 		st.TargetY[i] = ty
 		st.PrevFit[i] = fit
+	}
+
+	// Best-bot local random walk around GlobalBest for fine-grained exploitation
+	if st.BestIdx >= 0 && st.BestIdx < len(ss.Bots) {
+		bi := st.BestIdx
+		wx := st.BestX + (ss.Rng.Float64()-0.5)*2*bfoLocalWalkR
+		wy := st.BestY + (ss.Rng.Float64()-0.5)*2*bfoLocalWalkR
+		if wx < 0 {
+			wx = 0
+		}
+		if wx > ss.ArenaW {
+			wx = ss.ArenaW
+		}
+		if wy < 0 {
+			wy = 0
+		}
+		if wy > ss.ArenaH {
+			wy = ss.ArenaH
+		}
+		wf := distanceFitnessPt(ss, wx, wy)
+		if wf > st.BestF {
+			st.BestF = wf
+			st.BestX = wx
+			st.BestY = wy
+		}
+		st.TargetX[bi] = wx
+		st.TargetY[bi] = wy
 	}
 
 	// Periodic grid rescan: systematically sample the landscape to find

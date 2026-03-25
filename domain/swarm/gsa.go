@@ -25,6 +25,11 @@ const (
 	gsaSteerRate   = 0.30   // max steering change per tick (radians)
 	gsaEps         = 1.0    // softening constant to avoid division by zero
 	gsaMaxAccel    = 3.0    // acceleration clamp
+	gsaSpeedMult   = 5.0    // movement speed multiplier (5.0 * 1.5 = 7.5 px/tick)
+	gsaGridRescanRate = 300  // periodic grid rescan every N ticks
+	gsaGridRescanSize = 14   // grid resolution (14×14 = 196 samples)
+	gsaGridInjectTop  = 10   // best grid positions to inject per rescan
+	gsaDirectProb     = 0.55 // max direct-to-best probability in late phase
 )
 
 // GSAState holds Gravitational Search Algorithm state for the swarm.
@@ -44,6 +49,9 @@ type GSAState struct {
 	GlobalBestY float64
 	sortBuf     []float64 // reusable buffer for K-best partial sort (avoids per-tick allocation)
 	kBest       []bool    // reusable boolean mask for K-best agents
+	IsDirect    []bool    // per-bot flag: true if doing direct-to-best this tick
+	TargetX     []float64 // per-bot target X for algoMovBot
+	TargetY     []float64 // per-bot target Y for algoMovBot
 }
 
 // InitGSA allocates Gravitational Search Algorithm state.
@@ -56,6 +64,9 @@ func InitGSA(ss *SwarmState) {
 		AccY:        make([]float64, n),
 		G:           gsaG0,
 		GlobalBestF: -1e18,
+		IsDirect:    make([]bool, n),
+		TargetX:     make([]float64, n),
+		TargetY:     make([]float64, n),
 	}
 	ss.GSAOn = true
 }
@@ -91,6 +102,9 @@ func TickGSA(ss *SwarmState) {
 		st.Fitness = append(st.Fitness, 0)
 		st.AccX = append(st.AccX, 0)
 		st.AccY = append(st.AccY, 0)
+		st.IsDirect = append(st.IsDirect, false)
+		st.TargetX = append(st.TargetX, 0)
+		st.TargetY = append(st.TargetY, 0)
 	}
 	// Grow reusable buffers
 	if cap(st.sortBuf) < n {
@@ -239,6 +253,72 @@ func TickGSA(ss *SwarmState) {
 		}
 	}
 
+	// Periodic grid rescan: systematically sample the arena to find the
+	// global optimum on deceptive landscapes like Schwefel.
+	if st.Tick > 0 && st.Tick%gsaGridRescanRate == 0 && n > 0 {
+		gsaGridRescan(ss, st)
+	}
+
+	// Compute per-bot targets: either direct-to-best or gravity-based movement
+	progress := float64(st.Tick) / float64(gsaMaxTicks)
+	for i := range ss.Bots {
+		st.IsDirect[i] = false
+
+		// Direct-to-best: ab progress > 0.3, steigend bis gsaDirectProb
+		if progress > 0.3 && st.GlobalBestF > -1e17 {
+			directP := gsaDirectProb * (progress - 0.3) / 0.7
+			if ss.Rng.Float64() < directP {
+				st.IsDirect[i] = true
+				jitter := 7.5
+				st.TargetX[i] = st.GlobalBestX + (ss.Rng.Float64()*2-1)*jitter
+				st.TargetY[i] = st.GlobalBestY + (ss.Rng.Float64()*2-1)*jitter
+				// Evaluate the direct target and update GlobalBest if better
+				f := distanceFitnessPt(ss, st.TargetX[i], st.TargetY[i])
+				if f > st.GlobalBestF {
+					st.GlobalBestF = f
+					st.GlobalBestX = st.TargetX[i]
+					st.GlobalBestY = st.TargetY[i]
+				}
+				continue
+			}
+		}
+
+		// Gravity-based target: acceleration direction + global-best attraction
+		ax, ay := st.AccX[i], st.AccY[i]
+		accMag := math.Sqrt(ax*ax + ay*ay)
+
+		// Base target from acceleration
+		tx, ty := ss.Bots[i].X, ss.Bots[i].Y
+		if accMag > 1e-10 {
+			step := SwarmBotSpeed * gsaSpeedMult
+			tx += ax / accMag * step
+			ty += ay / accMag * step
+		} else {
+			// Random walk if no acceleration
+			tx += (ss.Rng.Float64()*2 - 1) * SwarmBotSpeed * gsaSpeedMult
+			ty += (ss.Rng.Float64()*2 - 1) * SwarmBotSpeed * gsaSpeedMult
+		}
+
+		// Global-best attraction: weight increases from 5% to 55% over time
+		gbWeight := 0.05 + 0.50*progress
+		if st.GlobalBestF > -1e17 {
+			tx = tx*(1-gbWeight) + st.GlobalBestX*gbWeight
+			ty = ty*(1-gbWeight) + st.GlobalBestY*gbWeight
+		}
+
+		st.TargetX[i] = tx
+		st.TargetY[i] = ty
+	}
+
+	// Best-bot local random walk around GlobalBest
+	if st.GlobalBestF > -1e17 && n > 0 {
+		bi := st.BestIdx
+		radius := 40.0
+		st.TargetX[bi] = st.GlobalBestX + (ss.Rng.Float64()*2-1)*radius
+		st.TargetY[bi] = st.GlobalBestY + (ss.Rng.Float64()*2-1)*radius
+		st.IsDirect[bi] = false
+	}
+
 	// Update sensor cache
 	for i := range ss.Bots {
 		ss.Bots[i].GSAMass = int(st.Mass[i] * 1000) // mass * 1000 for integer sensor
@@ -267,8 +347,100 @@ func gsaMovBot(bot *SwarmBot, dx, dy, arenaW, arenaH float64) {
 	bot.Speed = 0
 }
 
-// ApplyGSA moves a bot according to gravitational acceleration with direct
-// position updates. Adds adaptive global-best attraction for convergence.
+// gsaGridRescan evaluates a grid of points across the arena and teleports
+// the worst agents to the best-discovered grid positions. Critical for
+// deceptive landscapes like Schwefel where the global optimum is far
+// from local optima.
+func gsaGridRescan(ss *SwarmState, st *GSAState) {
+	margin := 10.0
+	usableW := ss.ArenaW - 2*margin
+	usableH := ss.ArenaH - 2*margin
+	n := len(ss.Bots)
+
+	type gridPt struct {
+		x, y, f float64
+	}
+	gridPts := make([]gridPt, 0, gsaGridRescanSize*gsaGridRescanSize)
+	for gx := 0; gx < gsaGridRescanSize; gx++ {
+		for gy := 0; gy < gsaGridRescanSize; gy++ {
+			x := margin + usableW*(float64(gx)+0.5)/float64(gsaGridRescanSize)
+			y := margin + usableH*(float64(gy)+0.5)/float64(gsaGridRescanSize)
+			// Small jitter
+			x += (ss.Rng.Float64()*2.0 - 1.0) * usableW * 0.02
+			y += (ss.Rng.Float64()*2.0 - 1.0) * usableH * 0.02
+			f := distanceFitnessPt(ss, x, y)
+			gridPts = append(gridPts, gridPt{x, y, f})
+		}
+	}
+
+	// Sort grid points by fitness descending
+	for i := 0; i < len(gridPts)-1; i++ {
+		for j := i + 1; j < len(gridPts); j++ {
+			if gridPts[j].f > gridPts[i].f {
+				gridPts[i], gridPts[j] = gridPts[j], gridPts[i]
+			}
+		}
+	}
+
+	// Update GlobalBest from grid findings
+	if len(gridPts) > 0 && gridPts[0].f > st.GlobalBestF {
+		st.GlobalBestF = gridPts[0].f
+		st.GlobalBestX = gridPts[0].x
+		st.GlobalBestY = gridPts[0].y
+	}
+
+	// Find worst agents by fitness
+	type idxFit struct {
+		idx int
+		f   float64
+	}
+	agents := make([]idxFit, n)
+	for i := range ss.Bots {
+		agents[i] = idxFit{i, st.Fitness[i]}
+	}
+	// Sort ascending by fitness (worst first)
+	for i := 0; i < len(agents)-1; i++ {
+		for j := i + 1; j < len(agents); j++ {
+			if agents[j].f < agents[i].f {
+				agents[i], agents[j] = agents[j], agents[i]
+			}
+		}
+	}
+
+	// Teleport worst agents to best grid points
+	inject := gsaGridInjectTop
+	if inject > len(gridPts) {
+		inject = len(gridPts)
+	}
+	if inject > n {
+		inject = n
+	}
+	for i := 0; i < inject; i++ {
+		bi := agents[i].idx
+		jitter := 5.0
+		ss.Bots[bi].X = gridPts[i].x + (ss.Rng.Float64()*2-1)*jitter
+		ss.Bots[bi].Y = gridPts[i].y + (ss.Rng.Float64()*2-1)*jitter
+		// Clamp to arena
+		if ss.Bots[bi].X < SwarmBotRadius {
+			ss.Bots[bi].X = SwarmBotRadius
+		}
+		if ss.Bots[bi].X > ss.ArenaW-SwarmBotRadius {
+			ss.Bots[bi].X = ss.ArenaW - SwarmBotRadius
+		}
+		if ss.Bots[bi].Y < SwarmBotRadius {
+			ss.Bots[bi].Y = SwarmBotRadius
+		}
+		if ss.Bots[bi].Y > ss.ArenaH-SwarmBotRadius {
+			ss.Bots[bi].Y = ss.ArenaH - SwarmBotRadius
+		}
+		// Reset acceleration for teleported agents
+		st.AccX[bi] = 0
+		st.AccY[bi] = 0
+	}
+}
+
+// ApplyGSA moves a bot toward its computed target via algoMovBot with 5x speed.
+// Targets are computed in TickGSA: either direct-to-best or gravity+attraction.
 func ApplyGSA(bot *SwarmBot, ss *SwarmState, idx int) {
 	if ss.GSA == nil || idx >= len(ss.GSA.AccX) {
 		bot.Speed = SwarmBotSpeed
@@ -276,38 +448,8 @@ func ApplyGSA(bot *SwarmBot, ss *SwarmState, idx int) {
 	}
 	st := ss.GSA
 
-	ax, ay := st.AccX[idx], st.AccY[idx]
-
-	// Compute movement from gravitational acceleration
-	accMag := math.Sqrt(ax*ax + ay*ay)
-	moveSpeed := SwarmBotSpeed * (0.5 + math.Min(accMag, 2.0)/2.0)
-	dx, dy := 0.0, 0.0
-	if accMag > 1e-10 {
-		dx = ax / accMag * moveSpeed
-		dy = ay / accMag * moveSpeed
-	}
-
-	// Adaptive global-best attraction: weight increases from 5% to 20% over time
-	progress := float64(st.Tick) / float64(gsaMaxTicks)
-	gbWeight := 0.05 + 0.15*progress
-	if st.GlobalBestF > -1e17 {
-		gbDx := st.GlobalBestX - bot.X
-		gbDy := st.GlobalBestY - bot.Y
-		gbDist := math.Sqrt(gbDx*gbDx + gbDy*gbDy)
-		if gbDist > 1.0 {
-			gbStep := SwarmBotSpeed * gbWeight
-			dx += gbDx / gbDist * gbStep
-			dy += gbDy / gbDist * gbStep
-		}
-	}
-
-	// Update angle for visual consistency
-	if dx != 0 || dy != 0 {
-		bot.Angle = math.Atan2(dy, dx)
-	}
-
-	// Direct position update
-	gsaMovBot(bot, dx, dy, ss.ArenaW, ss.ArenaH)
+	// Move toward pre-computed target
+	algoMovBot(bot, st.TargetX[idx], st.TargetY[idx], ss.ArenaW, ss.ArenaH, gsaSpeedMult)
 
 	// LED: mass as color intensity (heavy = bright red, light = dim blue)
 	mass01 := st.Mass[idx] * float64(len(ss.Bots)) // denormalise
@@ -316,9 +458,11 @@ func ApplyGSA(bot *SwarmBot, ss *SwarmState, idx int) {
 	}
 	r := uint8(mass01 * 255)
 	b := uint8((1 - mass01) * 180)
-	// Best agent gets gold
+	// Best agent gets gold, direct-to-best gets green
 	if idx == st.BestIdx {
 		bot.LEDColor = [3]uint8{255, 215, 0}
+	} else if st.IsDirect[idx] {
+		bot.LEDColor = [3]uint8{0, 200, 80}
 	} else {
 		bot.LEDColor = [3]uint8{r, 40, b}
 	}

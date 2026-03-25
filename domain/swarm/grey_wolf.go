@@ -29,11 +29,11 @@ const (
 	gwoEncircleWt      = 0.6   // weight for encircling behavior
 	gwoCohesionWt      = 0.3   // weight for pack cohesion
 	gwoMinNeighbors    = 3     // minimum neighbors to form a pack
-	gwoRestartInterval = 60    // ticks of stagnation before cataclysmic restart
+	gwoRestartInterval = 40    // ticks of stagnation before cataclysmic restart
 	gwoRestartFrac     = 0.5   // fraction of omega wolves to teleport on restart
 	gwoGridSize        = 12    // grid sampling resolution per axis (12×12 = 144 samples)
-	gwoGridRescanRate    = 250   // periodic grid rescan every N ticks
-	gwoGridRescanSize    = 14    // grid resolution for periodic rescan (14×14 = 196 samples)
+	gwoGridRescanRate    = 150   // periodic grid rescan every N ticks
+	gwoGridRescanSize    = 18    // grid resolution for periodic rescan (18×18 = 324 samples)
 	gwoGridInjectTop     = 10    // number of top grid points to inject into wolf positions
 	gwoLocalWalkRadius   = 40.0  // alpha local random walk radius
 	gwoDirectToBestStart = 0.3   // progress threshold to start Direct-to-Best
@@ -84,6 +84,39 @@ func InitGWO(ss *SwarmState) {
 			ss.GWO.GlobalBestIdx = i
 		}
 	}
+
+	// Initial grid scan: systematically sample the landscape to seed GlobalBest.
+	// Only updates GlobalBest if the grid finds a significantly better point
+	// than what wolves found, indicating a deceptive landscape (e.g. Schwefel).
+	// For non-deceptive landscapes, wolves' initial positions are sufficient.
+	{
+		aw := float64(ss.ArenaW)
+		ah := float64(ss.ArenaH)
+		const initGridSize = 25 // 25×25 = 625 samples
+		gridBestF := -1e18
+		gridBestX, gridBestY := 0.0, 0.0
+		for gx := 0; gx < initGridSize; gx++ {
+			for gy := 0; gy < initGridSize; gy++ {
+				px := (float64(gx) + 0.5) * aw / float64(initGridSize)
+				py := (float64(gy) + 0.5) * ah / float64(initGridSize)
+				f := distanceFitnessPt(ss, px, py)
+				if f > gridBestF {
+					gridBestF = f
+					gridBestX = px
+					gridBestY = py
+				}
+			}
+		}
+		// Only adopt grid result if it's meaningfully better (>5 fitness points)
+		// than what wolves found — this avoids premature convergence on
+		// non-deceptive landscapes while catching deceptive ones like Schwefel.
+		if gridBestF > ss.GWO.GlobalBestF+5.0 {
+			ss.GWO.GlobalBestF = gridBestF
+			ss.GWO.GlobalBestX = gridBestX
+			ss.GWO.GlobalBestY = gridBestY
+		}
+	}
+
 	ss.GWOOn = true
 }
 
@@ -179,11 +212,17 @@ func TickGWO(ss *SwarmState) {
 
 		for k := 0; k < numRestart; k++ {
 			idx := omegas[k]
-			if gridFound && k < numRestart/2 {
+			if gridFound && k < numRestart/3 {
 				// Teleport near the best grid point with some spread
 				spread := 40.0 + ss.Rng.Float64()*60.0
 				ss.Bots[idx].X = bestGridX + (ss.Rng.Float64()-0.5)*spread
 				ss.Bots[idx].Y = bestGridY + (ss.Rng.Float64()-0.5)*spread
+			} else if k < numRestart/3 {
+				// No grid improvement found: teleport near GlobalBest
+				// (which may come from init grid scan) with moderate spread
+				spread := 30.0 + ss.Rng.Float64()*50.0
+				ss.Bots[idx].X = st.GlobalBestX + (ss.Rng.Float64()-0.5)*spread
+				ss.Bots[idx].Y = st.GlobalBestY + (ss.Rng.Float64()-0.5)*spread
 			} else {
 				// Random teleport for diversity
 				ss.Bots[idx].X = ss.Rng.Float64() * aw

@@ -25,14 +25,17 @@ import "math"
 //	Technical Report TR06, Erciyes University.
 
 const (
-	abcSteerRate     = 0.14  // max steering change per tick (radians)
-	abcAbandonLimit  = 60    // ticks without improvement before source is abandoned
-	abcLocalStep     = 40.0  // local search perturbation radius
-	abcScoutSpeed    = 1.5   // speed multiplier for scouting bees
-	abcOnlookerRatio = 0.5   // fraction of colony acting as onlookers
-	abcSpeedMult     = 5.0   // movement speed multiplier (7.5 px/tick)
-	abcMaxTicks      = 3000  // optimization cycle length (matches benchmark)
-	abcArrivalDist   = 5.0   // distance threshold for arrival at target
+	abcSteerRate        = 0.14  // max steering change per tick (radians)
+	abcAbandonLimit     = 60    // ticks without improvement before source is abandoned
+	abcLocalStep        = 40.0  // local search perturbation radius
+	abcScoutSpeed       = 1.5   // speed multiplier for scouting bees
+	abcOnlookerRatio    = 0.5   // fraction of colony acting as onlookers
+	abcSpeedMult        = 5.0   // movement speed multiplier (7.5 px/tick)
+	abcMaxTicks         = 3000  // optimization cycle length (matches benchmark)
+	abcArrivalDist      = 5.0   // distance threshold for arrival at target
+	abcGridRescanRate   = 200   // periodic grid rescan every N ticks
+	abcGridSize         = 16    // grid side for rescan (16x16 = 256 points)
+	abcGridInjectTop    = 5     // teleport worst N bees to best grid points
 )
 
 // ABCState holds Artificial Bee Colony state for the swarm.
@@ -56,6 +59,11 @@ type ABCState struct {
 	GlobalBestY   float64
 	GlobalBestIdx int
 
+	// Target-based movement arrays (computed in TickABC, applied in ApplyABC).
+	TargetX  []float64
+	TargetY  []float64
+	IsDirect []bool // true if bot is using direct-to-best this tick
+
 	Tick int // current tick counter
 }
 
@@ -70,6 +78,9 @@ func InitABC(ss *SwarmState) {
 		TrialY:        make([]float64, n),
 		Stale:         make([]int, n),
 		Role:          make([]int, n),
+		TargetX:       make([]float64, n),
+		TargetY:       make([]float64, n),
+		IsDirect:      make([]bool, n),
 		BestF:         -1e9,
 		BestIdx:       -1,
 		GlobalBestF:   -1e9,
@@ -136,6 +147,9 @@ func TickABC(ss *SwarmState) {
 		st.TrialY = append(st.TrialY, 0)
 		st.Stale = append(st.Stale, 0)
 		st.Role = append(st.Role, 0)
+		st.TargetX = append(st.TargetX, 0)
+		st.TargetY = append(st.TargetY, 0)
+		st.IsDirect = append(st.IsDirect, false)
 	}
 
 	// Re-evaluate fitness for all bees.
@@ -143,110 +157,19 @@ func TickABC(ss *SwarmState) {
 		st.Fitness[i] = abcFitness(&ss.Bots[i], ss)
 	}
 
-	// Adaptive Global-Best attraction weight: 5% → 30% over abcMaxTicks.
+	// Adaptive Global-Best attraction weight: 5% → 35% over abcMaxTicks.
 	progress := float64(st.Tick) / float64(abcMaxTicks)
 	if progress > 1 {
 		progress = 1
 	}
-	gbWeight := 0.05 + 0.25*progress
+	gbWeight := 0.05 + 0.30*progress
 
-	// ── Phase 1: Employed bees — local search ──
-	for i := 0; i < n; i++ {
-		if st.Role[i] != 0 { // only employed bees
-			continue
-		}
-		// Pick a random partner k ≠ i.
-		k := i
-		for k == i {
-			k = ss.Rng.Intn(n)
-		}
-
-		// Generate neighbor: x_new = x_i + phi * (x_i - x_k)
-		phi := (ss.Rng.Float64()*2.0 - 1.0) // phi ∈ [-1, 1]
-		tx := ss.Bots[i].X + phi*(ss.Bots[i].X-ss.Bots[k].X)
-		ty := ss.Bots[i].Y + phi*(ss.Bots[i].Y-ss.Bots[k].Y)
-
-		// Shift toward GlobalBest.
-		if st.GlobalBestIdx >= 0 {
-			tx += gbWeight * (st.GlobalBestX - tx)
-			ty += gbWeight * (st.GlobalBestY - ty)
-		}
-
-		// Clamp to arena.
-		tx = math.Max(SwarmEdgeMargin, math.Min(ss.ArenaW-SwarmEdgeMargin, tx))
-		ty = math.Max(SwarmEdgeMargin, math.Min(ss.ArenaH-SwarmEdgeMargin, ty))
-
-		st.TrialX[i] = tx
-		st.TrialY[i] = ty
-	}
-
-	// ── Phase 2: Onlooker bees — probabilistic selection ──
-	// Build roulette wheel from employed fitness values.
-	totalFit := 0.0
-	for i := 0; i < n; i++ {
-		if st.Role[i] == 0 {
-			// Shift fitness to be positive for roulette selection.
-			f := st.Fitness[i] + 100.0
-			if f < 0.01 {
-				f = 0.01
-			}
-			totalFit += f
-		}
-	}
-
-	for i := 0; i < n; i++ {
-		if st.Role[i] != 1 { // only onlooker bees
-			continue
-		}
-
-		// Roulette-wheel selection: pick an employed bee's source.
-		spin := ss.Rng.Float64() * totalFit
-		cumul := 0.0
-		selected := 0
-		for j := 0; j < n; j++ {
-			if st.Role[j] != 0 {
-				continue
-			}
-			f := st.Fitness[j] + 100.0
-			if f < 0.01 {
-				f = 0.01
-			}
-			cumul += f
-			if cumul >= spin {
-				selected = j
-				break
-			}
-		}
-
-		// Perform local search around the selected source.
-		phi := (ss.Rng.Float64()*2.0 - 1.0)
-		k := i
-		for k == i {
-			k = ss.Rng.Intn(n)
-		}
-		tx := ss.Bots[selected].X + phi*(ss.Bots[selected].X-ss.Bots[k].X)
-		ty := ss.Bots[selected].Y + phi*(ss.Bots[selected].Y-ss.Bots[k].Y)
-
-		// Shift toward GlobalBest.
-		if st.GlobalBestIdx >= 0 {
-			tx += gbWeight * (st.GlobalBestX - tx)
-			ty += gbWeight * (st.GlobalBestY - ty)
-		}
-
-		tx = math.Max(SwarmEdgeMargin, math.Min(ss.ArenaW-SwarmEdgeMargin, tx))
-		ty = math.Max(SwarmEdgeMargin, math.Min(ss.ArenaH-SwarmEdgeMargin, ty))
-
-		st.TrialX[i] = tx
-		st.TrialY[i] = ty
-	}
-
-	// ── Phase 3: Scout bees — abandon exhausted sources ──
+	// ── Phase 3 (early): Scout bees — abandon exhausted sources ──
 	for i := 0; i < n; i++ {
 		if st.Role[i] == 0 {
 			st.Stale[i]++
 		}
 		if st.Stale[i] >= abcAbandonLimit {
-			// Abandon source: random new position.
 			st.Role[i] = 2 // scout
 			st.Stale[i] = 0
 			margin := SwarmEdgeMargin
@@ -270,6 +193,137 @@ func TickABC(ss *SwarmState) {
 			st.GlobalBestX = ss.Bots[i].X
 			st.GlobalBestY = ss.Bots[i].Y
 		}
+	}
+
+	// ── Periodic Grid-Rescan: systematically sample the arena ──
+	if st.Tick > 0 && st.Tick%abcGridRescanRate == 0 && n > 0 {
+		abcGridRescan(ss, st)
+	}
+
+	// ── Compute targets for all bees ──
+	for i := 0; i < n; i++ {
+		st.IsDirect[i] = false
+
+		// Direct-to-Best: after progress > 0.4, increasing probability (0→45%)
+		if progress > 0.4 && st.GlobalBestF > -1e8 && i != st.GlobalBestIdx {
+			directProb := 0.45 * (progress - 0.4) / 0.6
+			if ss.Rng.Float64() < directProb {
+				jitter := 7.5
+				tx := st.GlobalBestX + (ss.Rng.Float64()*2-1)*jitter
+				ty := st.GlobalBestY + (ss.Rng.Float64()*2-1)*jitter
+				tx = math.Max(SwarmEdgeMargin, math.Min(ss.ArenaW-SwarmEdgeMargin, tx))
+				ty = math.Max(SwarmEdgeMargin, math.Min(ss.ArenaH-SwarmEdgeMargin, ty))
+				// Evaluate the direct-to-best point
+				f := distanceFitnessPt(ss, tx, ty)
+				if f > st.GlobalBestF {
+					st.GlobalBestF = f
+					st.GlobalBestX = tx
+					st.GlobalBestY = ty
+				}
+				st.TargetX[i] = tx
+				st.TargetY[i] = ty
+				st.IsDirect[i] = true
+				continue
+			}
+		}
+
+		// Best bot: local random walk around GlobalBest
+		if i == st.GlobalBestIdx && st.GlobalBestF > -1e8 {
+			walkR := 40.0
+			tx := st.GlobalBestX + (ss.Rng.Float64()*2-1)*walkR
+			ty := st.GlobalBestY + (ss.Rng.Float64()*2-1)*walkR
+			tx = math.Max(SwarmEdgeMargin, math.Min(ss.ArenaW-SwarmEdgeMargin, tx))
+			ty = math.Max(SwarmEdgeMargin, math.Min(ss.ArenaH-SwarmEdgeMargin, ty))
+			f := distanceFitnessPt(ss, tx, ty)
+			if f > st.GlobalBestF {
+				st.GlobalBestF = f
+				st.GlobalBestX = tx
+				st.GlobalBestY = ty
+			}
+			st.TargetX[i] = tx
+			st.TargetY[i] = ty
+			continue
+		}
+
+		// Scout bees: move to random position
+		if st.Role[i] == 2 {
+			st.TargetX[i] = st.TrialX[i]
+			st.TargetY[i] = st.TrialY[i]
+			continue
+		}
+
+		// ── Employed bees: local search ──
+		if st.Role[i] == 0 {
+			k := i
+			for k == i {
+				k = ss.Rng.Intn(n)
+			}
+			phi := ss.Rng.Float64()*2.0 - 1.0
+			tx := ss.Bots[i].X + phi*(ss.Bots[i].X-ss.Bots[k].X)
+			ty := ss.Bots[i].Y + phi*(ss.Bots[i].Y-ss.Bots[k].Y)
+
+			// Shift toward GlobalBest.
+			if st.GlobalBestIdx >= 0 {
+				tx += gbWeight * (st.GlobalBestX - tx)
+				ty += gbWeight * (st.GlobalBestY - ty)
+			}
+			tx = math.Max(SwarmEdgeMargin, math.Min(ss.ArenaW-SwarmEdgeMargin, tx))
+			ty = math.Max(SwarmEdgeMargin, math.Min(ss.ArenaH-SwarmEdgeMargin, ty))
+			st.TrialX[i] = tx
+			st.TrialY[i] = ty
+			st.TargetX[i] = tx
+			st.TargetY[i] = ty
+			continue
+		}
+
+		// ── Onlooker bees: probabilistic selection ──
+		// Build roulette wheel (inline for this bee).
+		totalFit := 0.0
+		for j := 0; j < n; j++ {
+			if st.Role[j] == 0 {
+				f := st.Fitness[j] + 100.0
+				if f < 0.01 {
+					f = 0.01
+				}
+				totalFit += f
+			}
+		}
+		spin := ss.Rng.Float64() * totalFit
+		cumul := 0.0
+		selected := 0
+		for j := 0; j < n; j++ {
+			if st.Role[j] != 0 {
+				continue
+			}
+			f := st.Fitness[j] + 100.0
+			if f < 0.01 {
+				f = 0.01
+			}
+			cumul += f
+			if cumul >= spin {
+				selected = j
+				break
+			}
+		}
+		phi := ss.Rng.Float64()*2.0 - 1.0
+		k := i
+		for k == i {
+			k = ss.Rng.Intn(n)
+		}
+		tx := ss.Bots[selected].X + phi*(ss.Bots[selected].X-ss.Bots[k].X)
+		ty := ss.Bots[selected].Y + phi*(ss.Bots[selected].Y-ss.Bots[k].Y)
+
+		// Shift toward GlobalBest.
+		if st.GlobalBestIdx >= 0 {
+			tx += gbWeight * (st.GlobalBestX - tx)
+			ty += gbWeight * (st.GlobalBestY - ty)
+		}
+		tx = math.Max(SwarmEdgeMargin, math.Min(ss.ArenaW-SwarmEdgeMargin, tx))
+		ty = math.Max(SwarmEdgeMargin, math.Min(ss.ArenaH-SwarmEdgeMargin, ty))
+		st.TrialX[i] = tx
+		st.TrialY[i] = ty
+		st.TargetX[i] = tx
+		st.TargetY[i] = ty
 	}
 
 	// Update sensor cache.
@@ -301,47 +355,48 @@ func ApplyABC(bot *SwarmBot, ss *SwarmState, idx int) {
 		return
 	}
 
-	// Move directly toward trial position (eigenbewegung)
-	algoMovBot(bot, st.TrialX[idx], st.TrialY[idx], ss.ArenaW, ss.ArenaH, abcSpeedMult)
+	// Move toward precomputed target (eigenbewegung)
+	algoMovBot(bot, st.TargetX[idx], st.TargetY[idx], ss.ArenaW, ss.ArenaH, abcSpeedMult)
 
 	// Check arrival — evaluate fitness at new position
-	dx := st.TrialX[idx] - bot.X
-	dy := st.TrialY[idx] - bot.Y
+	dx := st.TargetX[idx] - bot.X
+	dy := st.TargetY[idx] - bot.Y
 	dist := math.Sqrt(dx*dx + dy*dy)
 
-	switch st.Role[idx] {
-	case 0: // Employed bee — exploit food source neighborhood.
-		if dist < abcArrivalDist {
-			trialF := abcFitness(bot, ss)
-			if trialF > st.Fitness[idx] {
-				st.Fitness[idx] = trialF
-				st.Stale[idx] = 0
-			}
+	if dist < abcArrivalDist {
+		trialF := abcFitness(bot, ss)
+		if trialF > st.Fitness[idx] {
+			st.Fitness[idx] = trialF
+			st.Stale[idx] = 0
 		}
-		fit01 := math.Min(math.Max((st.Fitness[idx]+50)/150, 0), 1)
-		g := uint8(150 + fit01*105)
-		bot.LEDColor = [3]uint8{255, g, 30}
-
-	case 1: // Onlooker bee — follow recruited source.
-		if dist < abcArrivalDist {
-			trialF := abcFitness(bot, ss)
-			if trialF > st.Fitness[idx] {
-				st.Fitness[idx] = trialF
-			}
+		if trialF > st.GlobalBestF {
+			st.GlobalBestF = trialF
+			st.GlobalBestIdx = idx
+			st.GlobalBestX = bot.X
+			st.GlobalBestY = bot.Y
 		}
-		bot.LEDColor = [3]uint8{255, 140, 0}
-
-	case 2: // Scout bee — explore new random position.
-		if dist < abcArrivalDist {
+		// Scouts revert to employed on arrival.
+		if st.Role[idx] == 2 {
 			st.Role[idx] = 0
-			st.Fitness[idx] = abcFitness(bot, ss)
 		}
-		bot.LEDColor = [3]uint8{255, 255, 255}
 	}
 
-	// Gold LED for global best bot.
+	// LED colors
 	if idx == st.GlobalBestIdx {
-		bot.LEDColor = [3]uint8{255, 215, 0}
+		bot.LEDColor = [3]uint8{255, 215, 0} // Gold for global best
+	} else if st.IsDirect[idx] {
+		bot.LEDColor = [3]uint8{50, 255, 50} // Green for direct-to-best
+	} else {
+		switch st.Role[idx] {
+		case 0: // Employed
+			fit01 := math.Min(math.Max((st.Fitness[idx]+50)/150, 0), 1)
+			g := uint8(150 + fit01*105)
+			bot.LEDColor = [3]uint8{255, g, 30}
+		case 1: // Onlooker
+			bot.LEDColor = [3]uint8{255, 140, 0}
+		case 2: // Scout
+			bot.LEDColor = [3]uint8{255, 255, 255}
+		}
 	}
 }
 
@@ -349,4 +404,97 @@ func ApplyABC(bot *SwarmBot, ss *SwarmState, idx int) {
 // Gaussian fitness landscape for consistent comparison across algorithms.
 func abcFitness(bot *SwarmBot, ss *SwarmState) float64 {
 	return distanceFitness(bot, ss)
+}
+
+// abcGridRescan evaluates a grid of points across the arena and teleports
+// the worst bees to the best-discovered grid positions. Critical for
+// deceptive landscapes like Schwefel and multi-modal landscapes like Rastrigin.
+func abcGridRescan(ss *SwarmState, st *ABCState) {
+	margin := 10.0
+	usableW := ss.ArenaW - 2*margin
+	usableH := ss.ArenaH - 2*margin
+	n := len(ss.Bots)
+
+	type gridPt struct {
+		x, y, f float64
+	}
+	gridPts := make([]gridPt, 0, abcGridSize*abcGridSize)
+	for gx := 0; gx < abcGridSize; gx++ {
+		for gy := 0; gy < abcGridSize; gy++ {
+			x := margin + usableW*(float64(gx)+0.5)/float64(abcGridSize)
+			y := margin + usableH*(float64(gy)+0.5)/float64(abcGridSize)
+			x += (ss.Rng.Float64()*2.0 - 1.0) * usableW * 0.02
+			y += (ss.Rng.Float64()*2.0 - 1.0) * usableH * 0.02
+			f := distanceFitnessPt(ss, x, y)
+			gridPts = append(gridPts, gridPt{x, y, f})
+		}
+	}
+
+	// Sort grid points by fitness descending.
+	for i := 0; i < len(gridPts)-1; i++ {
+		for j := i + 1; j < len(gridPts); j++ {
+			if gridPts[j].f > gridPts[i].f {
+				gridPts[i], gridPts[j] = gridPts[j], gridPts[i]
+			}
+		}
+	}
+
+	// Update GlobalBest from grid findings.
+	if len(gridPts) > 0 && gridPts[0].f > st.GlobalBestF {
+		st.GlobalBestF = gridPts[0].f
+		st.GlobalBestX = gridPts[0].x
+		st.GlobalBestY = gridPts[0].y
+	}
+
+	// Find worst bees by fitness.
+	type idxFit struct {
+		idx int
+		f   float64
+	}
+	bees := make([]idxFit, n)
+	for i := range ss.Bots {
+		bees[i] = idxFit{i, st.Fitness[i]}
+	}
+	// Sort ascending (worst first).
+	for i := 0; i < len(bees)-1; i++ {
+		for j := i + 1; j < len(bees); j++ {
+			if bees[j].f < bees[i].f {
+				bees[i], bees[j] = bees[j], bees[i]
+			}
+		}
+	}
+
+	// Teleport worst bees to best grid points (only bees significantly below GlobalBest).
+	inject := abcGridInjectTop
+	if inject > len(gridPts) {
+		inject = len(gridPts)
+	}
+	if inject > n {
+		inject = n
+	}
+	threshold := st.GlobalBestF * 0.90 // only inject bees below 90% of GlobalBest
+	for i := 0; i < inject; i++ {
+		bi := bees[i].idx
+		if st.Fitness[bi] >= threshold {
+			continue // skip — this bee is already performing well
+		}
+		jitter := 5.0
+		ss.Bots[bi].X = gridPts[i].x + (ss.Rng.Float64()*2-1)*jitter
+		ss.Bots[bi].Y = gridPts[i].y + (ss.Rng.Float64()*2-1)*jitter
+		if ss.Bots[bi].X < SwarmBotRadius {
+			ss.Bots[bi].X = SwarmBotRadius
+		}
+		if ss.Bots[bi].X > ss.ArenaW-SwarmBotRadius {
+			ss.Bots[bi].X = ss.ArenaW - SwarmBotRadius
+		}
+		if ss.Bots[bi].Y < SwarmBotRadius {
+			ss.Bots[bi].Y = SwarmBotRadius
+		}
+		if ss.Bots[bi].Y > ss.ArenaH-SwarmBotRadius {
+			ss.Bots[bi].Y = ss.ArenaH - SwarmBotRadius
+		}
+		st.Fitness[bi] = distanceFitness(&ss.Bots[bi], ss)
+		st.Stale[bi] = 0
+		st.Role[bi] = 0 // reset to employed
+	}
 }

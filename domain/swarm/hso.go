@@ -41,10 +41,11 @@ const (
 	hsoDivCheckInterval   = 150   // ticks between diversity checks
 	hsoDivThreshold       = 50.0  // min RMS spread before injection
 	hsoDivInjectFrac      = 0.3   // fraction of HM to replace when clustered
-	hsoGridRescanInterval = 300   // ticks between grid re-scans
-	hsoGridRescanSide     = 14    // grid side for re-scan (14x14=196)
+	hsoGridRescanInterval = 200   // ticks between grid re-scans
+	hsoGridRescanSide     = 16    // grid side for re-scan (16x16=256)
 	hsoGridInjectCount    = 15    // best grid positions to inject per rescan
 	hsoDirectTobestStart  = 0.15  // progress threshold for direct-to-best
+	hsoLocalWalkRadius    = 40.0  // radius for best-bot local random walk
 )
 
 // HSOHarmony stores one solution in the Harmony Memory.
@@ -225,16 +226,10 @@ func TickHSO(ss *SwarmState) {
 		}
 
 		// ── Late-phase direct-to-best: send bot directly to global best
-		// with small jitter. Two-stage ramp: 0→40% during exploration (progress 0.15→0.6),
-		// then 40→80% during exploitation (progress 0.6→1.0).
-		// This aggressive late-phase convergence is critical for deceptive landscapes
+		// with small jitter. Linear ramp 0→85% over the run.
+		// Aggressive convergence is critical for deceptive landscapes
 		// like Schwefel where HM is populated with many local optima.
-		var directProb float64
-		if progress > 0.6 {
-			directProb = 0.40 + 0.40*(progress-0.6)/0.4 // 40% → 80%
-		} else {
-			directProb = 0.40 * progress // 0% → 24% at progress=0.6
-		}
+		directProb := 0.85 * progress
 		if progress > hsoDirectTobestStart && st.BestF > -1e8 && ss.Rng.Float64() < directProb {
 			jx := st.BestX + (ss.Rng.Float64()*2.0-1.0)*bw*0.5
 			jy := st.BestY + (ss.Rng.Float64()*2.0-1.0)*bw*0.5
@@ -289,9 +284,9 @@ func TickHSO(ss *SwarmState) {
 		}
 
 		// Adaptive global-best attraction: pull new harmonies toward the
-		// best known position. Weight increases from 10% to 65% over time.
+		// best known position. Weight increases from 10% to 75% over time.
 		if st.BestF > -1e8 {
-			gbWeight := 0.10 + 0.55*progress
+			gbWeight := 0.10 + 0.65*progress
 			newX += gbWeight * (st.BestX - newX)
 			newY += gbWeight * (st.BestY - newY)
 		}
@@ -331,6 +326,35 @@ func TickHSO(ss *SwarmState) {
 		st.TargetX[i] = newX
 		st.TargetY[i] = newY
 		st.Phase[i] = 0
+	}
+
+	// Best-bot local random walk: the bot closest to BestX/BestY does a
+	// random walk around the global best for fine-grained local exploitation.
+	if st.BestF > -1e8 && n > 0 {
+		bestBot := 0
+		bestDist := math.MaxFloat64
+		for i := 0; i < n; i++ {
+			ddx := ss.Bots[i].X - st.BestX
+			ddy := ss.Bots[i].Y - st.BestY
+			d := ddx*ddx + ddy*ddy
+			if d < bestDist {
+				bestDist = d
+				bestBot = i
+			}
+		}
+		rwx := st.BestX + (ss.Rng.Float64()*2.0-1.0)*hsoLocalWalkRadius
+		rwy := st.BestY + (ss.Rng.Float64()*2.0-1.0)*hsoLocalWalkRadius
+		rwx = math.Max(margin, math.Min(ss.ArenaW-margin, rwx))
+		rwy = math.Max(margin, math.Min(ss.ArenaH-margin, rwy))
+		st.TargetX[bestBot] = rwx
+		st.TargetY[bestBot] = rwy
+		st.Phase[bestBot] = 0
+		rwf := distanceFitnessPt(ss, rwx, rwy)
+		if rwf > st.BestF {
+			st.BestF = rwf
+			st.BestX = rwx
+			st.BestY = rwy
+		}
 	}
 
 	// HM diversity maintenance: if all HM entries cluster tightly,
