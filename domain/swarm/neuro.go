@@ -50,11 +50,24 @@ var NeuroActionNames = [NeuroOutputs]string{
 	"FROM_NEAR", "PICKUP", "DROP", "GO_DROP",
 }
 
+// NeuroTruckActionNames for truck mode visualization.
+var NeuroTruckActionNames = [NeuroOutputs]string{
+	"FWD", "TURN_L", "TURN_R", "TO_NEAR",
+	"FROM_NEAR", "GO_RAMP", "DROP", "GO_DROP",
+}
+
 // NeuroInputNames for visualization.
 var NeuroInputNames = [NeuroInputs]string{
 	"near_dist", "neighbors", "edge", "carry",
 	"p_dist", "d_dist", "match", "has_pkg",
 	"obs_ahead", "light", "rnd", "bias",
+}
+
+// NeuroTruckInputNames for truck mode visualization.
+var NeuroTruckInputNames = [NeuroInputs]string{
+	"near_dist", "neighbors", "edge", "carry",
+	"trk_pkg_d", "d_dist", "match", "on_ramp",
+	"obs_ahead", "trk_here", "rnd", "bias",
 }
 
 // NeuroBrain holds the neural network weights for a single bot.
@@ -174,6 +187,78 @@ func BuildNeuroInputs(bot *SwarmBot, ss *SwarmState) [NeuroInputs]float64 {
 	return inp
 }
 
+// BuildNeuroTruckInputs builds sensor inputs for truck unloading mode.
+// Same 12-input architecture, but sensors are mapped to truck-relevant data.
+func BuildNeuroTruckInputs(bot *SwarmBot, ss *SwarmState) [NeuroInputs]float64 {
+	var inp [NeuroInputs]float64
+
+	// [0] near_dist: normalized distance to nearest neighbor
+	nd := bot.NearestDist
+	if nd > 200 {
+		nd = 200
+	}
+	inp[0] = nd / 200.0
+
+	// [1] neighbors: count in range
+	nc := float64(bot.NeighborCount)
+	if nc > 10 {
+		nc = 10
+	}
+	inp[1] = nc / 10.0
+
+	// [2] edge: at arena border
+	if bot.OnEdge {
+		inp[2] = 1.0
+	}
+
+	// [3] carry: carrying a package
+	if bot.CarryingPkg >= 0 {
+		inp[3] = 1.0
+	}
+
+	// [4] trk_pkg_d: distance to nearest truck package (replaces pickup dist)
+	td := bot.NearestTruckPkgDist
+	if td > 500 {
+		td = 500
+	}
+	inp[4] = td / 500.0
+
+	// [5] d_dist: distance to nearest dropoff
+	dd := bot.NearestDropoffDist
+	if dd > 500 {
+		dd = 500
+	}
+	inp[5] = dd / 500.0
+
+	// [6] match: dropoff matches carried package color
+	if bot.DropoffMatch {
+		inp[6] = 1.0
+	}
+
+	// [7] on_ramp: bot is on the truck ramp (replaces has_pkg)
+	if bot.OnRamp {
+		inp[7] = 1.0
+	}
+
+	// [8] obs_ahead: obstacle ahead
+	if bot.ObstacleAhead {
+		inp[8] = 1.0
+	}
+
+	// [9] trk_here: truck is present (replaces light)
+	if bot.TruckHere {
+		inp[9] = 1.0
+	}
+
+	// [10] rnd: exploration noise
+	inp[10] = ss.Rng.Float64()
+
+	// [11] bias: always 1.0
+	inp[11] = 1.0
+
+	return inp
+}
+
 // ExecuteNeuroAction performs the action selected by the neural network.
 func ExecuteNeuroAction(actionIdx int, bot *SwarmBot, ss *SwarmState, botIdx int) {
 	switch actionIdx {
@@ -247,6 +332,99 @@ func ExecuteNeuroAction(actionIdx int, bot *SwarmBot, ss *SwarmState, botIdx int
 	}
 }
 
+// ExecuteNeuroTruckAction performs truck-mode actions for the neural network.
+// Actions 0-4 are same as delivery (movement). 5=GOTO_RAMP, 6=DROP, 7=GOTO_DROPOFF.
+func ExecuteNeuroTruckAction(actionIdx int, bot *SwarmBot, ss *SwarmState, botIdx int) {
+	switch actionIdx {
+	case 0: // FWD
+		bot.Speed = SwarmBotSpeed
+	case 1: // TURN_LEFT
+		bot.Angle -= 0.3
+	case 2: // TURN_RIGHT
+		bot.Angle += 0.3
+	case 3: // TURN_TO_NEAREST
+		if bot.NearestIdx >= 0 {
+			dx, dy := NeighborDelta(bot.X, bot.Y, ss.Bots[bot.NearestIdx].X, ss.Bots[bot.NearestIdx].Y, ss)
+			bot.Angle = math.Atan2(dy, dx)
+		}
+		bot.Speed = SwarmBotSpeed
+	case 4: // TURN_FROM_NEAREST
+		if bot.NearestIdx >= 0 {
+			dx, dy := NeighborDelta(bot.X, bot.Y, ss.Bots[bot.NearestIdx].X, ss.Bots[bot.NearestIdx].Y, ss)
+			bot.Angle = math.Atan2(-dy, -dx)
+		}
+		bot.Speed = SwarmBotSpeed
+	case 5: // GOTO_RAMP — navigate to the truck ramp to pick up packages
+		if ss.TruckState != nil && ss.TruckState.CurrentTruck != nil {
+			ts := ss.TruckState
+			// Target ramp edge, spread bots
+			cx := ts.RampX + ts.RampW + 20
+			slots := 20
+			slot := botIdx % slots
+			yFrac := (float64(slot) + 0.5) / float64(slots)
+			cy := ts.RampY + ts.RampH*0.1 + ts.RampH*0.8*yFrac
+			dx := cx - bot.X
+			dy := cy - bot.Y
+			bot.Angle = math.Atan2(dy, dx)
+			bot.Speed = SwarmBotSpeed
+		}
+	case 6: // DROP
+		if bot.CarryingPkg >= 0 && bot.DropoffMatch && bot.NearestDropoffDist < 30 {
+			bot.Speed = SwarmBotSpeed
+			// Actual drop handled by delivery system
+		}
+	case 7: // GOTO_DROPOFF
+		if bot.CarryingPkg >= 0 && bot.NearestDropoffIdx >= 0 {
+			st := &ss.Stations[bot.NearestDropoffIdx]
+			dx, dy := NeighborDelta(bot.X, bot.Y, st.X, st.Y, ss)
+			bot.Angle = math.Atan2(dy, dx)
+			bot.Speed = SwarmBotSpeed
+		}
+	}
+
+	// Obstacle avoidance
+	if bot.ObstacleAhead && actionIdx != 4 {
+		bot.Angle += 0.5
+	}
+	if bot.OnEdge {
+		bot.Angle += math.Pi
+	}
+
+	// LED: carrying → package color, on ramp → cyan, otherwise purple (truck-neuro)
+	if bot.CarryingPkg >= 0 && bot.CarryingPkg < len(ss.Packages) {
+		switch ss.Packages[bot.CarryingPkg].Color {
+		case 1:
+			bot.LEDColor = [3]uint8{255, 60, 60}
+		case 2:
+			bot.LEDColor = [3]uint8{60, 60, 255}
+		case 3:
+			bot.LEDColor = [3]uint8{255, 255, 60}
+		case 4:
+			bot.LEDColor = [3]uint8{60, 255, 60}
+		}
+	} else if bot.OnRamp {
+		bot.LEDColor = [3]uint8{40, 200, 200} // cyan = on ramp
+	} else {
+		bot.LEDColor = [3]uint8{160, 80, 200} // purple = truck-neuro bot
+	}
+}
+
+// EvaluateNeuroTruckFitness evaluates fitness for truck unloading mode.
+// Rewards: score (packages delivered to correct station), pickups, proximity to ramp.
+// Penalties: idle time, anti-stuck.
+func EvaluateNeuroTruckFitness(bot *SwarmBot, ss *SwarmState) float64 {
+	f := float64(bot.Stats.TotalDeliveries)*40 +
+		float64(bot.Stats.TotalPickups)*20 +
+		bot.Stats.TotalDistance*0.005 -
+		float64(bot.Stats.AntiStuckCount)*10 -
+		float64(bot.Stats.TicksIdle)*0.05
+	// Bonus for being near truck/ramp when not carrying
+	if bot.CarryingPkg < 0 && bot.TruckHere {
+		f += 5
+	}
+	return f
+}
+
 // ═══════════════════════════════════════════════════════════
 // NEUROEVOLUTION — Initialisierung & Evolution
 // ═══════════════════════════════════════════════════════════
@@ -286,10 +464,16 @@ func RunNeuroEvolution(ss *SwarmState) {
 		return
 	}
 
-	// 1. Evaluate fitness (same function as GP)
+	// 1. Evaluate fitness (truck mode uses truck-specific fitness)
 	fitnesses := make([]float64, n)
-	for i := range ss.Bots {
-		fitnesses[i] = EvaluateGPFitness(&ss.Bots[i])
+	if ss.TruckToggle && ss.TruckState != nil {
+		for i := range ss.Bots {
+			fitnesses[i] = EvaluateNeuroTruckFitness(&ss.Bots[i], ss)
+		}
+	} else {
+		for i := range ss.Bots {
+			fitnesses[i] = EvaluateGPFitness(&ss.Bots[i])
+		}
 	}
 
 	// 1b. Novelty Search blending (if enabled)

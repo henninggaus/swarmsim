@@ -328,9 +328,16 @@ func (s *Simulation) updateSwarmMode() {
 		}
 		// Neuroevolution: use neural network if NEURO is ON
 		if ss.NeuroEnabled && bot.Brain != nil {
-			inputs := swarm.BuildNeuroInputs(bot, ss)
-			actionIdx := swarm.NeuroForward(bot.Brain, inputs)
-			swarm.ExecuteNeuroAction(actionIdx, bot, ss, i)
+			// Truck mode: use truck-specific sensors and actions
+			if ss.TruckToggle && ss.TruckState != nil {
+				inputs := swarm.BuildNeuroTruckInputs(bot, ss)
+				actionIdx := swarm.NeuroForward(bot.Brain, inputs)
+				swarm.ExecuteNeuroTruckAction(actionIdx, bot, ss, i)
+			} else {
+				inputs := swarm.BuildNeuroInputs(bot, ss)
+				actionIdx := swarm.NeuroForward(bot.Brain, inputs)
+				swarm.ExecuteNeuroAction(actionIdx, bot, ss, i)
+			}
 			// Auto-pickup/drop for neuro bots: the net navigates, the system handles interaction
 			if ss.DeliveryOn {
 				if bot.CarryingPkg < 0 && bot.NearestPickupDist < 20 && bot.NearestPickupHasPkg {
@@ -339,6 +346,10 @@ func (s *Simulation) updateSwarmMode() {
 				if bot.CarryingPkg >= 0 && bot.DropoffMatch && bot.NearestDropoffDist < 30 {
 					executeSwarmAction(swarmscript.Action{Type: swarmscript.ActDrop}, bot, ss, i)
 				}
+			}
+			// Auto-pickup from truck ramp for neuro bots
+			if ss.TruckToggle && bot.OnRamp && bot.CarryingPkg < 0 && bot.NearestTruckPkgIdx >= 0 {
+				executeSwarmAction(swarmscript.Action{Type: swarmscript.ActTurnToTruckPkg}, bot, ss, i)
 			}
 			continue
 		}

@@ -66,7 +66,7 @@ func drawNeuroVisualization(screen *ebiten.Image, ss *swarm.SwarmState) {
 	}
 
 	// Draw the neural network visualization
-	drawNeuroNetDiagram(screen, brain, x+2, y, editorPanelW-10, 220)
+	drawNeuroNetDiagram(screen, brain, x+2, y, editorPanelW-10, 220, ss.TruckToggle)
 	y += 225
 
 	// ── Separator ──
@@ -111,7 +111,8 @@ func drawNeuroVisualization(screen *ebiten.Image, ss *swarm.SwarmState) {
 }
 
 // drawNeuroNetDiagram draws the actual neural network nodes and connections.
-func drawNeuroNetDiagram(screen *ebiten.Image, brain *swarm.NeuroBrain, gx, gy, gw, gh int) {
+func drawNeuroNetDiagram(screen *ebiten.Image, brain *swarm.NeuroBrain, gx, gy, gw, gh int, truckMode ...bool) {
+	isTruck := len(truckMode) > 0 && truckMode[0]
 	// Background
 	vector.DrawFilledRect(screen, float32(gx-2), float32(gy-2), float32(gw+4), float32(gh+4),
 		color.RGBA{5, 5, 15, 220}, false)
@@ -174,7 +175,11 @@ func drawNeuroNetDiagram(screen *ebiten.Image, brain *swarm.NeuroBrain, gx, gy, 
 		r := float32(3.0)
 		vector.DrawFilledCircle(screen, inputNodes[i].x, inputNodes[i].y, r, nodeCol, false)
 		// Label (left of node)
-		name := swarm.NeuroInputNames[i]
+		inputNames := swarm.NeuroInputNames
+		if isTruck {
+			inputNames = swarm.NeuroTruckInputNames
+		}
+		name := inputNames[i]
 		if len(name) > 6 {
 			name = name[:6]
 		}
@@ -203,7 +208,11 @@ func drawNeuroNetDiagram(screen *ebiten.Image, brain *swarm.NeuroBrain, gx, gy, 
 		}
 		vector.DrawFilledCircle(screen, outputNodes[i].x, outputNodes[i].y, r, nodeCol, false)
 		// Label (right of node)
-		name := swarm.NeuroActionNames[i]
+		actionNames := swarm.NeuroActionNames
+		if isTruck {
+			actionNames = swarm.NeuroTruckActionNames
+		}
+		name := actionNames[i]
 		labelCol := color.RGBA{140, 140, 160, 200}
 		if isWinner {
 			labelCol = color.RGBA{255, 255, 100, 255}
