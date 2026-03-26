@@ -53,15 +53,15 @@ func DrawHUD(screen *ebiten.Image, s *simulation.Simulation, fps float64, r *Ren
 	// Top-right: Bot counts
 	counts := s.BotCount()
 	y := 10
-	drawBotCount(screen, sw-160, y, "Scout", counts[bot.TypeScout], ColorScout)
+	drawBotCount(screen, sw-160, y, "Kundschafter", counts[bot.TypeScout], ColorScout)
 	y += 16
-	drawBotCount(screen, sw-160, y, "Worker", counts[bot.TypeWorker], ColorWorker)
+	drawBotCount(screen, sw-160, y, "Arbeiter", counts[bot.TypeWorker], ColorWorker)
 	y += 16
-	drawBotCount(screen, sw-160, y, "Leader", counts[bot.TypeLeader], ColorLeader)
+	drawBotCount(screen, sw-160, y, "Anfuehrer", counts[bot.TypeLeader], ColorLeader)
 	y += 16
-	drawBotCount(screen, sw-160, y, "Tank", counts[bot.TypeTank], ColorTank)
+	drawBotCount(screen, sw-160, y, "Panzer", counts[bot.TypeTank], ColorTank)
 	y += 16
-	drawBotCount(screen, sw-160, y, "Healer", counts[bot.TypeHealer], ColorHealer)
+	drawBotCount(screen, sw-160, y, "Heiler", counts[bot.TypeHealer], ColorHealer)
 
 	// Bottom-left: Resources & messages
 	available := 0
@@ -78,7 +78,7 @@ func DrawHUD(screen *ebiten.Image, s *simulation.Simulation, fps float64, r *Ren
 
 	// Bottom help: two lines for readability
 	printColoredAt(screen, "SPACE:Pause  1-5:Bot spawnen  R:Ressource  O:Hindernis  N:Szenario  D:Debug", 10, sh-28, color.RGBA{140, 150, 170, 200})
-	printColoredAt(screen, "P:Pheromone  E:Evolution  V:Genom  S:Sound  +/-:Speed  H:Hilfe (alle Tasten)", 10, sh-14, color.RGBA{140, 150, 170, 200})
+	printColoredAt(screen, "P:Pheromone  E:Evolution  V:Genom  S:Sound  +/-:Speed  H:Hilfe", 10, sh-14, color.RGBA{140, 150, 170, 200})
 
 	// Selected bot info panel
 	if s.SelectedBotID >= 0 {
@@ -119,7 +119,7 @@ func drawFPSWarning(screen *ebiten.Image, r *Renderer, fps float64, sw int) {
 		r.LowFPSCounter = 0
 	}
 	if r.LowFPSCounter > 60 {
-		warn := fmt.Sprintf("Low FPS: %.0f", fps)
+		warn := fmt.Sprintf("FPS niedrig: %.0f", fps)
 		warnW := len(warn) * charW
 		warnX := sw - warnW - 15
 		vector.DrawFilledRect(screen, float32(warnX-4), 2, float32(warnW+8), float32(lineH+4),

@@ -41,11 +41,15 @@ const (
 	hsoDivCheckInterval   = 150   // ticks between diversity checks
 	hsoDivThreshold       = 50.0  // min RMS spread before injection
 	hsoDivInjectFrac      = 0.3   // fraction of HM to replace when clustered
-	hsoGridRescanInterval = 200   // ticks between grid re-scans
-	hsoGridRescanSide     = 16    // grid side for re-scan (16x16=256)
-	hsoGridInjectCount    = 15    // best grid positions to inject per rescan
-	hsoDirectTobestStart  = 0.15  // progress threshold for direct-to-best
-	hsoLocalWalkRadius    = 40.0  // radius for best-bot local random walk
+	hsoGridRescanInterval  = 150   // ticks between grid re-scans
+	hsoGridRescanSide      = 20    // grid side for re-scan (20x20=400)
+	hsoGridInjectCount     = 20    // best grid positions to inject per rescan
+	hsoGridJitter          = 0.15  // grid position jitter fraction (15% of cell width)
+	hsoLocalRefineRadius   = 60.0  // radius for local refinement around best grid point
+	hsoLocalRefineSide     = 10    // local refinement grid side (10x10=100)
+	hsoInterpolateProb     = 0.20  // probability of interpolation between 2 HM entries
+	hsoDirectTobestStart   = 0.15  // progress threshold for direct-to-best
+	hsoLocalWalkRadius     = 40.0  // radius for best-bot local random walk
 )
 
 // HSOHarmony stores one solution in the Harmony Memory.
@@ -102,17 +106,34 @@ func InitHSO(ss *SwarmState) {
 	// Generate more candidates than hsoHMSize, evaluate each, and keep
 	// the top hsoHMSize positions. This gives the algorithm a head start
 	// on multi-modal landscapes like Gaussian Peaks.
-	gridSide := 10 // 10x10 = 100 candidate positions
-	candidates := make([]HSOHarmony, 0, gridSide*gridSide)
+	gridSide := 20 // 20x20 = 400 candidate positions
+	candidates := make([]HSOHarmony, 0, gridSide*gridSide+hsoLocalRefineSide*hsoLocalRefineSide)
 	usableW := ss.ArenaW - 2*margin
 	usableH := ss.ArenaH - 2*margin
+	var initBestF float64 = -1e9
+	var initBestX, initBestY float64
 	for gx := 0; gx < gridSide; gx++ {
 		for gy := 0; gy < gridSide; gy++ {
 			x := margin + usableW*(float64(gx)+0.5)/float64(gridSide)
 			y := margin + usableH*(float64(gy)+0.5)/float64(gridSide)
-			// Add small jitter to avoid exact grid patterns.
-			x += (ss.Rng.Float64()*2.0 - 1.0) * usableW * 0.03
-			y += (ss.Rng.Float64()*2.0 - 1.0) * usableH * 0.03
+			x += (ss.Rng.Float64()*2.0 - 1.0) * usableW * hsoGridJitter
+			y += (ss.Rng.Float64()*2.0 - 1.0) * usableH * hsoGridJitter
+			x = math.Max(margin, math.Min(ss.ArenaW-margin, x))
+			y = math.Max(margin, math.Min(ss.ArenaH-margin, y))
+			f := distanceFitnessPt(ss, x, y)
+			candidates = append(candidates, HSOHarmony{X: x, Y: y, Fitness: f})
+			if f > initBestF {
+				initBestF = f
+				initBestX = x
+				initBestY = y
+			}
+		}
+	}
+	// Local refinement: dense 10x10 grid around best grid point.
+	for rx := 0; rx < hsoLocalRefineSide; rx++ {
+		for ry := 0; ry < hsoLocalRefineSide; ry++ {
+			x := initBestX + (float64(rx)/float64(hsoLocalRefineSide-1)*2.0-1.0)*hsoLocalRefineRadius
+			y := initBestY + (float64(ry)/float64(hsoLocalRefineSide-1)*2.0-1.0)*hsoLocalRefineRadius
 			x = math.Max(margin, math.Min(ss.ArenaW-margin, x))
 			y = math.Max(margin, math.Min(ss.ArenaH-margin, y))
 			f := distanceFitnessPt(ss, x, y)
@@ -229,7 +250,7 @@ func TickHSO(ss *SwarmState) {
 		// with small jitter. Linear ramp 0→85% over the run.
 		// Aggressive convergence is critical for deceptive landscapes
 		// like Schwefel where HM is populated with many local optima.
-		directProb := 0.85 * progress
+		directProb := 0.90 * progress
 		if progress > hsoDirectTobestStart && st.BestF > -1e8 && ss.Rng.Float64() < directProb {
 			jx := st.BestX + (ss.Rng.Float64()*2.0-1.0)*bw*0.5
 			jy := st.BestY + (ss.Rng.Float64()*2.0-1.0)*bw*0.5
@@ -251,7 +272,32 @@ func TickHSO(ss *SwarmState) {
 
 		var newX, newY float64
 
-		if len(st.HM) > 0 && ss.Rng.Float64() < hsoHMCR {
+		if len(st.HM) >= 2 && ss.Rng.Float64() < hsoInterpolateProb {
+			// Interpolation: combine two tournament-selected HM entries.
+			// This creates candidates between known good positions,
+			// enabling discovery of peak overlap zones on Gaussian Peaks.
+			a := ss.Rng.Intn(len(st.HM))
+			b := ss.Rng.Intn(len(st.HM))
+			for t := 0; t < 2; t++ {
+				ca := ss.Rng.Intn(len(st.HM))
+				if st.HM[ca].Fitness > st.HM[a].Fitness {
+					a = ca
+				}
+				cb := ss.Rng.Intn(len(st.HM))
+				if st.HM[cb].Fitness > st.HM[b].Fitness {
+					b = cb
+				}
+			}
+			if a == b {
+				b = (b + 1) % len(st.HM)
+			}
+			w := ss.Rng.Float64()
+			newX = w*st.HM[a].X + (1-w)*st.HM[b].X
+			newY = w*st.HM[a].Y + (1-w)*st.HM[b].Y
+			// Small perturbation to avoid exact midpoints.
+			newX += (ss.Rng.Float64()*2.0 - 1.0) * bw * 0.3
+			newY += (ss.Rng.Float64()*2.0 - 1.0) * bw * 0.3
+		} else if len(st.HM) > 0 && ss.Rng.Float64() < hsoHMCR {
 			// Elite bias: with increasing probability, start from the best HM
 			// entry instead of a random one. Increases from 25% to 50% over time.
 			var hmIdx int
@@ -286,7 +332,7 @@ func TickHSO(ss *SwarmState) {
 		// Adaptive global-best attraction: pull new harmonies toward the
 		// best known position. Weight increases from 10% to 75% over time.
 		if st.BestF > -1e8 {
-			gbWeight := 0.10 + 0.65*progress
+			gbWeight := 0.10 + 0.70*progress
 			newX += gbWeight * (st.BestX - newX)
 			newY += gbWeight * (st.BestY - newY)
 		}
@@ -407,6 +453,7 @@ func TickHSO(ss *SwarmState) {
 	// Periodic grid re-scan: systematically evaluate a grid across the arena
 	// and inject the best discoveries into the HM. Critical for deceptive
 	// landscapes like Schwefel where the global optimum is far from local optima.
+	// Uses 15% jitter so each rescan covers different terrain (was 2%).
 	if ss.Tick > 0 && ss.Tick%hsoGridRescanInterval == 0 {
 		usableW := ss.ArenaW - 2*margin
 		usableH := ss.ArenaH - 2*margin
@@ -414,13 +461,32 @@ func TickHSO(ss *SwarmState) {
 		type gridPt struct {
 			x, y, f float64
 		}
-		gridPts := make([]gridPt, 0, hsoGridRescanSide*hsoGridRescanSide)
+		gridPts := make([]gridPt, 0, hsoGridRescanSide*hsoGridRescanSide+hsoLocalRefineSide*hsoLocalRefineSide)
+		var scanBestF float64 = -1e9
+		var scanBestX, scanBestY float64
 		for gx := 0; gx < hsoGridRescanSide; gx++ {
 			for gy := 0; gy < hsoGridRescanSide; gy++ {
 				x := margin + usableW*(float64(gx)+0.5)/float64(hsoGridRescanSide)
 				y := margin + usableH*(float64(gy)+0.5)/float64(hsoGridRescanSide)
-				x += (ss.Rng.Float64()*2.0 - 1.0) * usableW * 0.02
-				y += (ss.Rng.Float64()*2.0 - 1.0) * usableH * 0.02
+				x += (ss.Rng.Float64()*2.0 - 1.0) * usableW * hsoGridJitter
+				y += (ss.Rng.Float64()*2.0 - 1.0) * usableH * hsoGridJitter
+				x = math.Max(margin, math.Min(ss.ArenaW-margin, x))
+				y = math.Max(margin, math.Min(ss.ArenaH-margin, y))
+				f := distanceFitnessPt(ss, x, y)
+				gridPts = append(gridPts, gridPt{x, y, f})
+				if f > scanBestF {
+					scanBestF = f
+					scanBestX = x
+					scanBestY = y
+				}
+			}
+		}
+		// Local refinement: 10x10 dense grid around best scan point.
+		// Critical for Gaussian Peaks where peak overlap zones are narrow.
+		for rx := 0; rx < hsoLocalRefineSide; rx++ {
+			for ry := 0; ry < hsoLocalRefineSide; ry++ {
+				x := scanBestX + (float64(rx)/float64(hsoLocalRefineSide-1)*2.0-1.0)*hsoLocalRefineRadius
+				y := scanBestY + (float64(ry)/float64(hsoLocalRefineSide-1)*2.0-1.0)*hsoLocalRefineRadius
 				x = math.Max(margin, math.Min(ss.ArenaW-margin, x))
 				y = math.Max(margin, math.Min(ss.ArenaH-margin, y))
 				f := distanceFitnessPt(ss, x, y)

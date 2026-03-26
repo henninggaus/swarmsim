@@ -17,24 +17,26 @@ import "math"
 //            "Biomimicry of bacterial foraging for distributed optimization"
 
 const (
-	bfoChemoSteps     = 6     // consecutive swim steps before re-evaluation
-	bfoTumbleRate     = 0.15  // probability of tumbling each step
-	bfoSwarmRadius    = 80.0  // swarming signal radius
-	bfoReproInterval  = 150   // ticks between reproduction events
-	bfoElimProb       = 0.003 // probability of elimination-dispersal per bot per cycle
-	bfoGradientDirs   = 8     // number of directions to probe during tumble
-	bfoMaxTicks       = 3000  // total ticks for adaptive parameter scheduling
-	bfoProbeDistStart = 40.0  // gradient probe distance at start (exploration)
-	bfoProbeDistEnd   = 8.0   // gradient probe distance at end (exploitation)
-	bfoGBestWStart    = 0.05  // global-best attraction weight at start
-	bfoGBestWEnd      = 0.75  // global-best attraction weight at end
-	bfoSpeedMult      = 5.0   // movement speed multiplier (5x = 7.5 px/tick)
-	bfoGridRescanRate = 150   // periodic grid rescan every N ticks
-	bfoGridRescanSide = 18    // grid resolution (18x18 = 324 samples)
-	bfoGridInjectTop  = 10    // best grid positions to inject
-	bfoDtbStartProg   = 0.15  // direct-to-best starts at this progress
-	bfoDtbMaxProb     = 0.75  // max probability of direct-to-best
-	bfoLocalWalkR     = 40.0  // best-bot local random walk radius
+	bfoChemoSteps      = 6     // consecutive swim steps before re-evaluation
+	bfoTumbleRate      = 0.15  // probability of tumbling each step
+	bfoSwarmRadius     = 80.0  // swarming signal radius
+	bfoReproInterval   = 150   // ticks between reproduction events
+	bfoElimProbEarly   = 0.003 // elimination-dispersal probability (early phase)
+	bfoElimProbLate    = 0.001 // elimination-dispersal probability (late phase, less disruption)
+	bfoGradientDirs    = 8     // number of directions to probe during tumble
+	bfoMaxTicks        = 3000  // total ticks for adaptive parameter scheduling
+	bfoProbeDistStart  = 40.0  // gradient probe distance at start (exploration)
+	bfoProbeDistEnd    = 8.0   // gradient probe distance at end (exploitation)
+	bfoGBestWStart     = 0.05  // global-best attraction weight at start
+	bfoGBestWEnd       = 0.80  // global-best attraction weight at end (stronger convergence)
+	bfoSpeedMult       = 5.0   // movement speed multiplier (5x = 7.5 px/tick)
+	bfoGridRescanRate  = 120   // periodic grid rescan every N ticks (more frequent)
+	bfoGridRescanSide  = 20    // grid resolution (20x20 = 400 samples)
+	bfoGridInjectTop   = 15    // best grid positions to inject (more replacement)
+	bfoDtbStartProg    = 0.10  // direct-to-best starts earlier
+	bfoDtbMaxProb      = 0.85  // max probability of direct-to-best (stronger)
+	bfoLocalWalkR      = 40.0  // best-bot local random walk radius
+	bfoInitGridSide    = 20    // initial grid scan resolution (20x20 = 400 samples)
 )
 
 // BFOState holds Bacterial Foraging Optimization state.
@@ -92,6 +94,24 @@ func InitBFO(ss *SwarmState) {
 			st.BestIdx = i
 		}
 	}
+	// Initial grid scan: systematically sample the landscape to find the global
+	// optimum early. Critical for deceptive landscapes like Schwefel where random
+	// initialization rarely places bots near the global optimum.
+	aw := ss.ArenaW
+	ah := ss.ArenaH
+	for gx := 0; gx < bfoInitGridSide; gx++ {
+		for gy := 0; gy < bfoInitGridSide; gy++ {
+			px := (float64(gx) + 0.5) * aw / float64(bfoInitGridSide)
+			py := (float64(gy) + 0.5) * ah / float64(bfoInitGridSide)
+			f := distanceFitnessPt(ss, px, py)
+			if f > st.BestF {
+				st.BestF = f
+				st.BestX = px
+				st.BestY = py
+			}
+		}
+	}
+
 	ss.BFO = st
 	ss.BFOOn = true
 }
@@ -263,8 +283,10 @@ func TickBFO(ss *SwarmState) {
 	}
 
 	// Phase 4: Elimination-dispersal — random bots teleport
+	// Adaptive: reduce disruption in late phase to allow convergence
+	elimProb := bfoElimProbEarly + (bfoElimProbLate-bfoElimProbEarly)*progress
 	for i := range ss.Bots {
-		if ss.Rng.Float64() < bfoElimProb {
+		if ss.Rng.Float64() < elimProb {
 			ss.Bots[i].X = ss.Rng.Float64() * ss.ArenaW
 			ss.Bots[i].Y = ss.Rng.Float64() * ss.ArenaH
 			st.Health[i] = 0
@@ -369,28 +391,45 @@ func bfoReproduce(ss *SwarmState) {
 	midHealth /= float64(n)
 
 	// Clone fittest traits to least fit
+	// Half of weak bots move toward GlobalBest (exploitation),
+	// half move toward random healthy donors (diversity)
 	for i := range ss.Bots {
 		if st.Health[i] < midHealth {
-			// Find a random healthy donor
-			donor := ss.Rng.Intn(n)
-			for attempts := 0; attempts < 8 && st.Health[donor] < midHealth; attempts++ {
-				donor = ss.Rng.Intn(n)
-			}
-			if st.Health[donor] >= midHealth {
-				// Move weak bacterium toward donor position (partial teleport)
-				t := 0.3 + ss.Rng.Float64()*0.4 // blend factor 0.3-0.7
-				ss.Bots[i].X = ss.Bots[i].X*(1-t) + ss.Bots[donor].X*t
-				ss.Bots[i].Y = ss.Bots[i].Y*(1-t) + ss.Bots[donor].Y*t
-				st.SwimDir[i] = st.SwimDir[donor] + (ss.Rng.Float64()-0.5)*0.5
-				st.Health[i] = st.Health[donor] * 0.5
-				st.PrevFit[i] = 0 // force re-evaluation
-				// Inherit donor's personal best knowledge
-				if i < len(st.PBestF) && donor < len(st.PBestF) {
-					st.PBestF[i] = st.PBestF[donor]
-					st.PBestX[i] = st.PBestX[donor]
-					st.PBestY[i] = st.PBestY[donor]
+			t := 0.3 + ss.Rng.Float64()*0.4 // blend factor 0.3-0.7
+			if st.BestF > 0 && ss.Rng.Float64() < 0.5 {
+				// Move toward GlobalBest with jitter
+				jitter := 15.0
+				ss.Bots[i].X = ss.Bots[i].X*(1-t) + st.BestX*t + (ss.Rng.Float64()-0.5)*jitter
+				ss.Bots[i].Y = ss.Bots[i].Y*(1-t) + st.BestY*t + (ss.Rng.Float64()-0.5)*jitter
+				st.Health[i] = 0
+				st.PrevFit[i] = 0
+				if i < len(st.PBestF) {
+					st.PBestF[i] = st.BestF
+					st.PBestX[i] = st.BestX
+					st.PBestY[i] = st.BestY
+				}
+			} else {
+				// Find a random healthy donor
+				donor := ss.Rng.Intn(n)
+				for attempts := 0; attempts < 8 && st.Health[donor] < midHealth; attempts++ {
+					donor = ss.Rng.Intn(n)
+				}
+				if st.Health[donor] >= midHealth {
+					// Move weak bacterium toward donor position (partial teleport)
+					ss.Bots[i].X = ss.Bots[i].X*(1-t) + ss.Bots[donor].X*t
+					ss.Bots[i].Y = ss.Bots[i].Y*(1-t) + ss.Bots[donor].Y*t
+					st.SwimDir[i] = st.SwimDir[donor] + (ss.Rng.Float64()-0.5)*0.5
+					st.Health[i] = st.Health[donor] * 0.5
+					st.PrevFit[i] = 0 // force re-evaluation
+					// Inherit donor's personal best knowledge
+					if i < len(st.PBestF) && donor < len(st.PBestF) {
+						st.PBestF[i] = st.PBestF[donor]
+						st.PBestX[i] = st.PBestX[donor]
+						st.PBestY[i] = st.PBestY[donor]
+					}
 				}
 			}
+			st.SwimDir[i] = ss.Rng.Float64() * 2 * math.Pi
 		}
 	}
 }

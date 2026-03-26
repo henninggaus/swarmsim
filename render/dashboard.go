@@ -33,7 +33,7 @@ func DrawDashboard(screen *ebiten.Image, ss *swarm.SwarmState, x, y, w, h int) {
 	cy := y + 5
 
 	printColoredAt(screen, "DASHBOARD", cx, cy, headerCol)
-	printColoredAt(screen, "(Taste D)", cx+70, cy, dimCol)
+	printColoredAt(screen, "(Tab: Anzeige)", cx+70, cy, dimCol)
 	cy += 18
 
 	// 1. Fitness Graph (if evolution, GP, or neuro active)

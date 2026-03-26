@@ -15,6 +15,7 @@ import (
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
+	"github.com/hajimehoshi/ebiten/v2/vector"
 )
 
 // gifMu protects Renderer fields written by the background GIF encoding goroutine
@@ -199,7 +200,7 @@ func halfScale(src []byte, srcW, srcH int) *image.RGBA {
 func DrawCaptureOverlay(screen *ebiten.Image, r *Renderer) {
 	sw := screen.Bounds().Dx()
 
-	// Overlay text (screenshot saved / GIF saved)
+	// Overlay snackbar (screenshot saved / GIF saved)
 	if r.OverlayTimer > 0 {
 		r.OverlayTimer--
 		alpha := 255
@@ -207,21 +208,25 @@ func DrawCaptureOverlay(screen *ebiten.Image, r *Renderer) {
 			alpha = r.OverlayTimer * 255 / 20
 		}
 		text := r.OverlayText
-		textW := len(text) * 6
-		x := sw/2 - textW/2
-		y := 5
+		charW := 6
+		textW := len(text) * charW
+		barW := textW + 30
+		barH := 28
+		x := sw/2 - barW/2
+		y := 55
 
-		// Background for readability
-		bgAlpha := uint8(alpha * 180 / 255)
-		ebitenutil.DrawRect(screen, float64(x-5), float64(y-2), float64(textW+10), 18,
-			color.RGBA{0, 0, 0, bgAlpha})
+		// Solid dark background with accent border
+		bgAlpha := uint8(alpha * 220 / 255)
+		borderAlpha := uint8(alpha * 255 / 255)
+		vector.DrawFilledRect(screen, float32(x), float32(y), float32(barW), float32(barH),
+			color.RGBA{15, 20, 40, bgAlpha}, false)
+		vector.DrawFilledRect(screen, float32(x), float32(y+barH-3), float32(barW), 3,
+			color.RGBA{80, 200, 120, borderAlpha}, false)
 
-		// Text with fade
-		op := &ebiten.DrawImageOptions{}
-		img := cachedTextImage(text)
-		op.GeoM.Translate(float64(x), float64(y+1))
-		op.ColorScale.ScaleAlpha(float32(alpha) / 255.0)
-		screen.DrawImage(img, op)
+		// Centered white text
+		textX := x + (barW-textW)/2
+		textY := y + (barH-12)/2
+		printColoredAt(screen, text, textX, textY, color.RGBA{240, 245, 255, uint8(alpha)})
 	}
 
 	// "Encoding GIF..." overlay with spinner
@@ -237,7 +242,7 @@ func DrawCaptureOverlay(screen *ebiten.Image, r *Renderer) {
 		spinChars := []string{"|", "/", "-", "\\"}
 		spin := spinChars[(r.RecBlinkTick/8)%4]
 		r.RecBlinkTick++
-		text := fmt.Sprintf("Encoding GIF... %s  (Bitte warten)", spin)
+		text := fmt.Sprintf("GIF wird erstellt... %s  (Bitte warten)", spin)
 		textW := len(text) * 6
 		x := sw/2 - textW/2
 		y := 5
@@ -248,7 +253,7 @@ func DrawCaptureOverlay(screen *ebiten.Image, r *Renderer) {
 
 	// Check if background encoding finished (using mutex-protected snapshot above)
 	if !encoding && encodedFile != "" {
-		r.OverlayText = "GIF saved: " + encodedFile
+		r.OverlayText = "GIF gespeichert: " + encodedFile
 		r.OverlayTimer = 90
 	}
 

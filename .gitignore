@@ -5,10 +5,13 @@ swarmsim-linux
 swarmsim.wasm
 wasm_exec.js
 
-# Test/coverage
+# Test/coverage/profiling
 coverage.out
 coverage.html
 cpu.prof
+*.prof
+*.pprof
+*.test
 
 # Screenshots & recordings
 *.png
@@ -18,6 +21,10 @@ cpu.prof
 swarmsim_presets.json
 swarmsim_leaderboard.json
 *.swarm
+
+# Telemetry & benchmark data
+telemetry.jsonl
+benchmark_results.json
 
 # Logs
 *.log
@@ -30,3 +37,9 @@ swarmsim_leaderboard.json
 # OS files
 Thumbs.db
 .DS_Store
+
+# Editor swap/temp files
+*.swp
+*.swo
+*.tmp
+*~

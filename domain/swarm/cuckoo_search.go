@@ -25,7 +25,7 @@ import "math"
 //	on Nature & Biologically Inspired Computing (NaBIC).
 
 const (
-	csDiscoveryProb = 0.10  // probability of worst nests being abandoned (pa), reduced from 0.25
+	csDiscoveryProb = 0.05  // probability of worst nests being abandoned (pa), reduced from 0.10
 	csLevyAlpha     = 1.5   // Lévy exponent (1 < alpha <= 2)
 	csStepScale     = 0.5   // scaling factor for Lévy step size
 	csTopFraction   = 0.25  // fraction considered "best" nests
@@ -33,17 +33,17 @@ const (
 	csMaxTicks      = 3000  // full benchmark length
 
 	// Grid rescan parameters
-	csGridRescanRate = 250 // periodic grid rescan every N ticks (more frequent)
-	csGridRescanSize = 14  // grid resolution (14×14 = 196 samples)
+	csGridRescanRate = 150 // periodic grid rescan every N ticks
+	csGridRescanSize = 18  // grid resolution (18×18 = 324 samples)
 	csGridInjectTop  = 10  // top grid points injected into worst nests
 
 	// Direct-to-best parameters
-	csDirectToBestStart = 0.25 // progress threshold to start direct-to-best
-	csDirectToBestMax   = 0.65 // max probability of direct-to-best
+	csDirectToBestStart = 0.20 // progress threshold to start direct-to-best
+	csDirectToBestMax   = 0.70 // max probability of direct-to-best
 
 	// Global-best attraction
 	csGBWeightMin = 0.05 // early-phase GB attraction
-	csGBWeightMax = 0.60 // late-phase GB attraction
+	csGBWeightMax = 0.65 // late-phase GB attraction
 )
 
 // CuckooState holds the state for Cuckoo Search optimization.
@@ -273,7 +273,7 @@ func ApplyCuckoo(bot *SwarmBot, ss *SwarmState, idx int) {
 	var targetX, targetY float64
 	if dist > 1.0 {
 		baseAngle := math.Atan2(dy, dx)
-		desired := baseAngle + step*0.3
+		desired := baseAngle + step*0.15
 		absStep := math.Abs(step)
 		stepDist := SwarmBotSpeed * (1.0 + math.Min(absStep*0.5, 1.0)) * csSpeedMult
 		targetX = bot.X + math.Cos(desired)*stepDist

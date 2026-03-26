@@ -137,45 +137,75 @@ func (r *Renderer) DrawWelcomeScreen(screen *ebiten.Image, tick int) {
 	sepY := float32(235)
 	vector.StrokeLine(screen, float32(sw/2-250), sepY, float32(sw/2+250), sepY, 1, color.RGBA{60, 60, 80, 255}, false)
 
-	// Mode selection (2 modes)
-	modeY := 255
-	keyCol := color.RGBA{136, 204, 255, 255} // cyan for keys
+	// Mode selection — 3 clickable buttons
+	modeY := 250
 	dimCol := color.RGBA{100, 100, 120, 255}
-	scenarioCol := color.RGBA{180, 200, 220, 255}
+	btnBorderCol := color.RGBA{80, 100, 140, 150}
 
-	// [F1] Classic Mode
-	f1X := centerX - 200
-	printColoredAt(screen, "[F1]", f1X, modeY, keyCol)
-	printColoredAt(screen, "Classic Mode", f1X+30, modeY, scenarioCol)
-	printColoredAt(screen, "5 Bot-Typen mit Genom-Evolution und Pheromonen.", f1X+30, modeY+lineH+2, dimCol)
-	printColoredAt(screen, "Ideal fuer Schwarm-Beobachtung ohne Programmieren.", f1X+30, modeY+2*lineH+2, dimCol)
+	// Button dimensions
+	btnW := 340
+	btnH := 48
+	btnX := (sw - btnW) / 2
 
-	// [F2] Swarm Lab — highlighted as recommended
-	f2Y := modeY + 60
-	f2Text := "[F2] Swarm Lab — SwarmScript Editor (empfohlen)"
-	f2W := len(f2Text) * charW
-	f2X := sw/2 - f2W/2
-
-	// Pulsing glow for F2 (recommended default)
+	// ---- Button 1: Swarm Lab (empfohlen, pulsing) ----
 	pulse := 0.7 + 0.3*math.Sin(float64(tick)*0.05)
-	glowAlpha := uint8(float64(40) * pulse)
-	vector.DrawFilledRect(screen, float32(f2X-8), float32(f2Y-4), float32(f2W+16), 42,
-		color.RGBA{40, 80, 140, glowAlpha}, false)
-	vector.StrokeRect(screen, float32(f2X-8), float32(f2Y-4), float32(f2W+16), 42,
-		1, color.RGBA{136, 204, 255, uint8(float64(100) * pulse)}, false)
+	glowAlpha := uint8(float64(50) * pulse)
+	vector.DrawFilledRect(screen, float32(btnX), float32(modeY), float32(btnW), float32(btnH),
+		color.RGBA{30, 50, 100, 200}, false)
+	vector.DrawFilledRect(screen, float32(btnX), float32(modeY), float32(btnW), float32(btnH),
+		color.RGBA{40, 80, 160, glowAlpha}, false)
+	vector.StrokeRect(screen, float32(btnX), float32(modeY), float32(btnW), float32(btnH),
+		2, color.RGBA{136, 204, 255, uint8(float64(120) * pulse)}, false)
 
-	printColoredAt(screen, "[F2]", f2X, f2Y, keyCol)
-	printColoredAt(screen, "Swarm Lab", f2X+30, f2Y, color.RGBA{255, 255, 255, 255})
-	printColoredAt(screen, "— SwarmScript Editor (empfohlen)", f2X+30+10*charW, f2Y, dimCol)
-	printColoredAt(screen, "Schreibe eigene IF...THEN Regeln oder lade 20 Presets.", f2X+30, f2Y+lineH+2, dimCol)
-	printColoredAt(screen, "GP, Evolution, Delivery-Logistik, Teams. Am meisten Spass!", f2X+30, f2Y+2*lineH+2, dimCol)
+	labTitle := "Swarm Lab — Editor (empfohlen)"
+	labTitleW := len(labTitle) * charW
+	printColoredAt(screen, labTitle, sw/2-labTitleW/2, modeY+6, color.RGBA{255, 255, 255, 255})
+	labDesc := "IF...THEN Regeln, 20 Presets, Evolution, GP"
+	labDescW := len(labDesc) * charW
+	printColoredAt(screen, labDesc, sw/2-labDescW/2, modeY+22, dimCol)
+	// Store hit zone ID
+	r.WelcomeBtn1 = [4]int{btnX, modeY, btnW, btnH}
+
+	// ---- Button 2: Tutorial (gruen) ----
+	tutY := modeY + btnH + 10
+	pulse3 := 0.7 + 0.3*math.Sin(float64(tick)*0.06+1.0)
+	glowAlpha3 := uint8(float64(35) * pulse3)
+	vector.DrawFilledRect(screen, float32(btnX), float32(tutY), float32(btnW), float32(btnH),
+		color.RGBA{25, 50, 30, 200}, false)
+	vector.DrawFilledRect(screen, float32(btnX), float32(tutY), float32(btnW), float32(btnH),
+		color.RGBA{40, 100, 50, glowAlpha3}, false)
+	vector.StrokeRect(screen, float32(btnX), float32(tutY), float32(btnW), float32(btnH),
+		2, color.RGBA{120, 200, 80, uint8(float64(100) * pulse3)}, false)
+
+	tutTitle := "Tutorial starten"
+	tutTitleW := len(tutTitle) * charW
+	printColoredAt(screen, tutTitle, sw/2-tutTitleW/2, tutY+6, color.RGBA{220, 255, 220, 255})
+	tutDesc := "15 Schritte von der ersten Regel bis zur Evolution"
+	tutDescW := len(tutDesc) * charW
+	printColoredAt(screen, tutDesc, sw/2-tutDescW/2, tutY+22, dimCol)
+	r.WelcomeBtn2 = [4]int{btnX, tutY, btnW, btnH}
+
+	// ---- Button 3: Classic Mode (dezent) ----
+	classicY := tutY + btnH + 10
+	vector.DrawFilledRect(screen, float32(btnX), float32(classicY), float32(btnW), 38,
+		color.RGBA{30, 30, 45, 180}, false)
+	vector.StrokeRect(screen, float32(btnX), float32(classicY), float32(btnW), 38,
+		1, btnBorderCol, false)
+
+	classTitle := "Classic Mode"
+	classTitleW := len(classTitle) * charW
+	printColoredAt(screen, classTitle, sw/2-classTitleW/2, classicY+4, color.RGBA{180, 200, 220, 255})
+	classDesc := "5 Bot-Typen, Genom-Evolution, Pheromone"
+	classDescW := len(classDesc) * charW
+	printColoredAt(screen, classDesc, sw/2-classDescW/2, classicY+20, dimCol)
+	r.WelcomeBtn3 = [4]int{btnX, classicY, btnW, 38}
 
 	// Separator
-	sepY2 := float32(f2Y + 60)
+	sepY2 := float32(classicY + 50)
 	vector.StrokeLine(screen, float32(sw/2-250), sepY2, float32(sw/2+250), sepY2, 1, color.RGBA{60, 60, 80, 255}, false)
 
 	// Feature highlights
-	featureY := int(sepY2) + 15
+	featureY := int(sepY2) + 12
 	featureCol := color.RGBA{140, 160, 180, 255}
 	highlightCol := color.RGBA{180, 220, 255, 200}
 
@@ -183,7 +213,7 @@ func (r *Renderer) DrawWelcomeScreen(screen *ebiten.Image, tick int) {
 		icon string
 		text string
 	}{
-		{"Schwarm", "50-500 autonome Bots, jeder sieht nur 120px — kein GPS!"},
+		{"Schwarm", "20-500 autonome Bots, jeder sieht nur 120px — kein GPS!"},
 		{"Script", "IF nearest_dist < 40 THEN TURN_FROM_NEAREST — so einfach"},
 		{"Evolve", "GA optimiert Parameter, GP evolviert ganze Programme"},
 		{"Neuro", "Neuronale Netze pro Bot — lernt durch Evolution!"},
@@ -192,25 +222,20 @@ func (r *Renderer) DrawWelcomeScreen(screen *ebiten.Image, tick int) {
 	}
 
 	for i, f := range features {
-		fy := featureY + i*(lineH+6)
+		fy := featureY + i*(lineH+4)
 		printColoredAt(screen, f.icon, centerX-280, fy, highlightCol)
 		printColoredAt(screen, f.text, centerX-235, fy, featureCol)
 	}
 
 	// Hint text (blinking)
-	hintY := featureY + len(features)*(lineH+6) + 20
+	hintY := featureY + len(features)*(lineH+4) + 14
 	hintAlpha := uint8(120 + int(80*math.Sin(float64(tick)*0.08)))
-	hint := "Druecke F2 fuer Swarm Lab oder F1 fuer Classic Mode"
+	hint := "Klicke auf einen Button oben oder druecke F1 / F2 / F3"
 	hintW := len(hint) * charW
 	printColoredAt(screen, hint, sw/2-hintW/2, hintY,
 		color.RGBA{180, 180, 200, hintAlpha})
 
-	// Keyboard shortcuts hint
-	shortcutHint := "H = Hilfe  |  F3 = Tutorial  |  ESC = Beenden"
-	shW := len(shortcutHint) * charW
-	printColoredAt(screen, shortcutHint, sw/2-shW/2, sh-50, dimCol)
-
 	// Version
-	version := "v1.1"
+	version := "v2.0"
 	printColoredAt(screen, version, sw-len(version)*charW-15, sh-20, color.RGBA{60, 60, 70, 255})
 }

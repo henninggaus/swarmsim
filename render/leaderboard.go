@@ -29,7 +29,7 @@ func DrawLeaderboardOverlay(screen *ebiten.Image, lb *swarm.LeaderboardState) {
 		float32(panelW), float32(panelH), 2, color.RGBA{255, 200, 50, 200}, false)
 
 	// Title
-	title := "LEADERBOARD — HIGHSCORES"
+	title := "BESTENLISTE — HIGHSCORES"
 	titleW := len(title) * charW
 	printColoredAt(screen, title, sw/2-titleW/2, py+10, color.RGBA{255, 200, 50, 255})
 

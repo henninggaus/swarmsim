@@ -176,7 +176,7 @@ func (r *Renderer) drawSwarmMinimap(screen *ebiten.Image, ss *swarm.SwarmState) 
 	ly := int(my) + minimapH + 2
 	lx := int(mx)
 	legendCol := color.RGBA{100, 110, 130, 180}
-	printColoredAt(screen, "Minimap (M)", lx, ly, legendCol)
+	printColoredAt(screen, "Minimap", lx, ly, legendCol)
 	if ss.DeliveryOn {
 		ly += 10
 		printColoredAt(screen, "o=Pickup  O=Dropoff", lx, ly, legendCol)

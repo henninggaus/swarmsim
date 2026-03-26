@@ -527,6 +527,6 @@ func drawVoronoiOverlay(a *ebiten.Image, ss *swarm.SwarmState) {
 	}
 
 	// Label
-	printColoredAt(a, "VORONOI (Ctrl+V)", 5, int(ss.ArenaH)-14, color.RGBA{180, 200, 255, 180})
+	printColoredAt(a, "VORONOI", 5, int(ss.ArenaH)-14, color.RGBA{180, 200, 255, 180})
 }
 

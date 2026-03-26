@@ -745,7 +745,7 @@ func (r *Renderer) DrawSwarmMode(screen *ebiten.Image, s *simulation.Simulation,
 	// Truck round complete overlay
 	if ss.TruckToggle && ss.TruckState != nil && ss.TruckState.CurrentTruck != nil &&
 		ss.TruckState.CurrentTruck.Phase == swarm.TruckRoundDone {
-		roundText := fmt.Sprintf("ROUND COMPLETE! Score: %d [N: New Round]", ss.TruckState.Score)
+		roundText := fmt.Sprintf("RUNDE ABGESCHLOSSEN! Punkte: %d", ss.TruckState.Score)
 		rtW := len(roundText) * charW
 		rtX := sw/2 - rtW/2 + 100
 		rtY := sh/2 - 30
@@ -1240,7 +1240,7 @@ func drawBotComparisonPanel(screen *ebiten.Image, ss *swarm.SwarmState) {
 	printColoredAt(screen, fmt.Sprintf("S:%d C:%d", botB.State, botB.Counter), colB, ly, dimCol)
 	ly += lineH + 2
 
-	printColoredAt(screen, "[Shift+Click to compare, Click to clear]", px+5, py+ph-lineH-2, color.RGBA{80, 80, 100, 200})
+	printColoredAt(screen, "[Klick = abwaehlen, Shift+Klick = vergleichen]", px+5, py+ph-lineH-2, color.RGBA{80, 80, 100, 200})
 }
 
 // deliveryColor returns the RGBA color for a delivery color ID (1-4).
@@ -2753,10 +2753,10 @@ func (r *Renderer) drawFitnessLandscapeOverlay(a *ebiten.Image, ss *swarm.SwarmS
 	printColoredAt(a, " -> ", 28, legendY, color.RGBA{200, 200, 200, 180})
 	printColoredAt(a, "High", 50, legendY, color.RGBA{255, 0, 0, 200})
 	legendY += 14
-	printColoredAt(a, "Shift+F: Cycle function", 10, legendY, color.RGBA{180, 180, 180, 160})
+	printColoredAt(a, "Funktion wechseln: Tab Algo", 10, legendY, color.RGBA{180, 180, 180, 160})
 	if sa.DynamicLandscape {
 		legendY += 14
-		printColoredAt(a, "DYNAMIC (Ctrl+D)", 10, legendY, color.RGBA{255, 180, 0, 220})
+		printColoredAt(a, "DYNAMISCH", 10, legendY, color.RGBA{255, 180, 0, 220})
 	}
 }
 

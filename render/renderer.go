@@ -67,6 +67,9 @@ type Renderer struct {
 
 	// Welcome screen
 	WelcomeBots []WelcomeBot
+	WelcomeBtn1 [4]int // [x, y, w, h] hit zone for Swarm Lab button
+	WelcomeBtn2 [4]int // [x, y, w, h] hit zone for Tutorial button
+	WelcomeBtn3 [4]int // [x, y, w, h] hit zone for Classic button
 
 	// Fade transition
 	FadeAlpha float32 // 0.0 = transparent, 1.0 = fully black

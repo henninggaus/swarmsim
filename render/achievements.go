@@ -59,7 +59,7 @@ func DrawAchievementPopup(screen *ebiten.Image, ss *swarm.SwarmState) {
 
 	// Achievement unlocked label
 	unlockCol := color.RGBA{255, 255, 255, textAlpha}
-	printColoredAt(screen, "ACHIEVEMENT FREIGESCHALTET!", x+10, y+18, unlockCol)
+	printColoredAt(screen, "ERFOLG FREIGESCHALTET!", x+10, y+18, unlockCol)
 
 	// Description
 	descCol := color.RGBA{180, 180, 200, textAlpha}
@@ -93,7 +93,7 @@ func DrawAchievementOverlay(screen *ebiten.Image, ss *swarm.SwarmState) {
 		1, color.RGBA{80, 80, 120, 255}, false)
 
 	// Title
-	titleStr := fmt.Sprintf("ACHIEVEMENTS  [%d/%d]", as.TotalUnlocked, int(swarm.AchCount))
+	titleStr := fmt.Sprintf("ERFOLGE  [%d/%d]", as.TotalUnlocked, int(swarm.AchCount))
 	printColoredAt(screen, titleStr, x+10, y+5, color.RGBA{255, 220, 100, 255})
 
 	// Progress bar

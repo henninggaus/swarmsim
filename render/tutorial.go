@@ -65,8 +65,8 @@ var TutorialSteps = []TutorialStep{
 	},
 	// Step 6: Delivery on
 	{
-		Lines:     [3]string{"Klicke auf 'Delivery: ON'. Farbige Stationen erscheinen:", "Gefuellte Kreise = Pickup (Paket abholen),", "Ringe = Dropoff (Paket zur gleichen Farbe bringen)."},
-		ArrowX:    88, ArrowY: 725,
+		Lines:     [3]string{"Im Tab 'Arena' klicke auf 'Delivery: ON'.", "Farbige Stationen erscheinen: Gefuellte Kreise = Pickup,", "Ringe = Dropoff (Paket zur gleichen Farbe bringen)."},
+		ArrowX:    88, ArrowY: 680,
 		WaitInput: "click:delivery",
 	},
 	// Step 7: Delivery program
@@ -77,7 +77,7 @@ var TutorialSteps = []TutorialStep{
 	},
 	// Step 8: Stats
 	{
-		Lines:     [3]string{"Oben: Deliveries (geliefert), Correct (richtige Farbe), Wrong.", "AvgTime = durchschnittliche Lieferzeit in Ticks.", "Druecke D fuer das Dashboard mit Graphen und Heatmap."},
+		Lines:     [3]string{"Oben: Deliveries (geliefert), Correct (richtige Farbe), Wrong.", "AvgTime = durchschnittliche Lieferzeit in Ticks.", "Im Tab 'Anzeige' kannst du das Dashboard aktivieren."},
 		ArrowX:    600, ArrowY: 15,
 		WaitInput: "",
 	},
@@ -86,10 +86,10 @@ var TutorialSteps = []TutorialStep{
 		Lines:     [3]string{"Klicke auf einen Bot in der Arena!", "Du siehst sein Info-Panel: aktuelle Sensoren, Zustand,", "ob er ein Paket traegt und seine Lieferstatistiken."},
 		WaitInput: "click:bot",
 	},
-	// Step 10: Follow-cam
+	// Step 10: Follow-cam info (no key required, just explain)
 	{
-		Lines:     [3]string{"Druecke F um dem Bot zu folgen. Die Kamera zentriert sich", "auf ihn. So siehst du die Welt aus Bot-Perspektive.", "Nochmal F oder Klick ins Leere zum Beenden."},
-		WaitInput: "key:F",
+		Lines:     [3]string{"Tipp: Im Tab 'Anzeige' gibt es einen Follow-Cam Toggle.", "Die Kamera zentriert sich auf den selektierten Bot.", "So siehst du die Welt aus Bot-Perspektive!"},
+		WaitInput: "",
 	},
 	// Step 11: Block editor
 	{
@@ -97,20 +97,20 @@ var TutorialSteps = []TutorialStep{
 		ArrowX:    288, ArrowY: 10,
 		WaitInput: "click:blocks",
 	},
-	// Step 12: Toggles
+	// Step 12: Tabs
 	{
-		Lines:     [3]string{"Unten links: Arena-Konfiguration. Obstacles = Hindernisse,", "Maze = Labyrinth, Evolution = Param-Optimierung,", "GP = Programme evolvieren sich selbst! Hover fuer Details."},
-		ArrowX:    175, ArrowY: 710,
+		Lines:     [3]string{"Unten links: 5 Tabs fuer alle Features.", "Arena = Umgebung, Evo = Evolution, Anzeige = Visualisierung,", "Algo = 20 Optimierungs-Algorithmen, Tools = Speed/Export."},
+		ArrowX:    175, ArrowY: 650,
 		WaitInput: "",
 	},
 	// Step 13: Help
 	{
-		Lines:     [3]string{"Druecke H fuer die komplette Hilfe mit allen Sensoren,", "Aktionen und Algorithmus-Erklaerungen.", "Log-Konsole: ` oder Oe-Taste."},
+		Lines:     [3]string{"Druecke H fuer die Hilfe mit allen Sensoren,", "Aktionen und Feature-Erklaerungen.", "Hover ueber Buttons zeigt Tooltips mit Details."},
 		WaitInput: "key:H",
 	},
 	// Step 14: Finish
 	{
-		Lines:     [3]string{"Fertig! Tipps: 'Evolving Delivery'+Evolution ON optimiert Parameter.", "GP: Random Start+GP ON = Programme evolvieren sich selbst!", "Neuro: Delivery = Neuronale Netze lernen ohne Code! Viel Spass!"},
+		Lines:     [3]string{"Fertig! Tipps: 'Evolving Delivery' + Tab Evo: Evolution ON.", "GP: Random Start + GP ON = Programme evolvieren sich!", "Tab Algo: 20 Algorithmen per Klick testen. Viel Spass!"},
 		WaitInput: "",
 	},
 }

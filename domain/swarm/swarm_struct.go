@@ -16,7 +16,7 @@ const (
 	SwarmDropoffBeaconRange  = 150.0 // virtual dropoff beacon broadcast range
 	SwarmArenaSize           = 800.0
 	SwarmEdgeMargin          = 20.0
-	SwarmDefaultBots         = 50
+	SwarmDefaultBots         = 20
 	SwarmMaxBots             = 500
 	SwarmMinBots             = 5
 
@@ -620,15 +620,15 @@ type SwarmState struct {
 	// Using a struct slice prevents name/program arrays from diverging.
 	Presets []SwarmPreset
 
-	// Deprecated: use Presets[i].Name / Presets[i].Source instead.
-	// Kept temporarily for backward compatibility during migration.
-	PresetNames    []string
-	PresetPrograms []string
 	DropdownOpen   bool
 	DropdownHover  int
 
 	BotCountText string // editable bot count field text
 	BotCountEdit bool   // is bot count field focused
+
+	// Tabbed editor panel (replaces hardcoded toggle rows)
+	EditorTab  int // 0=Arena, 1=Evo, 2=Anzeige, 3=Algo, 4=Tools
+	TabScrollY int // vertical scroll offset within active tab content
 
 	// Obstacles / Maze / Environment toggles
 	Obstacles   []*physics.Obstacle
@@ -829,6 +829,12 @@ type SwarmState struct {
 	DayNightOn    bool
 	DayNightPhase float64 // 0.0-1.0 (0=noon, 0.5=midnight)
 	DayNightSpeed float64 // phase advance per tick
+
+	// Minimap toggle (synced with Renderer.ShowMinimap)
+	ShowMinimap bool
+
+	// Current simulation speed (synced from sim.Speed for tab display)
+	CurrentSpeed float64
 
 	// Swarm center of mass overlay (Shift+C in swarm mode)
 	ShowSwarmCenter bool

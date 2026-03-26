@@ -343,8 +343,8 @@ func TestNewSwarmState(t *testing.T) {
 	if ss.Hash == nil {
 		t.Error("spatial hash should be initialized")
 	}
-	if len(ss.PresetNames) == 0 {
-		t.Error("preset names should be populated")
+	if len(ss.Presets) == 0 {
+		t.Error("presets should be populated")
 	}
 	if ss.SelectedBot != -1 {
 		t.Errorf("SelectedBot should be -1, got %d", ss.SelectedBot)

@@ -60,7 +60,8 @@ func NewSwarmState(rng *rand.Rand, botCount int) *SwarmState {
 		FollowCamBot: -1,
 		SwarmCamX:    SwarmArenaSize / 2,
 		SwarmCamY:    SwarmArenaSize / 2,
-		SwarmCamZoom: 1.0,
+		SwarmCamZoom:  1.0,
+		CurrentSpeed: 1.0,
 	}
 
 	// Set up presets as type-safe pairs (name + source always stay together)
@@ -86,14 +87,7 @@ func NewSwarmState(rng *rand.Rand, botCount int) *SwarmState {
 		{"GP: Random Start", presetGPRandomStart},
 		{"GP: Seeded Start", presetGPSeededStart},
 		{"Neuro: Delivery", presetNeuroDelivery},
-	}
-
-	// Backward-compatible parallel arrays (derived from Presets)
-	ss.PresetNames = make([]string, len(ss.Presets))
-	ss.PresetPrograms = make([]string, len(ss.Presets))
-	for i, p := range ss.Presets {
-		ss.PresetNames[i] = p.Name
-		ss.PresetPrograms[i] = p.Source
+		{"Neuro: LKW", presetNeuroTruck},
 	}
 
 	// Initialize editor with default preset
@@ -542,7 +536,12 @@ func IsGPPresetIdx(idx int) bool {
 
 // IsNeuroPresetIdx returns true for neuroevolution presets (idx 20).
 func IsNeuroPresetIdx(idx int) bool {
-	return idx == 20
+	return idx == 20 || idx == 21
+}
+
+// IsNeuroTruckPresetIdx returns true for the Neuro: LKW preset.
+func IsNeuroTruckPresetIdx(idx int) bool {
+	return idx == 21
 }
 
 // ScanUsedParams scans the current program and sets ss.UsedParams for each $A-$Z found.
@@ -1274,4 +1273,34 @@ var presetNeuroDelivery = `# === NEURO: DELIVERY ===
 # Tipp: Beobachte wie die Fitness ueber Generationen steigt!
 # Am Anfang bewegen sich die Bots zufaellig. Nach einigen
 # Generationen lernen sie Pakete aufzuheben und zu liefern.
+IF true THEN FWD`
+
+var presetNeuroTruck = `# === NEURO: LKW-ENTLADUNG ===
+# Benoetigt: NEURO ON + TRUCKS ON (werden automatisch aktiviert)
+# Neuronales Netz lernt LKW zu entladen!
+#
+# Architektur: 12 Sensoren -> 6 Hidden -> 8 Aktionen
+# 120 Gewichte pro Bot, evolviert durch Selektion.
+#
+# === Wie funktioniert es? ===
+# Jeder Bot hat ein eigenes Netz mit zufaelligen Gewichten.
+# Alle 2000 Ticks: Fitness bewerten, Top 20% vererben.
+# Die Bots muessen lernen: zur Rampe gehen, Paket nehmen,
+# zur richtigen Abgabestation bringen.
+#
+# === Sensoren (Inputs) ===
+# near_dist, neighbors, edge, carry,
+# trk_pkg_d, d_dist, match, on_ramp,
+# obs_ahead, trk_here, rnd, bias
+#
+# === Aktionen (Outputs) ===
+# FWD, TURN_LEFT, TURN_RIGHT, TURN_TO_NEAREST,
+# TURN_FROM_NEAREST, GOTO_RAMP, DROP, GOTO_DROPOFF
+#
+# === Fitness ===
+# Lieferungen x40 + Aufnahmen x20 + Distanz x0.005
+# - AntiStuck x10 - Idle x0.05 + Truck-Naehe-Bonus
+#
+# Tipp: Beobachte wie die Bots nach einigen Generationen
+# gezielt zur Rampe gehen und Pakete sortiert abliefern!
 IF true THEN FWD`

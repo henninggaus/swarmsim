@@ -22,10 +22,13 @@ var (
 	colorHelpFeature = color.RGBA{180, 220, 255, 255}
 	colorHelpAlgo    = color.RGBA{200, 160, 255, 255} // purple for algorithm names
 	colorHelpNote    = color.RGBA{160, 200, 160, 255} // soft green for notes/tips
+	colorHelpMath    = color.RGBA{255, 220, 100, 255} // gold for math formulas
+	colorHelpApply   = color.RGBA{140, 220, 180, 255} // green for "how it's applied"
+	colorHelpAlgoHdr = color.RGBA{180, 140, 255, 255} // purple for algo sub-headers
 )
 
 // DrawHelpOverlay renders the full-screen help overlay.
-// Two-column layout: left = keyboard reference + SwarmScript, right = feature & algorithm explanations.
+// Two-column layout: left = SwarmScript reference, right = feature explanations.
 func DrawHelpOverlay(screen *ebiten.Image, isSwarmMode bool, scrollY int) {
 	sw := screen.Bounds().Dx()
 	sh := screen.Bounds().Dy()
@@ -61,120 +64,44 @@ func DrawHelpOverlay(screen *ebiten.Image, isSwarmMode bool, scrollY int) {
 	y += 8
 
 	// ========================
-	// LEFT COLUMN: Keyboard Reference
+	// LEFT COLUMN: Quick Start + SwarmScript Reference
 	// ========================
 	ly := y
 
-	// -- ALLGEMEIN --
-	printColoredAt(screen, "ALLGEMEIN", px, ly, colorHelpSection)
+	// -- SCHNELLSTART --
+	printColoredAt(screen, "WO ANFANGEN?", px, ly, color.RGBA{120, 255, 120, 255})
 	ly += lineH + 2
-	helpKV(screen, px, &ly, []kv{
-		{"Space", "Pause / Fortsetzen"},
-		{"+/-", "Geschwindigkeit (Zeitlupe: 0.125x bis 10x)"},
-		{"1-5", "Speed-Presets: 0.5x / 1x / 2x / 5x / 10x"},
-		{"H", "Diese Hilfe ein/ausblenden"},
-		{"F3", "Interaktives Tutorial starten (15 Schritte)"},
-		{"F10", "Screenshot als PNG speichern"},
-		{"F11", "GIF-Aufnahme starten/stoppen"},
-		{"S", "Sound ein/aus"},
-		{"`/Oe", "Debug Log-Konsole oeffnen"},
-		{"ESC", "Beenden / Overlay schliessen"},
+	helpParagraph(screen, px, &ly, []string{
+		"1. Klicke F3 fuer das interaktive Tutorial",
+		"2. Oder F2 und waehle ein Preset im Dropdown",
+		"3. Klicke DEPLOY — beobachte die Bots!",
+		"4. Im Tab 'Evo' schalte Evolution ON ein",
+		"5. Im Tab 'Anzeige' aktiviere das Dashboard",
 	})
 	ly += 6
 
-	// -- MODI --
-	printColoredAt(screen, "MODI", px, ly, colorHelpSection)
+	// -- BEDIENUNG --
+	printColoredAt(screen, "BEDIENUNG", px, ly, colorHelpSection)
 	ly += lineH + 2
-	helpKV(screen, px, &ly, []kv{
-		{"F1", "Classic Mode (5 Bot-Typen, Pheromone, Evolution)"},
-		{"F2", "Swarm Lab (SwarmScript Editor, empfohlen)"},
+	helpParagraph(screen, px, &ly, []string{
+		"Alles wird per Maus gesteuert:",
+		"",
+		"  Linksklick    Bot auswaehlen (zeigt Info-Panel)",
+		"  Rechte Maus   Kamera verschieben (drag)",
+		"  Mausrad       Zoom rein/raus",
+		"  Space         Pause / Fortsetzen",
+		"  H             Diese Hilfe ein/ausblenden",
+		"  ESC           Beenden / Overlay schliessen",
+		"",
+		"Alle Features sind ueber die 5 Tabs links steuerbar:",
 	})
 	ly += 2
-	helpParagraph(screen, px, &ly, []string{
-		"  Classic = vordefinierte Bot-Typen mit Genom-Evolution",
-		"  Swarm Lab = frei programmierbare Bots mit Editor",
-	})
-	ly += 6
-
-	// -- NAVIGATION --
-	printColoredAt(screen, "NAVIGATION", px, ly, colorHelpSection)
-	ly += lineH + 2
 	helpKV(screen, px, &ly, []kv{
-		{"Mausrad", "Zoom rein/raus (stufenlos)"},
-		{"Rechte Maus", "Kamera verschieben (drag)"},
-		{"Linksklick", "Bot auswaehlen (Info-Panel oeffnen)"},
-		{"F", "Follow-Cam: Kamera folgt selektiertem Bot"},
-		{"Tab", "Log filtern: Alle / Nur selektierter Bot"},
-	})
-	ly += 6
-
-	// -- SWARM LAB --
-	printColoredAt(screen, "SWARM LAB (F2)", px, ly, colorHelpSection)
-	ly += lineH + 2
-	helpKV(screen, px, &ly, []kv{
-		{"L", "Lichtquelle positionieren (klicken)"},
-		{"T", "Bot-Trails (Bewegungsspuren) anzeigen"},
-		{"C", "Lieferrouten anzeigen / Challenge starten"},
-		{"D", "Dashboard mit Statistiken ein/aus"},
-		{"M", "Minimap (Uebersichtskarte) ein/aus"},
-		{"N", "Neue Runde (Trucks/Teams zuruecksetzen)"},
-		{"V", "Genom-Visualisierung (bei Evolution)"},
-		{"G", "Genom-Browser: sortierbare Bot-Liste (Evo/GP/Neuro)"},
-		{"J", "Dynamische Umgebung (bewegl. Hindernisse + Paket-Verfall)"},
-		{"Shift+J", "Patrouille/Rotation-Hindernisse ein/aus"},
-		{"O", "Arena-Editor: Hindernisse/Stationen platzieren (1/2/3)"},
-		{"U", "Turnier-Modus: Programme gegeneinander antreten lassen"},
-		{"Q", "Einzelschritt-Debugger (Q=1 Tick, Space=weiter)"},
-		{"W", "Farb-Filter: Rot/Gruen/Blau/Traegt/Idle (zyklisch)"},
-		{"Y", "Heatmap: zeigt wo Bots sich am meisten aufhalten"},
-		{"P", "Nachrichten-Wellen: zeigt Broadcast-Ringe"},
-		{"F4", "Auto-Optimizer: testet Parameter automatisch"},
-		{"F5", "Szenario-Kette: 3 Szenarien nacheinander durchlaufen"},
-		{"F6", "Formation-Analyse: Schwarm-Metriken Overlay"},
-		{"F8", "Parameter-Preset speichern"},
-		{"F9", "Gespeichertes Preset laden (zyklisch)"},
-		{".", "Live-Chart: Lieferstatistik als Liniendiagramm"},
-		{",", "Bot-Gedaechtnis: Bots merken sich besuchte Zellen"},
-		{"/", "Pareto-Modus: Multi-Objective Evolution (NSGA-II)"},
-		{"\\", "Sensor-Rauschen: Noise + Ausfaelle (realistisch)"},
-		{"Z", "Replay-Modus: Zeitverlauf mit Pfeiltasten scrubben"},
-		{"I", "Energie-System: Bots verbrauchen Energie"},
-		{"K", "Kommunikations-Graph: Nachrichten-Linien anzeigen"},
-		{"B", "Fitness-Baseline: aktuelle Kurve als Vergleich speichern"},
-		{"A", "Dashboard: Aktions-Heatmap / Bewegungs-Heatmap"},
-		{"Ctrl+S", "Programm als .swarm Datei exportieren"},
-		{"Ctrl+O", "Programm aus .swarm Datei importieren"},
-		{"Ctrl+L", "Leaderboard: Highscore-Tabelle anzeigen"},
-		{"Ctrl+Klick", "Bot-Genom auf alle anderen klonen"},
-		{"X", "Stats als CSV in Clipboard exportieren"},
-		{"6", "Grey Wolf Optimizer (GWO) Overlay"},
-		{"Shift+X", "Whale Optimization (WOA) Overlay"},
-		{"Shift+Z", "Bacterial Foraging (BFO) Overlay"},
-		{"Shift+R", "Moth-Flame Optimization (MFO) Overlay"},
-		{"Shift+Q", "Cuckoo Search (CS) Overlay"},
-		{"Shift+D", "Differential Evolution (DE) Overlay"},
-		{"Shift+B", "Artificial Bee Colony (ABC) Overlay"},
-		{"Shift+J", "Harmony Search (HSO) Overlay"},
-		{"Shift+Y", "Bat Algorithm (BA) Overlay"},
-		{"Shift+A", "Harris Hawks (HHO) Overlay"},
-		{"Ctrl+1", "Salp Swarm (SSA) Overlay"},
-		{"Ctrl+2", "Gravitational Search (GSA) Overlay"},
-		{"Ctrl+3", "Flower Pollination (FPA) Overlay"},
-		{"Ctrl+4", "Simulated Annealing (SA) Overlay"},
-		{"Ctrl+5", "Geschwindigkeits-Flussfeld (Velocity Flow Field)"},
-		{"Ctrl+6", "Aquila Optimizer (AO) Overlay"},
-		{"Ctrl+7", "Sine Cosine Algorithm (SCA) Overlay"},
-		{"Ctrl+8", "Dragonfly Algorithm (DA) Overlay"},
-		{"Ctrl+9", "Teaching-Learning (TLBO) Overlay"},
-		{"Ctrl+0", "Equilibrium Optimizer (EO) Overlay"},
-		{"Ctrl+-", "Jaya Algorithm Overlay"},
-		{"Ctrl+=", "Algorithmus-Radar: Performance-Vergleich (Spider Chart)"},
-		{"Shift+P", "Fitness-Landschaft Heatmap ein/aus"},
-		{"Shift+F", "Fitness-Funktion wechseln (Gauss/Rastrigin/Ackley/Rosenbrock/Schwefel)"},
-		{"Ctrl+T", "Auto-Turnier: alle Algorithmen auf aktueller Landschaft vergleichen"},
-		{"Ctrl+D", "Dynamische Fitness-Landschaft: Gauss-Peaks bewegen sich"},
-		{"Ctrl+G", "Fitness-Gradient: Pfeile zeigen Richtung steigender Fitness"},
-		{"Ctrl+V", "Voronoi-Territorien: Naechster-Nachbar-Gebietskarte"},
+		{"Arena", "Hindernisse, Labyrinth, Licht, Pakete, LKW"},
+		{"Evo", "Evolution, Gen. Programmierung, Neuro, Teams"},
+		{"Anzeige", "Dashboard, Spuren, Heatmap, Minimap, ..."},
+		{"Algo", "20 Optimierungs-Algorithmen per Klick"},
+		{"Werkzeuge", "Tempo, Zeitreise, Bildschirmfoto, Export"},
 	})
 	ly += 8
 
@@ -236,41 +163,41 @@ func DrawHelpOverlay(screen *ebiten.Image, isSwarmMode bool, scrollY int) {
 	printColoredAt(screen, "SENSOREN (vollstaendig)", px, ly, colorHelpSection)
 	ly += lineH + 2
 	helpKVSensor(screen, px, &ly, []kv{
-		{"near_dist", "Abstand zum naechsten Bot (in Pixeln)"},
-		{"neighbors", "Anzahl Nachbarn im Sensorradius (120px)"},
+		{"near_dist", "Abstand zum naechsten Bot (Pixel)"},
+		{"neighbors", "Nachbarn im Sensorradius (120px)"},
 		{"carry", "1 = traegt Paket, 0 = leer"},
-		{"match", "1 = Dropoff der richtigen Farbe in Reichweite"},
-		{"p_dist", "Abstand zur naechsten Pickup-Station"},
-		{"d_dist", "Abstand zur naechsten Dropoff-Station"},
-		{"has_pkg", "1 = Pickup hat ein Paket bereit"},
-		{"light", "Lichtstaerke am Standort (0-100)"},
-		{"obs_ahead", "1 = Hindernis voraus (Raycast)"},
-		{"wall_right", "1 = Wand rechts (fuer Maze-Navigation)"},
-		{"wall_left", "1 = Wand links (fuer Maze-Navigation)"},
-		{"edge", "1 = Bot ist am Arena-Rand"},
-		{"rnd", "Zufallszahl 0-100 (jedes Tick neu)"},
+		{"match", "1 = passende Dropoff in Reichweite"},
+		{"p_dist", "Abstand zur naechsten Pickup"},
+		{"d_dist", "Abstand zur naechsten Dropoff"},
+		{"has_pkg", "1 = Pickup hat Paket bereit"},
+		{"light", "Lichtstaerke (0-100)"},
+		{"obs_ahead", "1 = Hindernis voraus"},
+		{"wall_right", "1 = Wand rechts (Maze)"},
+		{"wall_left", "1 = Wand links (Maze)"},
+		{"edge", "1 = Am Arena-Rand"},
+		{"rnd", "Zufallszahl 0-100"},
 		{"tick", "Aktueller Simulations-Tick"},
-		{"state", "Interner Zustand des Bots (0-9)"},
-		{"counter", "Interner Zaehler (fuer Timer/Logik)"},
-		{"heading", "Aktuelle Blickrichtung (0-359 Grad)"},
-		{"team", "Team-Zugehoerigkeit (1=A, 2=B)"},
-		{"team_score", "Punktestand des eigenen Teams"},
-		{"enemy_score", "Punktestand des gegnerischen Teams"},
-		{"msg", "1 = Nachricht empfangen (hat_message)"},
-		{"on_ramp", "1 = Bot steht auf der LKW-Rampe"},
-		{"truck_here", "1 = LKW ist an der Rampe geparkt"},
-		{"truck_pkg", "Anzahl verbleibender Pakete im LKW"},
-		{"speed", "Aktuelle Geschwindigkeit des Bots"},
-		{"bot_ahead", "Nachbarn im 90-Grad-Kegel voraus"},
-		{"bot_behind", "Nachbarn im 90-Grad-Kegel hinten"},
-		{"bot_left", "Nachbarn im 90-Grad-Kegel links"},
-		{"bot_right", "Nachbarn im 90-Grad-Kegel rechts"},
-		{"visited_here", "Wie oft aktuelle Zelle besucht (Memory)"},
-		{"visited_ahead", "Wie oft Zelle voraus besucht (Memory)"},
-		{"explored", "Prozent des Gebiets erkundet (Memory)"},
-		{"group_carry", "Prozent der Nachbarn die tragen (0-100)"},
-		{"group_speed", "Durchschnitts-Speed der Nachbarn"},
-		{"group_size", "Cluster-Groesse (Nachbarn + 1)"},
+		{"state", "Interner Zustand (0-9)"},
+		{"counter", "Interner Zaehler"},
+		{"heading", "Blickrichtung (0-359 Grad)"},
+		{"team", "Team (1=A, 2=B)"},
+		{"team_score", "Eigenes Team-Score"},
+		{"enemy_score", "Gegner-Score"},
+		{"msg", "1 = Nachricht empfangen"},
+		{"on_ramp", "1 = Auf LKW-Rampe"},
+		{"truck_here", "1 = LKW an Rampe"},
+		{"truck_pkg", "Pakete im LKW"},
+		{"speed", "Aktuelle Geschwindigkeit"},
+		{"bot_ahead", "Bots im 90-Grad-Kegel vorn"},
+		{"bot_behind", "Bots hinten"},
+		{"bot_left", "Bots links"},
+		{"bot_right", "Bots rechts"},
+		{"visited_here", "Besuche aktuelle Zelle"},
+		{"visited_ahead", "Besuche Zelle voraus"},
+		{"explored", "% erkundet (Memory)"},
+		{"group_carry", "% Nachbarn die tragen"},
+		{"group_speed", "Avg Speed Nachbarn"},
+		{"group_size", "Cluster-Groesse"},
 	})
 	ly += 6
 
@@ -279,35 +206,91 @@ func DrawHelpOverlay(screen *ebiten.Image, isSwarmMode bool, scrollY int) {
 	ly += lineH + 2
 	helpKVAction(screen, px, &ly, []kv{
 		{"FWD", "Geradeaus bewegen"},
-		{"STOP", "Anhalten (0 Geschwindigkeit)"},
-		{"TURN_RIGHT N", "Um N Grad nach rechts drehen"},
-		{"TURN_LEFT N", "Um N Grad nach links drehen"},
-		{"TURN_RANDOM", "Zufaellige neue Richtung"},
-		{"TURN_TO_NEAREST", "Zum naechsten Bot drehen"},
-		{"TURN_FROM_NEAREST", "Vom naechsten Bot weg drehen"},
-		{"TURN_TO_LIGHT", "Richtung Lichtquelle drehen"},
-		{"TURN_TO_CENTER", "Zur Mitte der Nachbarn drehen"},
-		{"FOLLOW_NEAREST", "Dem naechsten Bot folgen"},
-		{"PICKUP", "Paket aufheben (an Pickup)"},
-		{"DROP", "Paket ablegen (an Dropoff)"},
-		{"GOTO_DROPOFF", "Zur passenden Dropoff drehen"},
-		{"GOTO_PICKUP", "Zur naechsten Pickup drehen"},
-		{"AVOID_OBSTACLE", "Hindernis ausweichen (Lenkung)"},
-		{"WALL_FOLLOW_RIGHT", "Rechte-Hand-Regel (Maze)"},
-		{"WALL_FOLLOW_LEFT", "Linke-Hand-Regel (Maze)"},
-		{"SET_LED R G B", "LED auf Farbe setzen (0-255)"},
-		{"COPY_LED", "LED des naechsten Bots kopieren"},
-		{"SEND_MESSAGE N", "Nachricht Typ N broadcasten"},
-		{"SET_STATE N", "Internen Zustand auf N setzen"},
-		{"INC_COUNTER", "Internen Zaehler erhoehen (+1)"},
-		{"RESET_COUNTER", "Internen Zaehler auf 0 setzen"},
-		{"GOTO_BEACON", "Zum Beacon-Signal navigieren"},
+		{"STOP", "Anhalten"},
+		{"TURN_RIGHT N", "N Grad rechts drehen"},
+		{"TURN_LEFT N", "N Grad links drehen"},
+		{"TURN_RANDOM", "Zufaellige Richtung"},
+		{"TURN_TO_NEAREST", "Zum naechsten Bot"},
+		{"TURN_FROM_NEAREST", "Vom naechsten Bot weg"},
+		{"TURN_TO_LIGHT", "Zur Lichtquelle"},
+		{"TURN_TO_CENTER", "Zur Nachbar-Mitte"},
+		{"FOLLOW_NEAREST", "Naechstem Bot folgen"},
+		{"PICKUP", "Paket aufheben"},
+		{"DROP", "Paket ablegen"},
+		{"GOTO_DROPOFF", "Zur passenden Dropoff"},
+		{"GOTO_PICKUP", "Zur naechsten Pickup"},
+		{"AVOID_OBSTACLE", "Hindernis ausweichen"},
+		{"WALL_FOLLOW_RIGHT", "Rechte-Hand-Regel"},
+		{"WALL_FOLLOW_LEFT", "Linke-Hand-Regel"},
+		{"SET_LED R G B", "LED-Farbe setzen"},
+		{"COPY_LED", "LED kopieren"},
+		{"SEND_MESSAGE N", "Nachricht broadcasten"},
+		{"SET_STATE N", "Zustand setzen"},
+		{"INC_COUNTER", "Zaehler +1"},
+		{"RESET_COUNTER", "Zaehler auf 0"},
+		{"GOTO_BEACON", "Zum Beacon navigieren"},
 	})
 
 	// ========================
-	// RIGHT COLUMN: Feature & Algorithm Explanations
+	// RIGHT COLUMN: Feature Explanations
 	// ========================
 	ry := y
+
+	// ==============================================
+	// GLOSSAR: Begriffe in Alltagssprache
+	// ==============================================
+	printColoredAt(screen, "BEGRIFFE — EINFACH ERKLAERT", midX, ry, colorHelpSection)
+	ry += lineH + 4
+
+	glossarCol := color.RGBA{255, 220, 140, 255} // warm gold for terms
+	glossarDesc := color.RGBA{190, 195, 210, 255}
+
+	// Each term: bold name + plain-language explanation
+	glossarItems := []struct{ term, desc1, desc2 string }{
+		{"Bot",
+			"Ein kleiner autonomer Roboter. Wie eine Ameise:",
+			"sieht nur 120 Pixel weit, kennt keinen Masterplan."},
+		{"Sensor",
+			"Was der Bot wahrnimmt: Abstand zum Nachbarn, Licht,",
+			"ob er ein Paket traegt. Wie Augen und Fuehler."},
+		{"Fitness",
+			"Eine Zahl die sagt 'wie gut macht der Bot seinen Job'.",
+			"Hoeher = besser. Wie eine Schulnote, nur andersrum."},
+		{"Evolution",
+			"Die 20% besten Bots 'vererben' ihre Einstellungen.",
+			"Wie in der Natur: was funktioniert, ueberlebt."},
+		{"Parameter ($A-$Z)",
+			"Zahlenwerte im Programm die Evolution veraendern darf.",
+			"Wie Regler an einem Mischpult — Evolution dreht dran."},
+		{"Emergenz",
+			"Wenn einfache Regeln zusammen etwas Komplexes ergeben.",
+			"Jeder Vogel folgt 3 Regeln — trotzdem fliegt der Schwarm."},
+		{"Exploration",
+			"Neues ausprobieren, weit suchen. Wie: 'Ich probiere",
+			"heute mal ein neues Restaurant aus.'"},
+		{"Exploitation",
+			"Das Bekannte verfeinern. Wie: 'Ich gehe zum Lieblings-",
+			"italiener und nehme mein Stammgericht.'"},
+		{"Konvergenz",
+			"Alle Loesungen naehern sich dem Optimum an.",
+			"Wie Leute die sich an einer Bushaltestelle sammeln."},
+		{"Lokales Optimum",
+			"Eine gute Loesung, aber nicht die beste. Wie der beste",
+			"Italiener deiner Strasse — es gibt vielleicht einen besseren."},
+	}
+
+	for _, g := range glossarItems {
+		printColoredAt(screen, g.term, midX+5, ry, glossarCol)
+		ry += lineH
+		printColoredAt(screen, "  "+g.desc1, midX+5, ry, glossarDesc)
+		ry += lineH
+		printColoredAt(screen, "  "+g.desc2, midX+5, ry, glossarDesc)
+		ry += lineH + 3
+	}
+
+	ry += 4
+	vector.StrokeLine(screen, float32(midX), float32(ry), float32(sw-px), float32(ry), 1, colorHelpSep, false)
+	ry += 8
 
 	printColoredAt(screen, "FEATURES & ALGORITHMEN", midX, ry, colorHelpSection)
 	ry += lineH + 4
@@ -316,101 +299,89 @@ func DrawHelpOverlay(screen *ebiten.Image, isSwarmMode bool, scrollY int) {
 	printColoredAt(screen, "WAS IST EMERGENTES VERHALTEN?", midX, ry, colorHelpAlgo)
 	ry += lineH
 	helpParagraph(screen, midX, &ry, []string{
-		"Komplexe globale Muster entstehen aus einfachen",
-		"lokalen Regeln. Kein Bot kennt den Gesamtplan —",
-		"jeder reagiert nur auf seine direkte Umgebung.",
-		"Beispiele: Vogelschwarm, Ameisenpfade, Fischschulen.",
+		"Stell dir einen Vogelschwarm vor: Kein Vogel weiss",
+		"wohin der Schwarm fliegt. Jeder folgt 3 Regeln:",
+		"Abstand halten, gleiche Richtung, zusammenbleiben.",
+		"Trotzdem fliegen Tausende synchron — OHNE Anweiser!",
+		"",
+		"Genau das passiert hier: Deine Bots kennen nur ihre",
+		"direkte Umgebung. Komplexe Muster entstehen von selbst.",
 	})
 	ry += 6
 
 	// --- Delivery ---
-	printColoredAt(screen, "PAKET-DELIVERY", midX, ry, colorHelpFeature)
+	printColoredAt(screen, "PAKET-DELIVERY (Tab: Arena)", midX, ry, colorHelpFeature)
 	ry += lineH
 	helpParagraph(screen, midX, &ry, []string{
 		"4 farbige Pickup-Stationen (gefuellte Kreise) und",
 		"4 Dropoff-Stationen (Ringe). Bots muessen Pakete",
 		"zur gleichfarbigen Dropoff transportieren.",
-		"Farben: Rot, Blau, Gelb, Gruen.",
-		"Traegen verlangsamt den Bot auf 70% Geschwindigkeit.",
 		"Sensoren: carry, match, p_dist, d_dist, has_pkg.",
 	})
 	ry += 6
 
 	// --- Trucks ---
-	printColoredAt(screen, "LKW-ENTLADUNG", midX, ry, colorHelpFeature)
+	printColoredAt(screen, "LKW-ENTLADUNG (Tab: Arena)", midX, ry, colorHelpFeature)
 	ry += lineH
 	helpParagraph(screen, midX, &ry, []string{
 		"Ein LKW faehrt an die Rampe und wird von Bots",
-		"entladen. Maximal 3 Bots gleichzeitig auf der",
-		"Rampe (Semaphor-Prinzip, verhindert Stau).",
-		"Nach Entladung faehrt der LKW ab, naechster kommt.",
-		"Sensoren: on_ramp, truck_here, truck_pkg_count.",
-	})
-	ry += 6
-
-	// --- Boids ---
-	printColoredAt(screen, "BOIDS-ALGORITHMUS (Flocking)", midX, ry, colorHelpAlgo)
-	ry += lineH
-	helpParagraph(screen, midX, &ry, []string{
-		"Craig Reynolds, 1986. Drei einfache Regeln erzeugen",
-		"realistisches Schwarmverhalten wie bei Voegeln:",
-		"1. Separation: Abstand halten (Gewicht 1.5)",
-		"2. Alignment: Gleiche Richtung (Gewicht 0.3)",
-		"3. Cohesion: Zusammenbleiben (Gewicht 0.3)",
-		"Jeder Bot sieht nur Nachbarn in 30-80px Radius.",
+		"entladen. Max. 3 Bots gleichzeitig auf der Rampe.",
+		"Sensoren: on_ramp, truck_here, truck_pkg.",
 	})
 	ry += 6
 
 	// --- Evolution ---
-	printColoredAt(screen, "GENETISCHER ALGORITHMUS", midX, ry, colorHelpAlgo)
+	printColoredAt(screen, "EVOLUTION (Tab: Evo)", midX, ry, colorHelpAlgo)
 	ry += lineH
 	helpParagraph(screen, midX, &ry, []string{
-		"Inspiriert von Darwins Evolution. Nach jeder",
-		"Generation (500 Ticks) werden Bots nach Fitness",
-		"bewertet. Die besten 20% vererben ihre Werte.",
-		"Operatoren: Crossover (Gene mischen), Mutation",
-		"(zufaellige Aenderungen), Elitismus (Top 3 direkt",
-		"uebernommen). $A-$Z Werte im Programm evolvieren.",
+		"Genetischer Algorithmus: $A-$Z Parameter werden",
+		"ueber Generationen optimiert. Top 20% vererben",
+		"Werte, Crossover + Mutation + Elitismus.",
 	})
 	ry += 6
 
 	// --- GP ---
-	printColoredAt(screen, "GENETISCHE PROGRAMMIERUNG (GP)", midX, ry, colorHelpAlgo)
+	printColoredAt(screen, "GENETISCHE PROGRAMMIERUNG (Tab: Evo)", midX, ry, colorHelpAlgo)
 	ry += lineH
 	helpParagraph(screen, midX, &ry, []string{
-		"Nicht nur Parameter, sondern die Programme selbst",
-		"evolvieren! Jeder Bot hat eigene SwarmScript-Regeln.",
-		"Crossover tauscht Regeln zwischen erfolgreichen Bots.",
-		"Mutation aendert Sensoren, Schwellwerte oder Aktionen.",
-		"Fitness: Deliveries*30 + Pickups*15 + Dist*0.01",
-		"         - StuckCount*10 - IdleTicks*0.05",
-		"10% jeder Generation sind komplett neue Programme.",
+		"Programme selbst evolvieren! Jeder Bot hat eigene",
+		"SwarmScript-Regeln. Crossover tauscht Regeln,",
+		"Mutation aendert Sensoren/Aktionen.",
 	})
 	ry += 6
 
 	// --- Neuroevolution ---
-	printColoredAt(screen, "NEUROEVOLUTION", midX, ry, colorHelpAlgo)
+	printColoredAt(screen, "NEUROEVOLUTION (Tab: Evo)", midX, ry, colorHelpAlgo)
 	ry += lineH
 	helpParagraph(screen, midX, &ry, []string{
-		"Jeder Bot hat ein eigenes neuronales Netz statt",
-		"handgeschriebener Regeln. Architektur: 12 Sensoren",
-		"-> 6 Hidden (tanh) -> 8 Aktionen = 120 Gewichte.",
-		"Die Gewichte evolvieren: Top 20% vererben, Crossover",
-		"mischt, Mutation veraendert. Kein Programmieren noetig!",
-		"Preset: Neuro: Delivery. Toggle: Neuro ON im Editor.",
+		"Jeder Bot hat ein neuronales Netz: 12 Sensoren",
+		"-> 6 Hidden -> 8 Aktionen = 120 Gewichte.",
+		"Gewichte evolvieren statt Regeln zu schreiben.",
+		"Preset: 'Neuro: Delivery' waehlen.",
 	})
 	ry += 6
 
-	// --- Pheromone ---
-	printColoredAt(screen, "PHEROMONE (Classic Mode)", midX, ry, colorHelpAlgo)
+	// --- Algorithmen ---
+	printColoredAt(screen, "20 OPTIMIERUNGS-ALGORITHMEN (Tab: Algo)", midX, ry, colorHelpAlgo)
 	ry += lineH
 	helpParagraph(screen, midX, &ry, []string{
-		"Indirekte Kommunikation ueber chemische Spuren",
-		"(Stigmergie), wie bei Ameisen. Bots hinterlassen",
-		"Pheromone die langsam verdunsten (Decay) und sich",
-		"ausbreiten (Diffusion). 3 Kanaele: Suche (blau),",
-		"Gefunden (gruen), Gefahr (rot). Nachfolgende Bots",
-		"folgen dem Konzentrationsgradienten zum Ziel.",
+		"GWO, WOA, BFO, MFO, Cuckoo Search, Differential",
+		"Evolution, ABC, Harmony Search, Bat, Harris Hawks,",
+		"SSA, GSA, FPA, Simulated Annealing, Aquila, SCA,",
+		"Dragonfly, TLBO, Equilibrium, Jaya.",
+		"",
+		"Alle per Klick im 'Algo' Tab aktivierbar.",
+		"Radar Chart vergleicht aktive Algorithmen.",
+	})
+	ry += 6
+
+	// --- Teams ---
+	printColoredAt(screen, "TEAM-WETTBEWERB (Tab: Evo)", midX, ry, colorHelpFeature)
+	ry += lineH
+	helpParagraph(screen, midX, &ry, []string{
+		"Zwei Teams (Blau A vs Rot B) mit verschiedenen",
+		"Programmen konkurrieren in derselben Arena.",
+		"Sensoren: team (1=A, 2=B), team_score, enemy_score.",
 	})
 	ry += 6
 
@@ -418,103 +389,467 @@ func DrawHelpOverlay(screen *ebiten.Image, isSwarmMode bool, scrollY int) {
 	printColoredAt(screen, "KOMMUNIKATION", midX, ry, colorHelpFeature)
 	ry += lineH
 	helpParagraph(screen, midX, &ry, []string{
-		"Bots senden Nachrichten per SEND_MESSAGE (Broadcast",
-		"an alle in Reichweite). Nachrichtentypen haben",
-		"verschiedene Reichweiten und Lebensdauer (TTL).",
+		"SEND_MESSAGE N broadcastet an Bots in Reichweite.",
 		"Typen: ResourceFound, HelpNeeded, PackageFound,",
 		"FormationJoin, Danger, RampCongested, TaskAssign.",
-		"Empfang pruefen mit dem 'msg' Sensor.",
-	})
-	ry += 6
-
-	// --- Teams ---
-	printColoredAt(screen, "TEAM-WETTBEWERB", midX, ry, colorHelpFeature)
-	ry += lineH
-	helpParagraph(screen, midX, &ry, []string{
-		"Zwei Teams (Blau A vs Rot B) mit verschiedenen",
-		"Programmen konkurrieren in derselben Arena.",
-		"C = Challenge-Modus: 5000 Ticks, wer liefert mehr?",
-		"N = Neue Runde starten. Teams sind farblich markiert.",
-		"Sensoren: team (1=A, 2=B), team_score, enemy_score.",
-	})
-	ry += 6
-
-	// --- Formationen ---
-	printColoredAt(screen, "FORMATIONEN (Classic Mode)", midX, ry, colorHelpAlgo)
-	ry += lineH
-	helpParagraph(screen, midX, &ry, []string{
-		"Bots koennen Formationen bilden: Kreis, Linie, V.",
-		"Jeder Bot berechnet seine Zielposition relativ zum",
-		"Leader und steuert dorthin. Slot-basiertes System",
-		"mit Heading-abhaengiger Positionierung.",
 	})
 	ry += 6
 
 	// --- Dashboard ---
-	printColoredAt(screen, "DASHBOARD (D)", midX, ry, colorHelpFeature)
+	printColoredAt(screen, "DASHBOARD (Tab: Anzeige)", midX, ry, colorHelpFeature)
 	ry += lineH
 	helpParagraph(screen, midX, &ry, []string{
-		"Echtzeit-Statistiken auf der rechten Seite:",
-		"- Fitness-Graph: Best (gruen) + Avg (gelb)",
-		"- Delivery-Rate: Lieferungen pro Zeitfenster",
-		"- Heatmap: Bot-Bewegungsdichte (blau=wenig, rot=viel)",
-		"- Bot-Ranking: Top 5 Bots nach Lieferungen",
-		"- Event-Ticker: Live-Feed von Pickup/Delivery Events",
+		"Echtzeit-Statistiken: Fitness-Graph, Delivery-Rate,",
+		"Heatmap, Bot-Ranking, Event-Ticker.",
 	})
 	ry += 6
 
-	// --- Bot-Typen Classic ---
-	printColoredAt(screen, "BOT-TYPEN (Classic Mode)", midX, ry, colorHelpFeature)
-	ry += lineH
-	helpParagraph(screen, midX, &ry, []string{
-		"Scout (Cyan): Schnell, erkundet, markiert Ressourcen",
-		"Worker (Orange): Sammelt Ressourcen, traegt zur Basis",
-		"Leader (Gold): Koordiniert, gibt Signale an Nachbarn",
-		"Tank (Gruen): Langsam, robust, raeumt Hindernisse",
-		"Healer (Pink): Repariert beschaedigte Nachbar-Bots",
-	})
-	ry += 8
-
-	// --- Classic Mode Keys ---
-	vector.StrokeLine(screen, float32(midX), float32(ry), float32(sw-px), float32(ry), 1, colorHelpSep, false)
-	ry += 6
-	printColoredAt(screen, "CLASSIC MODE TASTEN (F1)", midX, ry, colorHelpSection)
-	ry += lineH + 2
-	helpKV(screen, midX, &ry, []kv{
-		{"1-5", "Scout/Worker/Leader/Tank/Healer spawnen"},
-		{"R", "Ressource platzieren (bei Mausposition)"},
-		{"O", "Hindernis platzieren"},
-		{"P", "Pheromone (OFF -> FOUND -> ALL)"},
-		{"E", "Generation erzwingen (Evolution)"},
-		{"V", "Genom-Overlay (Parameterwerte anzeigen)"},
-		{"N", "Naechstes Szenario laden"},
-		{"WASD", "Kamera bewegen"},
-	})
-	ry += 8
-
-	// --- Tips ---
+	// --- Tipps ---
 	vector.StrokeLine(screen, float32(midX), float32(ry), float32(sw-px), float32(ry), 1, colorHelpSep, false)
 	ry += 6
 	printColoredAt(screen, "TIPPS FUER EINSTEIGER", midX, ry, colorHelpNote)
 	ry += lineH + 2
 	helpParagraph(screen, midX, &ry, []string{
-		"1. Starte mit Swarm Lab (F2) und dem Tutorial (F3)",
+		"1. Starte mit dem Tutorial (F3)",
 		"2. Probiere erst Aggregation, dann Simple Delivery",
-		"3. Schalte Evolution ON + Evolving Delivery ein",
-		"4. Beobachte wie die Fitness ueber Generationen steigt",
-		"5. Nutze das Dashboard (D) fuer Statistiken",
-		"6. GP: Random Start zeigt Evolution von Null",
-		"7. Neuro: Delivery — Bots lernen ganz ohne Code!",
-		"8. Klicke einen Bot an und druecke F zum Folgen",
-		"9. Experimentiere mit Maze + Maze Explorer",
+		"3. Tab 'Evo': Evolution ON + Evolving Delivery",
+		"4. Beobachte wie die Fitness steigt",
+		"5. Tab 'Anzeige': Dashboard fuer Statistiken",
+		"6. GP: Random Start = Programme von Null evolvieren",
+		"7. Neuro: Delivery = Bots lernen ohne Code!",
+		"8. Klicke einen Bot an fuer Details",
+		"9. Tab 'Algo': Algorithmen vergleichen",
 	})
 
-	// Vertical separator between columns
-	vector.StrokeLine(screen, float32(midX-15), float32(y), float32(midX-15), float32(sh-30), 1, colorHelpSep, false)
+	// Vertical separator between columns (up to where math section starts)
+	mathStartY := ly
+	if ry > ly {
+		mathStartY = ry
+	}
+	mathStartY += 10
+	vector.StrokeLine(screen, float32(midX-15), float32(y), float32(midX-15), float32(mathStartY-10), 1, colorHelpSep, false)
+
+	// ========================
+	// FULL-WIDTH: Mathematical Foundations
+	// ========================
+	my_ := mathStartY
+	vector.StrokeLine(screen, float32(px), float32(my_), float32(sw-px), float32(my_), 1, colorHelpSep, false)
+	my_ += 8
+
+	// Section title
+	mathTitle := "MATHEMATISCHE GRUNDLAGEN DER ALGORITHMEN"
+	mathTitleW := len(mathTitle) * charW
+	printColoredAt(screen, mathTitle, sw/2-mathTitleW/2, my_, colorHelpSection)
+	my_ += lineH + 2
+	mathIntro := "Jeder Algorithmus basiert auf einer mathematischen Update-Regel. Hier: Formel + Anwendung im Simulator."
+	printColoredAt(screen, mathIntro, px+5, my_, colorHelpDim)
+	my_ += lineH + 6
+
+	// Two-column math layout
+	mlx := px          // left math column
+	mrx := sw/2 + 10   // right math column
+	colW := sw/2 - 40  // column width
+	_ = colW
+
+	// Helper: draw one algorithm math block
+	type mathBlock struct {
+		name    string
+		formula []string
+		applied []string
+	}
+
+	mathAlgos := []mathBlock{
+		{
+			"GWO — Grey Wolf Optimizer",
+			[]string{
+				"X(t+1) = X_p - A * |C * X_p - X(t)|",
+				"A = 2a*r1 - a,  C = 2*r2",
+				"a: 2 -> 0 linear ueber Iterationen",
+			},
+			[]string{
+				"X_p = Position des Alpha-Wolfs (bester Bot).",
+				"A > 1: Exploration (Wolfe schweifen aus).",
+				"A < 1: Exploitation (Rudel kreist ein).",
+				"Im Sim: Bot-Parameter konvergieren zum Besten.",
+			},
+		},
+		{
+			"WOA — Whale Optimization",
+			[]string{
+				"Spirale: X(t+1) = D'*e^(b*l)*cos(2*pi*l) + X*",
+				"Einkreisen: X(t+1) = X* - A*|C*X* - X|",
+				"D' = |X*(t) - X(t)|,  p < 0.5: Kreis, sonst Spirale",
+			},
+			[]string{
+				"Modelliert Blasennetz-Jagd der Buckelwale.",
+				"50% Chance: Einkreisen ODER Spirale.",
+				"Spirale = logarithmisch enger werdend.",
+				"Im Sim: Parameter umkreisen das Optimum.",
+			},
+		},
+		{
+			"Cuckoo Search + Levy-Fluege",
+			[]string{
+				"x(t+1) = x(t) + alpha * L(lambda)",
+				"L(s) ~ s^(-lambda),  1 < lambda < 3",
+				"Levy: u/|v|^(1/beta), u~N(0,sigma), v~N(0,1)",
+			},
+			[]string{
+				"Levy-Fluege: viele kurze + seltene weite Spruenge.",
+				"Optimal fuer Suche in unbekanntem Terrain!",
+				"pa = 0.25: 25% schlechteste Nester werden ersetzt.",
+				"Im Sim: Grosse Spruenge vermeiden lokale Optima.",
+			},
+		},
+		{
+			"DE — Differential Evolution",
+			[]string{
+				"Mutation: v = x_r1 + F*(x_r2 - x_r3)",
+				"Crossover: u_j = v_j wenn rand < CR, sonst x_j",
+				"Selektion: x = u wenn f(u) < f(x), sonst x",
+			},
+			[]string{
+				"F = Skalierungsfaktor (0.5-1.0) der Differenz.",
+				"CR = Crossover-Rate, steuert Parametermischung.",
+				"Greedy: Nur Verbesserungen werden akzeptiert.",
+				"Im Sim: 3 zufaellige Bots erzeugen Mutanten.",
+			},
+		},
+		{
+			"SA — Simulated Annealing",
+			[]string{
+				"P(accept) = exp(-deltaE / T)",
+				"T(t) = T0 * alpha^t,  0.9 < alpha < 0.99",
+				"deltaE = f(x_new) - f(x_current)",
+			},
+			[]string{
+				"Hohe T: Fast alles akzeptiert (Exploration).",
+				"Niedrige T: Nur Verbesserungen (Exploitation).",
+				"Boltzmann-Verteilung aus der Thermodynamik!",
+				"Im Sim: Bots 'kuehlen ab' ueber Generationen.",
+			},
+		},
+		{
+			"BFO — Bacterial Foraging",
+			[]string{
+				"Chemotaxis: theta(j+1) = theta(j) + C*delta/|delta|",
+				"Schwimmen: gleiche Richtung, Taumeln: neue Richtung",
+				"Reproduktion: Top 50% verdoppeln sich",
+			},
+			[]string{
+				"E.coli navigiert per Tumble-and-Run.",
+				"C = Schrittweite, delta = zufaelliger Vektor.",
+				"Elimination: Zufaellig stirbt ein Bakterium.",
+				"Im Sim: Bots 'schwimmen' durch den Parameterraum.",
+			},
+		},
+		{
+			"ABC — Artificial Bee Colony",
+			[]string{
+				"v_ij = x_ij + phi*(x_ij - x_kj)",
+				"P(i) = fitness(i) / sum(fitness)",
+				"Scout: x_j = x_min + rand*(x_max - x_min)",
+			},
+			[]string{
+				"3 Phasen: Employed -> Onlooker -> Scout.",
+				"Employed: Lokale Suche um aktuelle Position.",
+				"Onlooker: Fitness-proportionale Selektion.",
+				"Scout: Erschoepfte Quellen werden aufgegeben.",
+			},
+		},
+		{
+			"HSO — Harmony Search",
+			[]string{
+				"x_new = x_i aus Memory (HMCR)",
+				"       +/- bw*rand (Pitch Adjust, PAR)",
+				"       oder rand(min,max) (1-HMCR)",
+			},
+			[]string{
+				"HMCR=0.95: 95% aus Erinnerung, 5% frisch.",
+				"PAR=0.3: 30% Chance auf Feintuning.",
+				"bw = Bandbreite der Pitch-Anpassung.",
+				"Im Sim: 'Noten' = Parameter, 'Harmonie' = Fitness.",
+			},
+		},
+		{
+			"MFO — Moth-Flame Optimization",
+			[]string{
+				"S(M_i, F_j) = D*e^(bt)*cos(2*pi*t) + F_j",
+				"D = |F_j - M_i|, t in [-1, 1]",
+				"Flammen = sortierte beste Positionen",
+			},
+			[]string{
+				"Motten fliegen Spiralen um Flammen (Licht).",
+				"t=-1: engste Bahn, t=1: weiteste Bahn.",
+				"Flammenanzahl sinkt: Fokussierung ueber Zeit.",
+				"Im Sim: Bots spiralen um beste Loesungen.",
+			},
+		},
+		{
+			"SCA — Sine Cosine Algorithm",
+			[]string{
+				"x(t+1) = x(t) + r1*sin(r2)*|r3*P - x(t)|",
+				"  oder   x(t) + r1*cos(r2)*|r3*P - x(t)|",
+				"r1 = a*(1 - t/T), a=2, Amplitude nimmt ab",
+			},
+			[]string{
+				"sin/cos oszillieren zwischen Explore & Exploit.",
+				"r1 > 1: Exploration (Sinus geht ueber Ziel).",
+				"r1 < 1: Exploitation (konvergiert).",
+				"Im Sim: Parameter schwingen um das Optimum.",
+			},
+		},
+		{
+			"HHO — Harris Hawks Optimization",
+			[]string{
+				"Exploration: X = X_rand - r1*|X_rand - 2*r2*X|",
+				"Soft Siege:  X = dX - E*|J*X_best - X|",
+				"Rapid Dive:  X = X_best - E*|dX| + S*Levy(d)",
+			},
+			[]string{
+				"E = Fluchtenergie des Beutetiers (2->0).",
+				"|E|>=1: Explore, |E|<1: Exploit (Angriff).",
+				"4 Phasen: Perch, Surprise, Siege, Dive.",
+				"Im Sim: Bots jagen kooperativ das Optimum.",
+			},
+		},
+		{
+			"GSA — Gravitational Search",
+			[]string{
+				"F_ij = G(t) * M_i*M_j / (R_ij+eps) * (x_j-x_i)",
+				"a_i = sum(F_ij) / M_i",
+				"G(t) = G0 * exp(-alpha * t/T)",
+			},
+			[]string{
+				"Masse proportional zu Fitness (besser=schwerer).",
+				"Schwere Massen ziehen leichtere an.",
+				"G sinkt: Anfangs starke, spaeter schwache Kraft.",
+				"Im Sim: Gute Bots ziehen andere Parameter an.",
+			},
+		},
+		{
+			"FPA — Flower Pollination",
+			[]string{
+				"Global: x(t+1) = x(t) + gamma*L*(x_best - x(t))",
+				"Lokal:  x(t+1) = x(t) + eps*(x_j - x_k)",
+				"p=0.8: 80% global (Insekten), 20% lokal (Wind)",
+			},
+			[]string{
+				"L = Levy-Flug (wie bei Cuckoo Search).",
+				"Globale Bestaeubung: Insekten fliegen weit.",
+				"Lokale: Wind = kleine zufaellige Aenderungen.",
+				"Im Sim: Mischung aus weiten und nahen Spruengen.",
+			},
+		},
+		{
+			"TLBO — Teaching-Learning-Based",
+			[]string{
+				"Teacher: x_new = x + r*(x_best - TF*x_mean)",
+				"Learner: x_new = x + r*(x_i - x_j) wenn f(i)<f(j)",
+				"TF = round(1 + rand) in {1, 2}. KEINE Parameter!",
+			},
+			[]string{
+				"Teacher-Phase: Lehrer hebt Klassendurchschnitt.",
+				"Learner-Phase: Schueler lernt von besserem Peer.",
+				"Einziger Algo OHNE Tuning-Parameter!",
+				"Im Sim: Bots lernen von den Besten direkt.",
+			},
+		},
+		{
+			"Bat Algorithm",
+			[]string{
+				"f_i = f_min + (f_max-f_min)*beta",
+				"v_i(t+1) = v_i(t) + (x_i - x_best)*f_i",
+				"x_i(t+1) = x_i(t) + v_i(t+1)",
+			},
+			[]string{
+				"Frequenz f: steuert Schrittweite.",
+				"Lautstaerke A: sinkt bei Erfolg (leiser=feiner).",
+				"Pulsrate r: steigt (mehr lokale Suche).",
+				"Im Sim: Echoortung sucht den Parameterraum ab.",
+			},
+		},
+		{
+			"SSA — Salp Swarm Algorithm",
+			[]string{
+				"Leader:   x = F + c1*(ub-lb)*c2 + lb  (c3>=0.5)",
+				"          x = F - c1*(ub-lb)*c2 + lb  (c3< 0.5)",
+				"Follower: x_i = (x_i + x_(i-1)) / 2",
+			},
+			[]string{
+				"c1 = 2*exp(-(4t/T)^2): Exploration nimmt ab.",
+				"Leader orientiert sich an Food-Quelle (Bester).",
+				"Follower mitteln mit Vordermann (Kettenbildung).",
+				"Im Sim: Bot-Kette konvergiert schrittweise.",
+			},
+		},
+		{
+			"EO — Equilibrium Optimizer",
+			[]string{
+				"x(t+1) = x_eq + (x-x_eq)*F + G/lambda*(1-F)",
+				"F = a*sign(r-0.5)*(e^(-lambda*t) - 1)",
+				"x_eq = Mittelwert der 4 besten + zufaellig",
+			},
+			[]string{
+				"Partikel streben zum Gleichgewicht (x_eq).",
+				"F: Exponentieller Decay steuert Konvergenz.",
+				"G: Generation-Rate fuer Zufallsperturbation.",
+				"Im Sim: Schnelle Konvergenz mit Diversitaet.",
+			},
+		},
+		{
+			"AO — Aquila Optimizer",
+			[]string{
+				"Hoehenflug: x = x_best*(1-t/T) + x_mean - x_rand",
+				"Konturflug: x = x_best*Levy + x_rand + (y-x)*r",
+				"Sturzflug:  x = (x_best-x_mean)*a - rand + lb*rand",
+			},
+			[]string{
+				"4 Jagdphasen des Steinadlers:",
+				"1. Hoehenflug (Explore, weiter Blick)",
+				"2. Konturflug (Beute lokalisieren)",
+				"3. Langsamer Abstieg (Verfolgen)",
+				"4. Sturzflug (finaler Angriff = Exploitation).",
+			},
+		},
+		{
+			"DA — Dragonfly Algorithm",
+			[]string{
+				"dX = s*S + a*A + c*C + f*F + e*E",
+				"S = -sum(X - X_j), A = sum(V_j)/N",
+				"C = sum(X_j)/N - X, F = X_food - X, E = X+X_enemy",
+			},
+			[]string{
+				"5 Kraeftemischung wie bei Schwarmsimulation!",
+				"S=Separation, A=Alignment, C=Cohesion,",
+				"F=Nahrung (Attraktion), E=Feind (Abstossung).",
+				"Im Sim: Boids-artig, aber fuer Optimierung.",
+			},
+		},
+		{
+			"Jaya — 'Sieg' (Sanskrit)",
+			[]string{
+				"x_new = x + r1*(x_best - |x|) - r2*(x_worst - |x|)",
+				"if f(x_new) < f(x): x = x_new",
+				"KEIN EINZIGER PARAMETER! Nur best und worst.",
+			},
+			[]string{
+				"Bewegt sich ZUM Besten und WEG vom Schlechtesten.",
+				"Einfachster aller Metaheuristiken.",
+				"Ueberraschend effektiv trotz Simplizitaet!",
+				"Im Sim: Minimaler Overhead, schnelle Iteration.",
+			},
+		},
+	}
+
+	// Draw math blocks in two columns
+	mlY := my_
+	mrY := my_
+	for i, mb := range mathAlgos {
+		var cx int
+		var cy *int
+		if i%2 == 0 {
+			cx = mlx
+			cy = &mlY
+		} else {
+			cx = mrx
+			cy = &mrY
+		}
+
+		// Algo name header
+		printColoredAt(screen, mb.name, cx+5, *cy, colorHelpAlgoHdr)
+		*cy += lineH + 1
+
+		// Formulas (gold)
+		for _, f := range mb.formula {
+			printColoredAt(screen, "  "+f, cx+5, *cy, colorHelpMath)
+			*cy += lineH
+		}
+		*cy += 2
+
+		// Application (green)
+		for _, a := range mb.applied {
+			printColoredAt(screen, "  "+a, cx+5, *cy, colorHelpApply)
+			*cy += lineH
+		}
+		*cy += 10
+	}
+
+	// Vertical separator in math section
+	finalY := mlY
+	if mrY > mlY {
+		finalY = mrY
+	}
+	vector.StrokeLine(screen, float32(midX-15), float32(mathStartY), float32(midX-15), float32(finalY), 1, colorHelpSep, false)
+
+	// General math concepts section
+	finalY += 4
+	vector.StrokeLine(screen, float32(px), float32(finalY), float32(sw-px), float32(finalY), 1, colorHelpSep, false)
+	finalY += 8
+	conceptTitle := "GEMEINSAME MATHEMATISCHE KONZEPTE"
+	conceptTitleW := len(conceptTitle) * charW
+	printColoredAt(screen, conceptTitle, sw/2-conceptTitleW/2, finalY, colorHelpSection)
+	finalY += lineH + 4
+
+	// Left: Exploration vs Exploitation
+	cly := finalY
+	printColoredAt(screen, "EXPLORATION vs EXPLOITATION", px+5, cly, colorHelpAlgoHdr)
+	cly += lineH
+	helpParagraph(screen, px, &cly, []string{
+		"Das zentrale Dilemma aller Optimierung!",
+		"Exploration = weite Suche im gesamten Raum.",
+		"Exploitation = lokale Verfeinerung nahe dem Besten.",
+		"",
+		"Typisches Muster: Start explorativ, Ende exploitativ.",
+		"Parameter a, r1 o.ae. steuern diese Balance.",
+		"Zu viel Explore = langsam, zu viel Exploit = lokales Opt.",
+	})
+	cly += 6
+	printColoredAt(screen, "LEVY-FLUEGE (Cuckoo, FPA, HHO, AO)", px+5, cly, colorHelpAlgoHdr)
+	cly += lineH
+	helpParagraph(screen, px, &cly, []string{
+		"Schrittlaenge folgt der Potenzverteilung: P(s) ~ s^(-beta).",
+		"Viele kleine Schritte + seltene riesige Spruenge.",
+		"Mathematisch optimal fuer Suche in unbekanntem Terrain!",
+		"Auch in der Natur: Albatrosse, Haie, Bienen, T-Zellen.",
+	})
+
+	// Right: Convergence + No Free Lunch
+	cry := finalY
+	printColoredAt(screen, "KONVERGENZVERHALTEN", mrx+5, cry, colorHelpAlgoHdr)
+	cry += lineH
+	helpParagraph(screen, mrx, &cry, []string{
+		"Alle Algorithmen konvergieren in Richtung Optimum.",
+		"Schnelle Konvergenz: SA, GWO, HHO, Jaya.",
+		"Breite Suche: Cuckoo, DE, BFO, DA.",
+		"",
+		"Fitness = Deliveries*30 + CorrectColor*50",
+		"         + Pickups*15 - WrongColor*20",
+	})
+	cry += 6
+	printColoredAt(screen, "NO FREE LUNCH THEOREM", mrx+5, cry, colorHelpAlgoHdr)
+	cry += lineH
+	helpParagraph(screen, mrx, &cry, []string{
+		"Wolpert & Macready (1997):",
+		"Kein Algorithmus ist fuer ALLE Probleme der Beste!",
+		"Jeder Algo hat Staerken bei bestimmten Landschaften.",
+		"Deshalb: Algo-Tab -> mehrere testen -> Radar Chart!",
+		"",
+		"Nutze das Auto-Turnier um alle 20 zu vergleichen.",
+	})
+
+	endY := cly
+	if cry > endY {
+		endY = cry
+	}
+	// Separator between concept columns
+	vector.StrokeLine(screen, float32(midX-15), float32(finalY), float32(midX-15), float32(endY), 1, colorHelpSep, false)
+
+	endY += 10
 
 	// Footer
 	footerY := sh - 20
-	footer := "H = Hilfe schliessen  |  Pfeiltasten / Mausrad = Scrollen  |  F3 = Tutorial"
+	footer := "H = Hilfe schliessen  |  Mausrad = Scrollen  |  F3 = Tutorial"
 	footerW := len(footer) * charW
 	vector.DrawFilledRect(screen, 0, float32(footerY-5), float32(sw), float32(lineH+10), color.RGBA{0, 0, 0, 240}, false)
 	printColoredAt(screen, footer, sw/2-footerW/2, footerY, colorHelpDim)
@@ -542,6 +877,16 @@ func helpKVAction(screen *ebiten.Image, px int, y *int, items []kv) {
 	for _, item := range items {
 		printColoredAt(screen, item.key, px+5, *y, colorHelpAction)
 		printColoredAt(screen, item.desc, px+145, *y, colorHelpDim)
+		*y += lineH
+	}
+}
+
+func helpKVDim(screen *ebiten.Image, px int, y *int, items []kv) {
+	dimKey := color.RGBA{90, 120, 150, 200}
+	dimDesc := color.RGBA{90, 90, 105, 200}
+	for _, item := range items {
+		printColoredAt(screen, item.key, px+5, *y, dimKey)
+		printColoredAt(screen, item.desc, px+100, *y, dimDesc)
 		*y += lineH
 	}
 }

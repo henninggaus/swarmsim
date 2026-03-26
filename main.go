@@ -176,6 +176,14 @@ func (g *Game) Update() (retErr error) {
 			g.showWelcome = false
 			return nil
 		}
+		// F3: Swarm Lab + Tutorial
+		if inpututil.IsKeyJustPressed(ebiten.KeyF3) {
+			g.sim.LoadSwarmScenario()
+			g.tickAcc = 0
+			g.showWelcome = false
+			g.maybeStartTutorial()
+			return nil
+		}
 
 		// Any other key or mouse click → load Swarm Lab (default) and dismiss
 		if inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) {
@@ -539,6 +547,9 @@ func (g *Game) handleInput() {
 	// M: toggle minimap
 	if inpututil.IsKeyJustPressed(ebiten.KeyM) {
 		g.renderer.ShowMinimap = !g.renderer.ShowMinimap
+		if g.sim != nil && g.sim.SwarmState != nil {
+			g.sim.SwarmState.ShowMinimap = g.renderer.ShowMinimap
+		}
 		logger.Info("KEY", "M pressed -> ShowMinimap=%v", g.renderer.ShowMinimap)
 	}
 
@@ -702,9 +713,21 @@ func (g *Game) handleSwarmInput() {
 		}
 	}
 
+	// Tab content scroll (algorithm list in Algo tab)
+	if mx < 350 && my >= 660 && wy != 0 && ss.EditorTab == 3 {
+		if wy < 0 {
+			ss.TabScrollY++
+		} else {
+			ss.TabScrollY--
+		}
+		if ss.TabScrollY < 0 {
+			ss.TabScrollY = 0
+		}
+	}
+
 	// Update dropdown hover tracking
 	if ss.DropdownOpen {
-		ss.DropdownHover = render.SwarmDropdownHitTest(mx, my, len(ss.PresetNames))
+		ss.DropdownHover = render.SwarmDropdownHitTest(mx, my, len(ss.Presets))
 	}
 
 	// Bot hover detection for tooltip
@@ -727,7 +750,7 @@ func (g *Game) handleSwarmInput() {
 	if inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) {
 		if ss.DropdownOpen {
 			// Dropdown is open — check if we clicked on an item
-			idx := render.SwarmDropdownHitTest(mx, my, len(ss.PresetNames))
+			idx := render.SwarmDropdownHitTest(mx, my, len(ss.Presets))
 			if idx >= 0 {
 				g.loadSwarmPreset(idx)
 			}
@@ -737,7 +760,10 @@ func (g *Game) handleSwarmInput() {
 		}
 	}
 
-	// L key: toggle light source at mouse position (when editor not focused)
+	// All feature toggles are now handled via the tabbed panel (mouse clicks).
+	// Keyboard shortcuts have been removed in favor of the clickable UI.
+
+	// L key kept: toggle light source at mouse position (needs arena coordinates)
 	if inpututil.IsKeyJustPressed(ebiten.KeyL) && !ed.Focused && !ss.BotCountEdit {
 		awx, awy, inside := render.SwarmScreenToArena(mx, my, ss)
 		if inside {
@@ -753,1024 +779,8 @@ func (g *Game) handleSwarmInput() {
 		}
 	}
 
-	// T key: Shift+T = prediction arrows, plain T = trails
-	if inpututil.IsKeyJustPressed(ebiten.KeyT) && !ed.Focused && !ss.BotCountEdit {
-		if ebiten.IsKeyPressed(ebiten.KeyShift) {
-			ss.ShowPrediction = !ss.ShowPrediction
-			swarm.RecordOverlayUsed(ss, "prediction")
-			logger.Info("SWARM", "Prediction arrows: %v", ss.ShowPrediction)
-		} else {
-			ss.ShowTrails = !ss.ShowTrails
-			swarm.RecordOverlayUsed(ss, "trails")
-			logger.Info("SWARM", "Trails: %v", ss.ShowTrails)
-		}
-	}
+	// (Keyboard shortcuts for T, F4, F5, F6, F8, F9, etc. removed — use tabbed panel instead)
 
-	// F5 key: start/stop scenario chain
-	if inpututil.IsKeyJustPressed(ebiten.KeyF5) && !ed.Focused {
-		if ss.ScenarioChain != nil && ss.ScenarioChain.Active {
-			swarm.ScenarioChainStop(ss)
-			logger.Info("SWARM", "Scenario chain stopped")
-		} else {
-			swarm.ScenarioChainStart(ss)
-		}
-	}
-
-	// F4 key: start/stop auto-optimizer
-	if inpututil.IsKeyJustPressed(ebiten.KeyF4) && !ed.Focused {
-		if ss.AutoOptimizer != nil && ss.AutoOptimizer.Active {
-			ss.AutoOptimizer.Active = false
-			logger.Info("SWARM", "Auto-Optimizer stopped")
-		} else {
-			if !ss.DeliveryOn {
-				ss.DeliveryOn = true
-				swarm.GenerateDeliveryStations(ss)
-			}
-			ss.EvolutionOn = true
-			swarm.ScanUsedParams(ss)
-			swarm.AutoOptimizerStart(ss)
-			g.sim.Speed = 10.0 // max speed during optimization
-		}
-	}
-
-	// F6 key: toggle formation analysis overlay
-	if inpututil.IsKeyJustPressed(ebiten.KeyF6) && !ed.Focused {
-		ss.ShowFormation = !ss.ShowFormation
-		swarm.RecordOverlayUsed(ss, "formation")
-		logger.Info("SWARM", "Formation-Analyse: %v", ss.ShowFormation)
-	}
-
-	// F8 key: save parameter preset
-	if inpututil.IsKeyJustPressed(ebiten.KeyF8) && !ed.Focused {
-		name := fmt.Sprintf("Preset_%s_%d", ss.ProgramName, ss.Tick)
-		swarm.SavePreset(ss, name)
-		g.renderer.OverlayText = "Preset gespeichert: " + name
-		g.renderer.OverlayTimer = 60
-	}
-
-	// F9 key: cycle and load saved presets
-	if inpututil.IsKeyJustPressed(ebiten.KeyF9) && !ed.Focused {
-		names := swarm.ListPresets()
-		if len(names) > 0 {
-			ss.PresetIdx = ss.PresetIdx % len(names)
-			swarm.LoadPreset(ss, names[ss.PresetIdx])
-			g.renderer.OverlayText = "Preset geladen: " + names[ss.PresetIdx]
-			g.renderer.OverlayTimer = 60
-			ss.PresetIdx = (ss.PresetIdx + 1) % len(names)
-		} else {
-			g.renderer.OverlayText = "Keine Presets gespeichert (F8 zum Speichern)"
-			g.renderer.OverlayTimer = 60
-		}
-	}
-
-	// Period key: toggle live chart
-	if inpututil.IsKeyJustPressed(ebiten.KeyPeriod) && !ed.Focused && !ss.BotCountEdit {
-		ss.ShowLiveChart = !ss.ShowLiveChart
-		swarm.RecordOverlayUsed(ss, "livechart")
-		logger.Info("SWARM", "Live-Chart: %v", ss.ShowLiveChart)
-	}
-
-	// Slash key: toggle Pareto multi-objective evolution
-	if inpututil.IsKeyJustPressed(ebiten.KeySlash) && !ed.Focused && !ss.BotCountEdit {
-		ss.ParetoEnabled = !ss.ParetoEnabled
-		if ss.ParetoEnabled {
-			logger.Info("SWARM", "Pareto-Modus: ON (Multi-Objective)")
-		} else {
-			ss.ParetoFront = nil
-			logger.Info("SWARM", "Pareto-Modus: OFF (Skalare Fitness)")
-		}
-	}
-
-	// Comma key: toggle bot spatial memory
-	if inpututil.IsKeyJustPressed(ebiten.KeyComma) && !ed.Focused && !ss.BotCountEdit {
-		ss.MemoryEnabled = !ss.MemoryEnabled
-		if ss.MemoryEnabled {
-			swarm.InitBotMemory(ss)
-		} else {
-			swarm.ClearBotMemory(ss)
-		}
-		logger.Info("SWARM", "Bot-Gedaechtnis: %v", ss.MemoryEnabled)
-	}
-
-	// Backslash key: toggle sensor noise
-	if inpututil.IsKeyJustPressed(ebiten.KeyBackslash) && !ed.Focused && !ss.BotCountEdit {
-		ss.SensorNoiseOn = !ss.SensorNoiseOn
-		if ss.SensorNoiseOn && ss.SensorNoiseCfg.NoiseLevel == 0 {
-			// Default noise config
-			ss.SensorNoiseCfg = swarm.SensorNoiseConfig{
-				NoiseLevel:  0.15,
-				FailureRate: 0.02,
-			}
-		}
-		logger.Info("SWARM", "Sensor-Rauschen: %v (Noise:%.0f%% Fail:%.0f%%)",
-			ss.SensorNoiseOn, ss.SensorNoiseCfg.NoiseLevel*100, ss.SensorNoiseCfg.FailureRate*100)
-	}
-
-	// Ctrl+L: toggle leaderboard overlay
-	if inpututil.IsKeyJustPressed(ebiten.KeyL) && ebiten.IsKeyPressed(ebiten.KeyControl) && !ed.Focused {
-		if ss.Leaderboard == nil {
-			ss.Leaderboard = swarm.LoadLeaderboard()
-		}
-		ss.ShowLeaderboard = !ss.ShowLeaderboard
-		swarm.RecordOverlayUsed(ss, "leaderboard")
-	}
-
-	// Ctrl+S: export program as .swarm file
-	if inpututil.IsKeyJustPressed(ebiten.KeyS) && ebiten.IsKeyPressed(ebiten.KeyControl) && !ed.Focused {
-		filename := fmt.Sprintf("%s_%d.swarm", ss.ProgramName, ss.Tick)
-		// Sanitize filename
-		filename = strings.ReplaceAll(filename, " ", "_")
-		filename = strings.ReplaceAll(filename, "/", "_")
-		err := swarm.ExportProgram(ss, filename)
-		if err != nil {
-			g.renderer.OverlayText = "Export-Fehler: " + err.Error()
-		} else {
-			g.renderer.OverlayText = "Exportiert: " + filename
-		}
-		g.renderer.OverlayTimer = 90
-	}
-
-	// Ctrl+O: import .swarm file (cycles through available files)
-	if inpututil.IsKeyJustPressed(ebiten.KeyO) && ebiten.IsKeyPressed(ebiten.KeyControl) && !ed.Focused {
-		files := swarm.ListSwarmFiles()
-		if len(files) > 0 {
-			// Cycle through files
-			idx := ss.Tick % len(files)
-			src, err := swarm.ImportProgram(ss, files[idx])
-			if err != nil {
-				g.renderer.OverlayText = "Import-Fehler: " + err.Error()
-			} else {
-				// Apply source to editor
-				ss.Editor.Lines = strings.Split(src, "\n")
-				ss.Editor.CursorLine = 0
-				ss.Editor.CursorCol = 0
-				ss.Editor.ScrollY = 0
-				g.deploySwarmProgram()
-				g.renderer.OverlayText = "Importiert: " + files[idx]
-			}
-			g.renderer.OverlayTimer = 90
-		} else {
-			g.renderer.OverlayText = "Keine .swarm Dateien gefunden"
-			g.renderer.OverlayTimer = 60
-		}
-	}
-
-	// Y key: Shift+Y = congestion zones, plain Y = heatmap
-	if inpututil.IsKeyJustPressed(ebiten.KeyY) && !ed.Focused && !ss.BotCountEdit && ebiten.IsKeyPressed(ebiten.KeyShift) {
-		ss.ShowZones = !ss.ShowZones
-		swarm.RecordOverlayUsed(ss, "zones")
-		logger.Info("SWARM", "Stau-Zonen: %v", ss.ShowZones)
-	}
-	if inpututil.IsKeyJustPressed(ebiten.KeyY) && !ed.Focused && !ss.BotCountEdit && !ebiten.IsKeyPressed(ebiten.KeyShift) {
-		ss.ShowHeatmap = !ss.ShowHeatmap
-		swarm.RecordOverlayUsed(ss, "heatmap")
-		if ss.ShowHeatmap && ss.HeatmapGrid == nil {
-			swarm.InitHeatmap(ss)
-		}
-		if !ss.ShowHeatmap {
-			swarm.ClearHeatmap(ss)
-		}
-		logger.Info("SWARM", "Heatmap: %v", ss.ShowHeatmap)
-	}
-
-	// W key: cycle color filter (off → red → green → blue → carrying → idle → off)
-	if inpututil.IsKeyJustPressed(ebiten.KeyW) && !ed.Focused && !ss.BotCountEdit {
-		ss.ColorFilter = (ss.ColorFilter + 1) % 6
-		filterNames := []string{"OFF", "Rot", "Gruen", "Blau", "Traegt Paket", "Idle"}
-		logger.Info("SWARM", "Color filter: %s", filterNames[ss.ColorFilter])
-	}
-
-	// P key: Shift+P = A* path overlay, plain P = message wave visualization
-	if inpututil.IsKeyJustPressed(ebiten.KeyP) && !ed.Focused && !ss.BotCountEdit {
-		if ebiten.IsKeyPressed(ebiten.KeyShift) {
-			if !ss.AStarOn {
-				swarm.InitAStar(ss)
-			}
-			ss.ShowPaths = !ss.ShowPaths
-			logger.Info("SWARM", "A* Pfade: %v", ss.ShowPaths)
-		} else {
-			ss.ShowMsgWaves = !ss.ShowMsgWaves
-			if !ss.ShowMsgWaves {
-				ss.MsgWaves = nil
-			}
-			logger.Info("SWARM", "Message waves: %v", ss.ShowMsgWaves)
-		}
-	}
-
-	// G key: Shift+G = A* nav grid debug overlay
-	if inpututil.IsKeyJustPressed(ebiten.KeyG) && !ed.Focused && !ss.BotCountEdit {
-		if ebiten.IsKeyPressed(ebiten.KeyShift) {
-			if !ss.AStarOn {
-				swarm.InitAStar(ss)
-			}
-			ss.ShowNavGrid = !ss.ShowNavGrid
-			logger.Info("SWARM", "A* Nav-Grid: %v", ss.ShowNavGrid)
-		}
-	}
-
-	// 7 key: Flocking velocity overlay
-	if inpututil.IsKeyJustPressed(ebiten.Key7) && !ed.Focused && !ss.BotCountEdit {
-		ss.ShowFlock = !ss.ShowFlock
-		logger.Info("SWARM", "Flock-Overlay: %v", ss.ShowFlock)
-	}
-
-	// 8 key: Role overlay
-	if inpututil.IsKeyJustPressed(ebiten.Key8) && !ed.Focused && !ss.BotCountEdit {
-		ss.ShowRoles = !ss.ShowRoles
-		logger.Info("SWARM", "Rollen-Overlay: %v", ss.ShowRoles)
-	}
-
-	// 9 key: Firefly flash overlay
-	if inpututil.IsKeyJustPressed(ebiten.Key9) && !ed.Focused && !ss.BotCountEdit {
-		if !ss.FireflyOn {
-			swarm.InitFirefly(ss)
-		}
-		ss.ShowFirefly = !ss.ShowFirefly
-		logger.Info("SWARM", "Firefly-Overlay: %v", ss.ShowFirefly)
-	}
-
-	// 0 key: Vortex overlay
-	if inpututil.IsKeyJustPressed(ebiten.Key0) && !ed.Focused && !ss.BotCountEdit {
-		ss.ShowVortex = !ss.ShowVortex
-		logger.Info("SWARM", "Vortex-Overlay: %v", ss.ShowVortex)
-	}
-
-	// Shift+M key: Morphogen pattern overlay
-	if inpututil.IsKeyJustPressed(ebiten.KeyM) && ebiten.IsKeyPressed(ebiten.KeyShift) && !ed.Focused && !ss.BotCountEdit {
-		if !ss.MorphogenOn {
-			swarm.InitMorphogen(ss)
-		}
-		ss.ShowMorphogen = !ss.ShowMorphogen
-		logger.Info("SWARM", "Morphogen-Overlay: %v", ss.ShowMorphogen)
-	}
-
-	// Shift+E key: Evasion wave overlay
-	if inpututil.IsKeyJustPressed(ebiten.KeyE) && ebiten.IsKeyPressed(ebiten.KeyShift) && !ed.Focused && !ss.BotCountEdit {
-		if !ss.EvasionOn {
-			swarm.InitEvasion(ss)
-		}
-		ss.ShowEvasion = !ss.ShowEvasion
-		logger.Info("SWARM", "Evasion-Overlay: %v", ss.ShowEvasion)
-	}
-
-	// Shift+S key: Slime trail overlay
-	if inpututil.IsKeyJustPressed(ebiten.KeyS) && ebiten.IsKeyPressed(ebiten.KeyShift) && !ed.Focused && !ss.BotCountEdit {
-		if !ss.SlimeOn {
-			swarm.InitSlime(ss)
-		}
-		ss.ShowSlime = !ss.ShowSlime
-		logger.Info("SWARM", "Slime-Overlay: %v", ss.ShowSlime)
-	}
-
-	// Shift+B key: Bridge overlay
-	if inpututil.IsKeyJustPressed(ebiten.KeyB) && ebiten.IsKeyPressed(ebiten.KeyShift) && !ed.Focused && !ss.BotCountEdit {
-		if !ss.BridgeOn {
-			swarm.InitBridge(ss)
-		}
-		ss.ShowBridge = !ss.ShowBridge
-		logger.Info("SWARM", "Bridge-Overlay: %v", ss.ShowBridge)
-	}
-
-	// Shift+W key: Wave overlay
-	if inpututil.IsKeyJustPressed(ebiten.KeyW) && ebiten.IsKeyPressed(ebiten.KeyShift) && !ed.Focused && !ss.BotCountEdit {
-		if !ss.WaveOn {
-			swarm.InitWave(ss)
-		}
-		ss.ShowWave = !ss.ShowWave
-		logger.Info("SWARM", "Wave-Overlay: %v", ss.ShowWave)
-	}
-
-	// Shift+H key: Shepherd overlay
-	if inpututil.IsKeyJustPressed(ebiten.KeyH) && ebiten.IsKeyPressed(ebiten.KeyShift) && !ed.Focused && !ss.BotCountEdit {
-		if !ss.ShepherdOn {
-			swarm.InitShepherd(ss)
-		}
-		ss.ShowShepherd = !ss.ShowShepherd
-		logger.Info("SWARM", "Shepherd-Overlay: %v", ss.ShowShepherd)
-	}
-
-	// Shift+P key: PSO fitness landscape overlay
-	if inpututil.IsKeyJustPressed(ebiten.KeyP) && ebiten.IsKeyPressed(ebiten.KeyShift) && !ed.Focused && !ss.BotCountEdit {
-		// If no algorithm is active, start PSO as default.
-		if !ss.SwarmAlgoOn {
-			swarm.InitSwarmAlgorithm(ss, swarm.AlgoPSO)
-		}
-		ss.ShowPSO = !ss.ShowPSO
-		logger.Info("SWARM", "Fitness-Landscape-Overlay: %v", ss.ShowPSO)
-	}
-
-	// Shift+F key: Cycle fitness landscape function
-	if inpututil.IsKeyJustPressed(ebiten.KeyF) && ebiten.IsKeyPressed(ebiten.KeyShift) && !ed.Focused && !ss.BotCountEdit {
-		if ss.SwarmAlgo != nil {
-			algo := ss.SwarmAlgo.ActiveAlgo
-			nextFit := (ss.SwarmAlgo.FitnessFunc + 1) % swarm.FitCount
-			// Re-init the algorithm so personal bests are recalculated on new surface
-			swarm.InitSwarmAlgorithm(ss, algo)
-			ss.SwarmAlgo.FitnessFunc = nextFit
-			// Old scoreboard entries are invalid on a different landscape
-			swarm.ClearAlgoScoreboard(ss)
-			logger.Info("SWARM", "Fitness-Funktion: %s", swarm.FitnessLandscapeName(nextFit))
-		}
-	}
-
-	// ] key: Next algorithm, [ key: Previous algorithm
-	if inpututil.IsKeyJustPressed(ebiten.KeyBracketRight) && !ed.Focused && !ss.BotCountEdit {
-		var current swarm.SwarmAlgorithmType
-		if ss.SwarmAlgo != nil {
-			current = ss.SwarmAlgo.ActiveAlgo
-		} else {
-			current = swarm.AlgoNone
-		}
-		next := swarm.NextAlgorithm(current)
-		swarm.InitSwarmAlgorithm(ss, next)
-		ss.ShowPSO = true
-		logger.Info("SWARM", "Algorithmus: %s", swarm.SwarmAlgorithmName(next))
-	}
-	if inpututil.IsKeyJustPressed(ebiten.KeyBracketLeft) && !ed.Focused && !ss.BotCountEdit {
-		var current swarm.SwarmAlgorithmType
-		if ss.SwarmAlgo != nil {
-			current = ss.SwarmAlgo.ActiveAlgo
-		} else {
-			current = swarm.AlgoCount - 1
-		}
-		prev := swarm.PrevAlgorithm(current)
-		swarm.InitSwarmAlgorithm(ss, prev)
-		ss.ShowPSO = true
-		logger.Info("SWARM", "Algorithmus: %s", swarm.SwarmAlgorithmName(prev))
-	}
-
-	// Ctrl+T key: Auto-Tournament — benchmark all optimization algorithms
-	if inpututil.IsKeyJustPressed(ebiten.KeyT) && ebiten.IsKeyPressed(ebiten.KeyControl) && !ed.Focused && !ss.BotCountEdit {
-		swarm.StartAlgoTournament(ss)
-		if ss.AlgoTournamentOn {
-			ss.ShowPSO = true // show heatmap during tournament
-			logger.Info("SWARM", "Algo-Tournament gestartet (%d Algorithmen)", ss.AlgoTournamentTotal)
-		} else {
-			logger.Info("SWARM", "Algo-Tournament abgebrochen")
-		}
-	}
-
-	// Ctrl+D key: Toggle dynamic fitness landscape (Gaussian peaks drift)
-	if inpututil.IsKeyJustPressed(ebiten.KeyD) && ebiten.IsKeyPressed(ebiten.KeyControl) && !ed.Focused && !ss.BotCountEdit {
-		if ss.SwarmAlgo != nil {
-			ss.SwarmAlgo.DynamicLandscape = !ss.SwarmAlgo.DynamicLandscape
-			if ss.SwarmAlgo.DynamicLandscape {
-				logger.Info("SWARM", "Dynamische Fitness-Landschaft EIN (Peaks bewegen sich)")
-			} else {
-				logger.Info("SWARM", "Dynamische Fitness-Landschaft AUS")
-			}
-		}
-	}
-
-	// Shift+G key: Magnetic chain overlay
-	if inpututil.IsKeyJustPressed(ebiten.KeyG) && ebiten.IsKeyPressed(ebiten.KeyShift) && !ed.Focused && !ss.BotCountEdit {
-		if !ss.MagneticOn {
-			swarm.InitMagnetic(ss)
-		}
-		ss.ShowMagnetic = !ss.ShowMagnetic
-		logger.Info("SWARM", "Magnetic-Overlay: %v", ss.ShowMagnetic)
-	}
-
-	// Shift+D key: Cell Division overlay
-	if inpututil.IsKeyJustPressed(ebiten.KeyD) && ebiten.IsKeyPressed(ebiten.KeyShift) && !ed.Focused && !ss.BotCountEdit {
-		if !ss.DivisionOn {
-			swarm.InitDivision(ss)
-		}
-		ss.ShowDivision = !ss.ShowDivision
-		logger.Info("SWARM", "Division-Overlay: %v", ss.ShowDivision)
-	}
-
-	// Shift+V key: V-Formation overlay
-	if inpututil.IsKeyJustPressed(ebiten.KeyV) && ebiten.IsKeyPressed(ebiten.KeyShift) && !ed.Focused && !ss.BotCountEdit {
-		if !ss.VFormationOn {
-			swarm.InitVFormation(ss)
-		}
-		ss.ShowVFormation = !ss.ShowVFormation
-		logger.Info("SWARM", "V-Formation-Overlay: %v", ss.ShowVFormation)
-	}
-
-	// Shift+O key: Brood Sorting overlay
-	if inpututil.IsKeyJustPressed(ebiten.KeyO) && ebiten.IsKeyPressed(ebiten.KeyShift) && !ed.Focused && !ss.BotCountEdit {
-		if !ss.BroodOn {
-			swarm.InitBrood(ss)
-		}
-		ss.ShowBrood = !ss.ShowBrood
-		logger.Info("SWARM", "Brood-Overlay: %v", ss.ShowBrood)
-	}
-
-	// Shift+U key: Jellyfish Pulse overlay
-	if inpututil.IsKeyJustPressed(ebiten.KeyU) && ebiten.IsKeyPressed(ebiten.KeyShift) && !ed.Focused && !ss.BotCountEdit {
-		if !ss.JellyfishOn {
-			swarm.InitJellyfish(ss)
-		}
-		ss.ShowJellyfish = !ss.ShowJellyfish
-		logger.Info("SWARM", "Jellyfish-Overlay: %v", ss.ShowJellyfish)
-	}
-
-	// Shift+I key: Immune System overlay
-	if inpututil.IsKeyJustPressed(ebiten.KeyI) && ebiten.IsKeyPressed(ebiten.KeyShift) && !ed.Focused && !ss.BotCountEdit {
-		if !ss.ImmuneSwarmOn {
-			swarm.InitImmuneSwarm(ss)
-		}
-		ss.ShowImmune = !ss.ShowImmune
-		logger.Info("SWARM", "Immune-Overlay: %v", ss.ShowImmune)
-	}
-
-	// Shift+N key: Gravitational N-Body overlay
-	if inpututil.IsKeyJustPressed(ebiten.KeyN) && ebiten.IsKeyPressed(ebiten.KeyShift) && !ed.Focused && !ss.BotCountEdit {
-		if !ss.GravityOn {
-			swarm.InitGravity(ss)
-		}
-		ss.ShowGravity = !ss.ShowGravity
-		logger.Info("SWARM", "Gravity-Overlay: %v", ss.ShowGravity)
-	}
-
-	// Shift+K key: Crystallization overlay
-	if inpututil.IsKeyJustPressed(ebiten.KeyK) && ebiten.IsKeyPressed(ebiten.KeyShift) && !ed.Focused && !ss.BotCountEdit {
-		if !ss.CrystalOn {
-			swarm.InitCrystal(ss)
-		}
-		ss.ShowCrystal = !ss.ShowCrystal
-		logger.Info("SWARM", "Crystal-Overlay: %v", ss.ShowCrystal)
-	}
-
-	// Shift+L key: Amoeba Locomotion overlay
-	if inpututil.IsKeyJustPressed(ebiten.KeyL) && ebiten.IsKeyPressed(ebiten.KeyShift) && !ed.Focused && !ss.BotCountEdit {
-		if !ss.AmoebaOn {
-			swarm.InitAmoeba(ss)
-		}
-		ss.ShowAmoeba = !ss.ShowAmoeba
-		logger.Info("SWARM", "Amoeba-Overlay: %v", ss.ShowAmoeba)
-	}
-
-	// Shift+Q key: ACO overlay
-	if inpututil.IsKeyJustPressed(ebiten.KeyQ) && ebiten.IsKeyPressed(ebiten.KeyShift) && !ed.Focused && !ss.BotCountEdit {
-		if !ss.ACOOn {
-			swarm.InitACO(ss)
-		}
-		ss.ShowACO = !ss.ShowACO
-		logger.Info("SWARM", "ACO-Overlay: %v", ss.ShowACO)
-	}
-
-	// 6 key: Grey Wolf Optimizer overlay
-	if inpututil.IsKeyJustPressed(ebiten.Key6) && !ed.Focused && !ss.BotCountEdit {
-		if !ss.GWOOn {
-			swarm.InitGWO(ss)
-		}
-		ss.ShowGWO = !ss.ShowGWO
-		logger.Info("SWARM", "GWO-Overlay: %v", ss.ShowGWO)
-	}
-
-	// Shift+X key: Whale Optimization Algorithm overlay
-	if inpututil.IsKeyJustPressed(ebiten.KeyX) && ebiten.IsKeyPressed(ebiten.KeyShift) && !ed.Focused && !ss.BotCountEdit {
-		if !ss.WOAOn {
-			swarm.InitWOA(ss)
-		}
-		ss.ShowWOA = !ss.ShowWOA
-		logger.Info("SWARM", "WOA-Overlay: %v", ss.ShowWOA)
-	}
-
-	// Shift+Z key: Bacterial Foraging Optimization overlay
-	if inpututil.IsKeyJustPressed(ebiten.KeyZ) && ebiten.IsKeyPressed(ebiten.KeyShift) && !ed.Focused && !ss.BotCountEdit {
-		if !ss.BFOOn {
-			swarm.InitBFO(ss)
-		}
-		ss.ShowBFO = !ss.ShowBFO
-		logger.Info("SWARM", "BFO-Overlay: %v", ss.ShowBFO)
-	}
-
-	// Shift+R key: Moth-Flame Optimization overlay
-	if inpututil.IsKeyJustPressed(ebiten.KeyR) && ebiten.IsKeyPressed(ebiten.KeyShift) && !ed.Focused && !ss.BotCountEdit {
-		if !ss.MFOOn {
-			swarm.InitMFO(ss)
-		}
-		ss.ShowMFO = !ss.ShowMFO
-		logger.Info("SWARM", "MFO-Overlay: %v", ss.ShowMFO)
-	}
-
-	// Shift+Q key: Cuckoo Search overlay
-	if inpututil.IsKeyJustPressed(ebiten.KeyQ) && ebiten.IsKeyPressed(ebiten.KeyShift) && !ed.Focused && !ss.BotCountEdit {
-		if !ss.CuckooOn {
-			swarm.InitCuckoo(ss)
-		}
-		ss.ShowCuckoo = !ss.ShowCuckoo
-		logger.Info("SWARM", "Cuckoo-Overlay: %v", ss.ShowCuckoo)
-	}
-
-	// Shift+D key: Differential Evolution overlay
-	if inpututil.IsKeyJustPressed(ebiten.KeyD) && ebiten.IsKeyPressed(ebiten.KeyShift) && !ed.Focused && !ss.BotCountEdit {
-		if !ss.DEOn {
-			swarm.InitDE(ss)
-		}
-		ss.ShowDE = !ss.ShowDE
-		logger.Info("SWARM", "DE-Overlay: %v", ss.ShowDE)
-	}
-
-	// Shift+B key: Artificial Bee Colony overlay
-	if inpututil.IsKeyJustPressed(ebiten.KeyB) && ebiten.IsKeyPressed(ebiten.KeyShift) && !ed.Focused && !ss.BotCountEdit {
-		if !ss.ABCOn {
-			swarm.InitABC(ss)
-		}
-		ss.ShowABC = !ss.ShowABC
-		logger.Info("SWARM", "ABC-Overlay: %v", ss.ShowABC)
-	}
-
-	// Shift+J key: Harmony Search overlay
-	if inpututil.IsKeyJustPressed(ebiten.KeyJ) && ebiten.IsKeyPressed(ebiten.KeyShift) && !ed.Focused && !ss.BotCountEdit {
-		if !ss.HSOOn {
-			swarm.InitHSO(ss)
-		}
-		ss.ShowHSO = !ss.ShowHSO
-		logger.Info("SWARM", "HSO-Overlay: %v", ss.ShowHSO)
-	}
-
-	// Shift+Y key: Bat Algorithm overlay
-	if inpututil.IsKeyJustPressed(ebiten.KeyY) && ebiten.IsKeyPressed(ebiten.KeyShift) && !ed.Focused && !ss.BotCountEdit {
-		if !ss.BatOn {
-			swarm.InitBat(ss)
-		}
-		ss.ShowBat = !ss.ShowBat
-		logger.Info("SWARM", "Bat-Overlay: %v", ss.ShowBat)
-	}
-
-	// Shift+A key: Harris Hawks Optimization overlay
-	if inpututil.IsKeyJustPressed(ebiten.KeyA) && ebiten.IsKeyPressed(ebiten.KeyShift) && !ed.Focused && !ss.BotCountEdit {
-		if !ss.HHOOn {
-			swarm.InitHHO(ss)
-		}
-		ss.ShowHHO = !ss.ShowHHO
-		logger.Info("SWARM", "HHO-Overlay: %v", ss.ShowHHO)
-	}
-
-	// Ctrl+1 key: Salp Swarm Algorithm overlay
-	if inpututil.IsKeyJustPressed(ebiten.Key1) && ebiten.IsKeyPressed(ebiten.KeyControl) && !ed.Focused && !ss.BotCountEdit {
-		if !ss.SSAOn {
-			swarm.InitSSA(ss)
-		}
-		ss.ShowSSA = !ss.ShowSSA
-		logger.Info("SWARM", "SSA-Overlay: %v", ss.ShowSSA)
-	}
-
-	// Ctrl+2 key: Gravitational Search Algorithm overlay
-	if inpututil.IsKeyJustPressed(ebiten.Key2) && ebiten.IsKeyPressed(ebiten.KeyControl) && !ed.Focused && !ss.BotCountEdit {
-		if !ss.GSAOn {
-			swarm.InitGSA(ss)
-		}
-		ss.ShowGSA = !ss.ShowGSA
-		logger.Info("SWARM", "GSA-Overlay: %v", ss.ShowGSA)
-	}
-
-	// Ctrl+3 key: Flower Pollination Algorithm overlay
-	if inpututil.IsKeyJustPressed(ebiten.Key3) && ebiten.IsKeyPressed(ebiten.KeyControl) && !ed.Focused && !ss.BotCountEdit {
-		if !ss.FPAOn {
-			swarm.InitFPA(ss)
-		}
-		ss.ShowFPA = !ss.ShowFPA
-		logger.Info("SWARM", "FPA-Overlay: %v", ss.ShowFPA)
-	}
-
-	// Ctrl+4 key: Simulated Annealing overlay
-	if inpututil.IsKeyJustPressed(ebiten.Key4) && ebiten.IsKeyPressed(ebiten.KeyControl) && !ed.Focused && !ss.BotCountEdit {
-		if !ss.SAOn {
-			swarm.InitSA(ss)
-		}
-		ss.ShowSA = !ss.ShowSA
-		logger.Info("SWARM", "SA-Overlay: %v", ss.ShowSA)
-	}
-
-	// Ctrl+5 key: Velocity flow field overlay
-	if inpututil.IsKeyJustPressed(ebiten.Key5) && ebiten.IsKeyPressed(ebiten.KeyControl) && !ed.Focused && !ss.BotCountEdit {
-		ss.ShowFlowField = !ss.ShowFlowField
-		logger.Info("SWARM", "Flow-Field: %v", ss.ShowFlowField)
-	}
-
-	// Ctrl+6 key: Aquila Optimizer overlay
-	if inpututil.IsKeyJustPressed(ebiten.Key6) && ebiten.IsKeyPressed(ebiten.KeyControl) && !ed.Focused && !ss.BotCountEdit {
-		if !ss.AOOn {
-			swarm.InitAO(ss)
-		}
-		ss.ShowAO = !ss.ShowAO
-		logger.Info("SWARM", "AO-Overlay: %v", ss.ShowAO)
-	}
-
-	// Ctrl+7 key: Sine Cosine Algorithm overlay
-	if inpututil.IsKeyJustPressed(ebiten.Key7) && ebiten.IsKeyPressed(ebiten.KeyControl) && !ed.Focused && !ss.BotCountEdit {
-		if !ss.SCAOn {
-			swarm.InitSCA(ss)
-		}
-		ss.ShowSCA = !ss.ShowSCA
-		logger.Info("SWARM", "SCA-Overlay: %v", ss.ShowSCA)
-	}
-
-	// Ctrl+8 key: Dragonfly Algorithm overlay
-	if inpututil.IsKeyJustPressed(ebiten.Key8) && ebiten.IsKeyPressed(ebiten.KeyControl) && !ed.Focused && !ss.BotCountEdit {
-		if !ss.DAOn {
-			swarm.InitDA(ss)
-		}
-		ss.ShowDA = !ss.ShowDA
-		logger.Info("SWARM", "DA-Overlay: %v", ss.ShowDA)
-	}
-
-	// Ctrl+9 key: TLBO overlay
-	if inpututil.IsKeyJustPressed(ebiten.Key9) && ebiten.IsKeyPressed(ebiten.KeyControl) && !ed.Focused && !ss.BotCountEdit {
-		if !ss.TLBOOn {
-			swarm.InitTLBO(ss)
-		}
-		ss.ShowTLBO = !ss.ShowTLBO
-		logger.Info("SWARM", "TLBO-Overlay: %v", ss.ShowTLBO)
-	}
-
-	// Ctrl+0 key: Equilibrium Optimizer overlay
-	if inpututil.IsKeyJustPressed(ebiten.Key0) && ebiten.IsKeyPressed(ebiten.KeyControl) && !ed.Focused && !ss.BotCountEdit {
-		if !ss.EOOn {
-			swarm.InitEO(ss)
-		}
-		ss.ShowEO = !ss.ShowEO
-		logger.Info("SWARM", "EO-Overlay: %v", ss.ShowEO)
-	}
-
-	// Ctrl+Minus key: Jaya Algorithm overlay
-	if inpututil.IsKeyJustPressed(ebiten.KeyMinus) && ebiten.IsKeyPressed(ebiten.KeyControl) && !ed.Focused && !ss.BotCountEdit {
-		if !ss.JayaOn {
-			swarm.InitJaya(ss)
-		}
-		ss.ShowJaya = !ss.ShowJaya
-		logger.Info("SWARM", "Jaya-Overlay: %v", ss.ShowJaya)
-	}
-
-	// Ctrl+= : Algorithm performance radar chart
-	if inpututil.IsKeyJustPressed(ebiten.KeyEqual) && ebiten.IsKeyPressed(ebiten.KeyControl) && !ed.Focused && !ss.BotCountEdit {
-		ss.ShowAlgoRadar = !ss.ShowAlgoRadar
-		logger.Info("SWARM", "Algorithmus-Radar: %v", ss.ShowAlgoRadar)
-	}
-
-	// Ctrl+G : Fitness gradient field overlay
-	if inpututil.IsKeyJustPressed(ebiten.KeyG) && ebiten.IsKeyPressed(ebiten.KeyControl) && !ed.Focused && !ss.BotCountEdit {
-		ss.ShowFitnessGradient = !ss.ShowFitnessGradient
-		logger.Info("SWARM", "Fitness-Gradient: %v", ss.ShowFitnessGradient)
-	}
-
-	// Ctrl+V : Voronoi territory overlay
-	if inpututil.IsKeyJustPressed(ebiten.KeyV) && ebiten.IsKeyPressed(ebiten.KeyControl) && !ed.Focused && !ss.BotCountEdit {
-		ss.ShowVoronoi = !ss.ShowVoronoi
-		logger.Info("SWARM", "Voronoi-Overlay: %v", ss.ShowVoronoi)
-	}
-
-	// C key: Shift+C = swarm center overlay, plain C = challenge/routes
-	if inpututil.IsKeyJustPressed(ebiten.KeyC) && !ed.Focused && !ss.BotCountEdit {
-		if ebiten.IsKeyPressed(ebiten.KeyShift) {
-			ss.ShowSwarmCenter = !ss.ShowSwarmCenter
-			swarm.RecordOverlayUsed(ss, "center")
-			logger.Info("SWARM", "Schwarm-Zentrum: %v", ss.ShowSwarmCenter)
-		} else if ss.TeamsEnabled {
-			// Start challenge: 5000 ticks
-			ss.ChallengeActive = true
-			ss.ChallengeTicks = 5000
-			ss.ChallengeResult = ""
-			ss.TeamAScore = 0
-			ss.TeamBScore = 0
-			logger.Info("SWARM", "Challenge started! 5000 ticks")
-		} else {
-			ss.ShowRoutes = !ss.ShowRoutes
-			swarm.RecordOverlayUsed(ss, "routes")
-			logger.Info("SWARM", "Routes: %v", ss.ShowRoutes)
-		}
-	}
-
-	// N key: new round (teams) or new truck round
-	if inpututil.IsKeyJustPressed(ebiten.KeyN) && !ed.Focused && !ss.BotCountEdit && !ebiten.IsKeyPressed(ebiten.KeyShift) {
-		if ss.TeamsEnabled {
-			swarm.ResetTeamScores(ss)
-			if ss.DeliveryOn {
-				ss.ResetDeliveryState()
-				swarm.GenerateDeliveryStations(ss)
-			}
-			logger.Info("SWARM", "Teams: New round!")
-		} else if ss.TruckToggle && ss.TruckState != nil {
-			// Always allow N to restart trucks (not just in RoundDone)
-			oldRound := ss.TruckState.RoundNum
-			ss.TruckState = swarm.NewSwarmTruckState(ss.Rng)
-			ss.TruckState.RoundNum = oldRound + 1
-			ss.ResetBots()
-			if ss.DeliveryOn {
-				swarm.GenerateDeliveryStations(ss)
-			}
-			logger.Info("SWARM", "New truck round %d", ss.TruckState.RoundNum)
-		}
-	}
-
-	// M key: toggle minimap (when editor not focused)
-	if inpututil.IsKeyJustPressed(ebiten.KeyM) && !ed.Focused && !ss.BotCountEdit {
-		g.renderer.ShowMinimap = !g.renderer.ShowMinimap
-		logger.Info("SWARM", "Minimap: %v", g.renderer.ShowMinimap)
-	}
-
-	// D key: toggle dashboard (when editor not focused)
-	if inpututil.IsKeyJustPressed(ebiten.KeyD) && !ed.Focused && !ss.BotCountEdit {
-		ss.DashboardOn = !ss.DashboardOn
-		swarm.RecordOverlayUsed(ss, "dashboard")
-		if ss.DashboardOn && ss.StatsTracker == nil {
-			ss.StatsTracker = swarm.NewStatsTracker()
-		}
-		logger.Info("SWARM", "Dashboard: %v", ss.DashboardOn)
-	}
-
-	// Z key: toggle replay mode
-	if inpututil.IsKeyJustPressed(ebiten.KeyZ) && !ebiten.IsKeyPressed(ebiten.KeyShift) && !ed.Focused && !ss.BotCountEdit {
-		if !g.replayMode {
-			if ss.ReplayBuf != nil && ss.ReplayBuf.Count > 0 {
-				g.replayMode = true
-				g.replayIdx = ss.ReplayBuf.Count - 1 // start at newest
-				g.replayWasPause = g.sim.Paused
-				g.sim.Paused = true
-				logger.Info("SWARM", "Replay ON — %d snapshots, Arrow keys to scrub, ESC to exit", ss.ReplayBuf.Count)
-			}
-		} else {
-			g.replayMode = false
-			g.sim.Paused = g.replayWasPause
-			logger.Info("SWARM", "Replay OFF")
-		}
-	}
-
-	// Replay navigation (when in replay mode)
-	if g.replayMode && ss.ReplayBuf != nil {
-		step := 1
-		if ebiten.IsKeyPressed(ebiten.KeyShift) {
-			step = 10
-		}
-		if inpututil.IsKeyJustPressed(ebiten.KeyLeft) || (ebiten.IsKeyPressed(ebiten.KeyLeft) && ss.Tick%3 == 0) {
-			g.replayIdx -= step
-			if g.replayIdx < 0 {
-				g.replayIdx = 0
-			}
-		}
-		if inpututil.IsKeyJustPressed(ebiten.KeyRight) || (ebiten.IsKeyPressed(ebiten.KeyRight) && ss.Tick%3 == 0) {
-			g.replayIdx += step
-			if g.replayIdx >= ss.ReplayBuf.Count {
-				g.replayIdx = ss.ReplayBuf.Count - 1
-			}
-		}
-		if inpututil.IsKeyJustPressed(ebiten.KeyHome) {
-			g.replayIdx = 0
-		}
-		if inpututil.IsKeyJustPressed(ebiten.KeyEnd) {
-			g.replayIdx = ss.ReplayBuf.Count - 1
-		}
-	}
-
-	// I key: Shift+I = day/night cycle, plain I = energy system
-	if inpututil.IsKeyJustPressed(ebiten.KeyI) && !ed.Focused && !ss.BotCountEdit {
-		if ebiten.IsKeyPressed(ebiten.KeyShift) {
-			ss.DayNightOn = !ss.DayNightOn
-			swarm.RecordOverlayUsed(ss, "daynight")
-			if ss.DayNightOn && ss.DayNightSpeed == 0 {
-				ss.DayNightSpeed = 0.001 // ~1000 tick full cycle
-			}
-			logger.Info("SWARM", "Tag/Nacht-Zyklus: %v (Phase=%.2f)", ss.DayNightOn, ss.DayNightPhase)
-		}
-	}
-	if inpututil.IsKeyJustPressed(ebiten.KeyI) && !ed.Focused && !ss.BotCountEdit && !ebiten.IsKeyPressed(ebiten.KeyShift) {
-		ss.EnergyEnabled = !ss.EnergyEnabled
-		if ss.EnergyEnabled {
-			// Initialize all bots with full energy
-			for i := range ss.Bots {
-				ss.Bots[i].Energy = 100
-			}
-			logger.Info("SWARM", "Energy system ON — Bots verbrauchen Energie bei Bewegung")
-		} else {
-			logger.Info("SWARM", "Energy system OFF")
-		}
-	}
-
-	// B key: Shift+B = achievements overlay, plain B = baseline bookmark
-	if inpututil.IsKeyJustPressed(ebiten.KeyB) && !ed.Focused && !ss.BotCountEdit {
-		if ebiten.IsKeyPressed(ebiten.KeyShift) {
-			ss.ShowAchievements = !ss.ShowAchievements
-			if ss.AchievementState == nil {
-				ss.AchievementState = swarm.NewAchievementState()
-			}
-			swarm.RecordOverlayUsed(ss, "achievements")
-			logger.Info("SWARM", "Achievements: %v", ss.ShowAchievements)
-		} else if len(ss.FitnessHistory) > 1 {
-			ss.BaselineFitness = make([]swarm.FitnessRecord, len(ss.FitnessHistory))
-			copy(ss.BaselineFitness, ss.FitnessHistory)
-			gen := ss.Generation
-			if ss.GPEnabled {
-				gen = ss.GPGeneration
-			}
-			if ss.NeuroEnabled {
-				gen = ss.NeuroGeneration
-			}
-			ss.BaselineLabel = fmt.Sprintf("Baseline Gen %d", gen)
-			logger.Info("SWARM", "Fitness baseline saved (%d generations)", len(ss.BaselineFitness))
-		}
-	}
-
-	// E key in swarm mode: Shift+E = speciation toggle
-	if inpututil.IsKeyJustPressed(ebiten.KeyE) && !ed.Focused && !ss.BotCountEdit {
-		if ebiten.IsKeyPressed(ebiten.KeyShift) && ss.EvolutionOn {
-			ss.SpeciationOn = !ss.SpeciationOn
-			swarm.RecordOverlayUsed(ss, "speciation")
-			ss.ShowSpeciation = ss.SpeciationOn
-			if ss.SpeciationOn && ss.Speciation == nil {
-				swarm.InitSpeciation(ss)
-			}
-			logger.Info("SWARM", "Speciation: %v", ss.SpeciationOn)
-		}
-	}
-
-	// K key: toggle communication graph overlay
-	if inpututil.IsKeyJustPressed(ebiten.KeyK) && !ed.Focused && !ss.BotCountEdit && !ebiten.IsKeyPressed(ebiten.KeyShift) {
-		ss.ShowCommGraph = !ss.ShowCommGraph
-		swarm.RecordOverlayUsed(ss, "commgraph")
-		logger.Info("SWARM", "Comm graph: %v", ss.ShowCommGraph)
-	}
-
-	// A key: Shift+A = aurora background, plain A = action heatmap toggle
-	if inpututil.IsKeyJustPressed(ebiten.KeyA) && !ed.Focused && !ss.BotCountEdit {
-		if ebiten.IsKeyPressed(ebiten.KeyShift) {
-			ss.AuroraOn = !ss.AuroraOn
-			swarm.RecordOverlayUsed(ss, "aurora")
-			logger.Info("SWARM", "Aurora: %v", ss.AuroraOn)
-		} else if ss.DashboardOn && ss.StatsTracker != nil {
-			ss.StatsTracker.ShowActionHeat = !ss.StatsTracker.ShowActionHeat
-			logger.Info("SWARM", "Action heatmap: %v", ss.StatsTracker.ShowActionHeat)
-		}
-	}
-
-	// Speed presets: number keys 1-5 (when editor not focused)
-	if !ed.Focused && !ss.BotCountEdit {
-		speedPresets := map[ebiten.Key]float64{
-			ebiten.KeyDigit1: 0.5,
-			ebiten.KeyDigit2: 1.0,
-			ebiten.KeyDigit3: 2.0,
-			ebiten.KeyDigit4: 5.0,
-			ebiten.KeyDigit5: 10.0,
-		}
-		for key, speed := range speedPresets {
-			if inpututil.IsKeyJustPressed(key) {
-				g.sim.Speed = speed
-				logger.Info("SWARM", "Speed preset: %.1fx (key %d)", speed, key-ebiten.KeyDigit0)
-			}
-		}
-	}
-
-	// X key: export stats as CSV to clipboard
-	if inpututil.IsKeyJustPressed(ebiten.KeyX) && !ebiten.IsKeyPressed(ebiten.KeyShift) && !ed.Focused && !ss.BotCountEdit {
-		csv := g.buildStatsCSV()
-		if csv != "" {
-			render.ClipboardWrite(csv)
-			ss.ClipboardFlash = 30
-			logger.Info("SWARM", "Stats exported to clipboard (%d bytes)", len(csv))
-		}
-	}
-
-	// V key: toggle genome visualization (when editor not focused + evolution on)
-	if inpututil.IsKeyJustPressed(ebiten.KeyV) && !ed.Focused && !ss.BotCountEdit && !ebiten.IsKeyPressed(ebiten.KeyShift) {
-		if ss.EvolutionOn {
-			ss.ShowGenomeViz = !ss.ShowGenomeViz
-			swarm.RecordOverlayUsed(ss, "genome")
-			logger.Info("SWARM", "Genome viz: %v", ss.ShowGenomeViz)
-		}
-	}
-
-	// G key: toggle Genom-Browser (when any evolution mode is active)
-	if inpututil.IsKeyJustPressed(ebiten.KeyG) && !ed.Focused && !ss.BotCountEdit {
-		if ss.EvolutionOn || ss.GPEnabled || ss.NeuroEnabled {
-			ss.GenomeBrowserOn = !ss.GenomeBrowserOn
-			ss.GenomeBrowserScroll = 0
-			logger.Info("SWARM", "Genom-Browser: %v", ss.GenomeBrowserOn)
-		}
-	}
-
-	// G+Up/Down: scroll Genom-Browser, G+Tab: change sort
-	if ss.GenomeBrowserOn {
-		_, wy := ebiten.Wheel()
-		if wy < 0 {
-			ss.GenomeBrowserScroll += 3
-		} else if wy > 0 {
-			ss.GenomeBrowserScroll -= 3
-			if ss.GenomeBrowserScroll < 0 {
-				ss.GenomeBrowserScroll = 0
-			}
-		}
-		if inpututil.IsKeyJustPressed(ebiten.KeyTab) && !ed.Focused {
-			ss.GenomeBrowserSort = (ss.GenomeBrowserSort + 1) % 3
-			logger.Info("SWARM", "Genom-Browser sort: %d", ss.GenomeBrowserSort)
-			return
-		}
-	}
-
-	// Tab key: toggle console bot filter (when editor not focused)
-	if inpututil.IsKeyJustPressed(ebiten.KeyTab) && !ed.Focused && !ss.BotCountEdit {
-		if g.consoleFilterBot >= 0 {
-			g.consoleFilterBot = -1
-		} else if ss.SelectedBot >= 0 {
-			g.consoleFilterBot = ss.SelectedBot
-		}
-	}
-
-	// J key: toggle dynamic environment (moving obstacles + package expiry)
-	if inpututil.IsKeyJustPressed(ebiten.KeyJ) && !ed.Focused && !ss.BotCountEdit {
-		if ebiten.IsKeyPressed(ebiten.KeyShift) {
-			// Shift+J: toggle patrol/rotating obstacles
-			if swarm.HasMovingObstacles(ss) {
-				swarm.ClearMovingObstacles(ss)
-				logger.Info("SWARM", "Moving obstacles: OFF")
-			} else {
-				swarm.GeneratePatrolObstacles(ss, 3)
-				swarm.GenerateRotatingObstacles(ss, 2)
-				ss.ObstaclesOn = true
-				logger.Info("SWARM", "Moving obstacles: ON (3 Patrol + 2 Rotation)")
-			}
-		} else {
-			ss.DynamicEnv = !ss.DynamicEnv
-			logger.Info("SWARM", "Dynamic environment: %v", ss.DynamicEnv)
-		}
-	}
-
-	// F key: Shift+F = pattern detection, plain F = follow-cam
-	if inpututil.IsKeyJustPressed(ebiten.KeyF) && !ed.Focused && !ss.BotCountEdit {
-		if ebiten.IsKeyPressed(ebiten.KeyShift) {
-			ss.ShowPatterns = !ss.ShowPatterns
-			swarm.RecordOverlayUsed(ss, "patterns")
-			logger.Info("SWARM", "Muster-Erkennung: %v", ss.ShowPatterns)
-		} else if ss.FollowCamBot >= 0 {
-			ss.FollowCamBot = -1
-			logger.Info("SWARM", "Follow-cam OFF")
-		} else if ss.SelectedBot >= 0 {
-			ss.FollowCamBot = ss.SelectedBot
-			logger.Info("SWARM", "Follow-cam ON: Bot #%d", ss.FollowCamBot)
-		}
-	}
-
-	// U key: tournament mode
-	if inpututil.IsKeyJustPressed(ebiten.KeyU) && !ed.Focused && !ss.BotCountEdit && !ebiten.IsKeyPressed(ebiten.KeyShift) {
-		if !ss.TournamentOn {
-			// Add current program to tournament roster and open tournament
-			name := ss.ProgramName
-			if name == "" {
-				name = "Custom"
-			}
-			source := strings.Join(ed.Lines, "\n")
-			swarm.TournamentAddEntry(ss, name, source)
-			ss.TournamentOn = true
-		} else if ss.TournamentPhase == 0 {
-			// Already in tournament idle — add current program
-			name := ss.ProgramName
-			if name == "" {
-				name = "Custom"
-			}
-			source := strings.Join(ed.Lines, "\n")
-			swarm.TournamentAddEntry(ss, name, source)
-		} else if ss.TournamentPhase == 2 {
-			// Results shown — reset for new tournament
-			ss.TournamentEntries = nil
-			ss.TournamentResults = nil
-			ss.TournamentPhase = 0
-			logger.Info("SWARM", "Tournament reset")
-		}
-	}
-
-	// Enter key in tournament idle: start the tournament
-	if ss.TournamentOn && ss.TournamentPhase == 0 &&
-		inpututil.IsKeyJustPressed(ebiten.KeyEnter) && !ed.Focused {
-		if len(ss.TournamentEntries) >= 2 {
-			if !ss.DeliveryOn {
-				ss.DeliveryOn = true
-				swarm.GenerateDeliveryStations(ss)
-			}
-			swarm.TournamentStart(ss)
-		}
-	}
-
-	// O key: toggle arena edit mode
-	if inpututil.IsKeyJustPressed(ebiten.KeyO) && !ed.Focused && !ss.BotCountEdit && !ebiten.IsKeyPressed(ebiten.KeyShift) && !ebiten.IsKeyPressed(ebiten.KeyControl) {
-		ss.ArenaEditMode = !ss.ArenaEditMode
-		ss.ArenaDragIdx = -1
-		if ss.ArenaEditMode {
-			ss.ArenaEditTool = 0 // default: obstacle
-			logger.Info("SWARM", "Arena-Editor ON (Tool: Obstacle)")
-		} else {
-			logger.Info("SWARM", "Arena-Editor OFF")
-		}
-	}
-
-	// Arena edit tool switching: 1=obstacle, 2=station, 3=delete (when in edit mode)
-	if ss.ArenaEditMode && !ed.Focused {
-		if inpututil.IsKeyJustPressed(ebiten.KeyDigit1) {
-			ss.ArenaEditTool = 0
-			logger.Info("SWARM", "Arena-Editor Tool: Obstacle")
-		}
-		if inpututil.IsKeyJustPressed(ebiten.KeyDigit2) {
-			ss.ArenaEditTool = 1
-			logger.Info("SWARM", "Arena-Editor Tool: Station")
-		}
-		if inpututil.IsKeyJustPressed(ebiten.KeyDigit3) {
-			ss.ArenaEditTool = 2
-			logger.Info("SWARM", "Arena-Editor Tool: Delete")
-		}
-	}
 
 	// Editor keyboard input (when editor is focused)
 	if ed.Focused {
@@ -1790,12 +800,12 @@ func (g *Game) handleSwarmInput() {
 	// Tooltip hover detection
 	hoverID := ""
 	if !ed.Focused && !ss.BotCountEdit {
-		hoverID = render.SwarmEditorHitTest(mx, my)
+		hoverID = render.SwarmEditorHitTest(mx, my, ss)
 		// Also check dropdown hover for preset tooltips
 		if ss.DropdownOpen {
-			idx := render.SwarmDropdownHitTest(mx, my, len(ss.PresetNames))
-			if idx >= 0 && idx < len(ss.PresetNames) {
-				hoverID = "preset:" + ss.PresetNames[idx]
+			idx := render.SwarmDropdownHitTest(mx, my, len(ss.Presets))
+			if idx >= 0 && idx < len(ss.Presets) {
+				hoverID = "preset:" + ss.Presets[idx].Name
 			}
 		}
 	}
@@ -1806,7 +816,7 @@ func (g *Game) handleSwarmClick(mx, my int) {
 	ss := g.sim.SwarmState
 	ed := ss.Editor
 
-	hit := render.SwarmEditorHitTest(mx, my)
+	hit := render.SwarmEditorHitTest(mx, my, ss)
 	switch hit {
 	case "dropdown":
 		ss.DropdownOpen = !ss.DropdownOpen
@@ -2000,13 +1010,6 @@ func (g *Game) handleSwarmClick(mx, my int) {
 		}
 		ss.DeliveryOn = !ss.DeliveryOn
 		if ss.DeliveryOn {
-			// Force maze on
-			if !ss.MazeOn {
-				ss.MazeOn = true
-				ss.ObstaclesOn = false
-				ss.Obstacles = nil
-				swarm.GenerateSwarmMaze(ss)
-			}
 			// Generate stations and packages
 			swarm.GenerateDeliveryStations(ss)
 			// Reset bot carrying state
@@ -2143,7 +1146,188 @@ func (g *Game) handleSwarmClick(mx, my int) {
 		ed.Focused = false
 		ss.BotCountEdit = false
 
+	// ==================== TAB SYSTEM ====================
+	case "tab:0", "tab:1", "tab:2", "tab:3", "tab:4":
+		tabIdx := int(hit[4] - '0')
+		ss.EditorTab = tabIdx
+		ss.TabScrollY = 0
+		ed.Focused = false
+		ss.BotCountEdit = false
+
+	// --- Tab 1 (Evo) new toggles ---
+	case "pareto":
+		ss.ParetoEnabled = !ss.ParetoEnabled
+		logger.Info("SWARM", "Pareto: %v", ss.ParetoEnabled)
+	case "speciation":
+		ss.SpeciationOn = !ss.SpeciationOn
+		if ss.SpeciationOn && ss.Speciation == nil {
+			swarm.InitSpeciation(ss)
+		}
+		logger.Info("SWARM", "Speciation: %v", ss.SpeciationOn)
+	case "sensornoise":
+		ss.SensorNoiseOn = !ss.SensorNoiseOn
+		if ss.SensorNoiseOn && ss.SensorNoiseCfg.NoiseLevel == 0 {
+			ss.SensorNoiseCfg = swarm.SensorNoiseConfig{
+				NoiseLevel:  0.15,
+				FailureRate: 0.02,
+			}
+		}
+		logger.Info("SWARM", "SensorNoise: %v", ss.SensorNoiseOn)
+	case "memory":
+		ss.MemoryEnabled = !ss.MemoryEnabled
+		logger.Info("SWARM", "Memory: %v", ss.MemoryEnabled)
+	case "leaderboard":
+		ss.ShowLeaderboard = !ss.ShowLeaderboard
+		logger.Info("SWARM", "Leaderboard: %v", ss.ShowLeaderboard)
+
+	// --- Tab 2 (Anzeige) toggles ---
+	case "dashboard":
+		ss.DashboardOn = !ss.DashboardOn
+		logger.Info("SWARM", "Dashboard: %v", ss.DashboardOn)
+	case "minimap":
+		g.renderer.ShowMinimap = !g.renderer.ShowMinimap
+		ss.ShowMinimap = g.renderer.ShowMinimap
+		logger.Info("SWARM", "Minimap: %v", g.renderer.ShowMinimap)
+	case "trails":
+		ss.ShowTrails = !ss.ShowTrails
+		logger.Info("SWARM", "Trails: %v", ss.ShowTrails)
+	case "heatmap":
+		ss.ShowHeatmap = !ss.ShowHeatmap
+		if ss.ShowHeatmap {
+			swarm.InitHeatmap(ss)
+		}
+		logger.Info("SWARM", "Heatmap: %v", ss.ShowHeatmap)
+	case "routes":
+		ss.ShowRoutes = !ss.ShowRoutes
+		logger.Info("SWARM", "Routes: %v", ss.ShowRoutes)
+	case "livechart":
+		ss.ShowLiveChart = !ss.ShowLiveChart
+		logger.Info("SWARM", "LiveChart: %v", ss.ShowLiveChart)
+	case "commgraph":
+		ss.ShowCommGraph = !ss.ShowCommGraph
+		logger.Info("SWARM", "CommGraph: %v", ss.ShowCommGraph)
+	case "msgwaves":
+		ss.ShowMsgWaves = !ss.ShowMsgWaves
+		logger.Info("SWARM", "MsgWaves: %v", ss.ShowMsgWaves)
+	case "genomeviz":
+		ss.ShowGenomeViz = !ss.ShowGenomeViz
+		logger.Info("SWARM", "GenomeViz: %v", ss.ShowGenomeViz)
+	case "genomebrowser":
+		ss.GenomeBrowserOn = !ss.GenomeBrowserOn
+		logger.Info("SWARM", "GenomeBrowser: %v", ss.GenomeBrowserOn)
+	case "swarmcenter":
+		ss.ShowSwarmCenter = !ss.ShowSwarmCenter
+		logger.Info("SWARM", "SwarmCenter: %v", ss.ShowSwarmCenter)
+	case "congestion":
+		ss.ShowZones = !ss.ShowZones
+		logger.Info("SWARM", "CongestionZones: %v", ss.ShowZones)
+	case "prediction":
+		ss.ShowPrediction = !ss.ShowPrediction
+		logger.Info("SWARM", "Prediction: %v", ss.ShowPrediction)
+	case "colorfilter":
+		ss.ColorFilter = (ss.ColorFilter + 1) % 6
+		logger.Info("SWARM", "ColorFilter: %d", ss.ColorFilter)
+
+	// --- Tab 3 (Algo) ---
+	case "algo:radar":
+		ss.ShowAlgoRadar = !ss.ShowAlgoRadar
+		logger.Info("SWARM", "AlgoRadar: %v", ss.ShowAlgoRadar)
+	case "algo:tourney":
+		if !ss.AlgoTournamentOn {
+			swarm.StartAlgoTournament(ss)
+			logger.Info("SWARM", "Algo-Tournament gestartet")
+		}
+
+	// --- Tab 4 (Tools) ---
+	case "speed:0.5":
+		g.sim.Speed = 0.5
+		ss.CurrentSpeed = 0.5
+	case "speed:1":
+		g.sim.Speed = 1.0
+		ss.CurrentSpeed = 1.0
+	case "speed:2":
+		g.sim.Speed = 2.0
+		ss.CurrentSpeed = 2.0
+	case "speed:5":
+		g.sim.Speed = 5.0
+		ss.CurrentSpeed = 5.0
+	case "speed:10":
+		g.sim.Speed = 10.0
+		ss.CurrentSpeed = 10.0
+	case "newround":
+		if ss.TeamsEnabled {
+			swarm.ResetTeamScores(ss)
+			if ss.DeliveryOn {
+				ss.ResetDeliveryState()
+				swarm.GenerateDeliveryStations(ss)
+			}
+		} else if ss.TruckToggle && ss.TruckState != nil {
+			oldRound := ss.TruckState.RoundNum
+			ss.TruckState = swarm.NewSwarmTruckState(ss.Rng)
+			ss.TruckState.RoundNum = oldRound + 1
+			ss.ResetBots()
+			if ss.DeliveryOn {
+				swarm.GenerateDeliveryStations(ss)
+			}
+		}
+		logger.Info("SWARM", "Neue Runde")
+	case "screenshot":
+		g.screenshotRequested = true
+	case "gif":
+		g.gifToggleRequested = true
+	case "replay":
+		ss.ReplayMode = !ss.ReplayMode
+		if ss.ReplayMode && ss.ReplayBuf != nil {
+			ss.ReplayPlayer = swarm.NewReplayPlayer(ss.ReplayBuf)
+		}
+		logger.Info("SWARM", "Replay: %v", ss.ReplayMode)
+	case "tournament":
+		ss.TournamentOn = !ss.TournamentOn
+		logger.Info("SWARM", "Tournament: %v", ss.TournamentOn)
+
+	// --- Tab 0 (Arena) new toggles ---
+	case "energy":
+		ss.EnergyEnabled = !ss.EnergyEnabled
+		if ss.EnergyEnabled {
+			for i := range ss.Bots {
+				ss.Bots[i].Energy = 100
+			}
+		}
+		logger.Info("SWARM", "Energy: %v", ss.EnergyEnabled)
+	case "dynamicenv":
+		ss.DynamicEnv = !ss.DynamicEnv
+		logger.Info("SWARM", "DynamicEnv: %v", ss.DynamicEnv)
+	case "daynight":
+		ss.DayNightOn = !ss.DayNightOn
+		if ss.DayNightOn {
+			ss.DayNightPhase = 0
+			ss.DayNightSpeed = 0.0002
+		}
+		logger.Info("SWARM", "DayNight: %v", ss.DayNightOn)
+	case "arenaeditor":
+		ss.ArenaEditMode = !ss.ArenaEditMode
+		logger.Info("SWARM", "ArenaEditMode: %v", ss.ArenaEditMode)
+
 	default:
+		// Handle algo:N clicks (algorithm toggle from tab 3)
+		if len(hit) > 5 && hit[:5] == "algo:" {
+			idx := 0
+			fmt.Sscanf(hit[5:], "%d", &idx)
+			entries := render.GetAlgoEntries(ss)
+			if idx >= 0 && idx < len(entries) {
+				e := entries[idx]
+				if !*e.OnPtr {
+					// Turning ON: call Init
+					e.Init(ss)
+				}
+				*e.ShowPtr = !*e.ShowPtr
+				logger.Info("SWARM", "Algo %s: %v", e.Name, *e.ShowPtr)
+			}
+			return
+		}
+		// exportswarm / importswarm / exportcsv are handled via existing keyboard shortcuts
+		// (Ctrl+S, Ctrl+O, X) — not yet wired as click actions
+
 		// Clicked outside editor panel — check arena for bot selection
 		ed.Focused = false
 		ss.BotCountEdit = false
@@ -2621,12 +1805,12 @@ func (g *Game) autoReset(reason string) {
 
 func (g *Game) loadSwarmPreset(idx int) {
 	ss := g.sim.SwarmState
-	if idx < 0 || idx >= len(ss.PresetPrograms) {
+	if idx < 0 || idx >= len(ss.Presets) {
 		return
 	}
 
-	ss.ProgramName = ss.PresetNames[idx]
-	presetText := ss.PresetPrograms[idx]
+	ss.ProgramName = ss.Presets[idx].Name
+	presetText := ss.Presets[idx].Source
 	ss.Editor.Lines = strings.Split(presetText, "\n")
 	ss.Editor.CursorLine = 0
 	ss.Editor.CursorCol = 0
@@ -2650,13 +1834,13 @@ func (g *Game) loadSwarmPreset(idx int) {
 		ss.DeliveryOn = true
 		ss.ObstaclesOn = false
 		ss.Obstacles = nil
-		// Truck presets: maze OFF (open arena); delivery presets: maze ON
-		if swarm.IsTruckPresetIdx(idx) {
-			ss.MazeOn = false
-			ss.MazeWalls = nil
-		} else {
+		// Maze OFF by default, except Maze Explorer preset
+		if ss.Presets[idx].Name == "Maze Explorer" {
 			ss.MazeOn = true
 			swarm.GenerateSwarmMaze(ss)
+		} else {
+			ss.MazeOn = false
+			ss.MazeWalls = nil
 		}
 		swarm.GenerateDeliveryStations(ss)
 		for i := range ss.Bots {
@@ -2716,8 +1900,18 @@ func (g *Game) loadSwarmPreset(idx int) {
 		swarm.ClearGP(ss)
 		swarm.InitNeuro(ss)
 		g.sim.Speed = 5.0 // auto 5x speed for neuro
-		logger.Info("SWARM", "Neuro Delivery preset — NEURO auto-aktiviert, %d Bots × %d Gewichte",
-			ss.BotCount, swarm.NeuroWeights)
+		// Neuro: LKW needs truck mode + delivery
+		if swarm.IsNeuroTruckPresetIdx(idx) {
+			ss.TruckToggle = true
+			ss.DeliveryOn = true
+			ss.TruckState = swarm.NewSwarmTruckState(ss.Rng)
+			swarm.GenerateDeliveryStations(ss)
+			logger.Info("SWARM", "Neuro LKW preset — NEURO+TRUCKS auto-aktiviert, %d Bots × %d Gewichte",
+				ss.BotCount, swarm.NeuroWeights)
+		} else {
+			logger.Info("SWARM", "Neuro Delivery preset — NEURO auto-aktiviert, %d Bots × %d Gewichte",
+				ss.BotCount, swarm.NeuroWeights)
+		}
 	} else {
 		if ss.NeuroEnabled {
 			swarm.ClearNeuro(ss)
