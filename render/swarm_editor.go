@@ -32,10 +32,10 @@ const (
 	editorStatusY = 618
 
 	// Separator 1
-	editorSep1Y = 636
+	editorSep1Y = 618
 
-	// Bot count input
-	editorBotCountY = 642
+	// Bot count input (above the tab bar)
+	editorBotCountY = 622
 
 	// Toggle buttons row 1
 	editorToggle1Y = 662
@@ -484,6 +484,19 @@ func DrawSwarmHUD(screen *ebiten.Image, s *simulation.Simulation, fps float64) {
 			printColoredAt(screen, "RESET", 700, 35, color.RGBA{255, 255, 50, flashAlpha})
 		}
 
+		// Delivery & Truck HUD bar with dark background for readability
+		hudLines := 0
+		if ss.DeliveryOn {
+			hudLines++
+		}
+		if ss.TruckToggle && ss.TruckState != nil {
+			hudLines++
+		}
+		if hudLines > 0 {
+			barH := float64(hudLines*18 + 6)
+			ebitenutil.DrawRect(screen, 415, 10, float64(screen.Bounds().Dx()-420), barH, color.RGBA{10, 12, 25, 200})
+		}
+
 		// Delivery HUD line
 		if ss.DeliveryOn {
 			ds := &ss.DeliveryStats
@@ -497,7 +510,7 @@ func DrawSwarmHUD(screen *ebiten.Image, s *simulation.Simulation, fps float64) {
 			}
 			dInfo := fmt.Sprintf("Lieferungen: %d | Richtig: %d | Falsch: %d | Schnitt: %d",
 				ds.TotalDelivered, ds.CorrectDelivered, ds.WrongDelivered, avgTime)
-			printColoredAt(screen, dInfo, 420, 15, color.RGBA{255, 200, 100, 255})
+			printColoredAt(screen, dInfo, 420, 15, color.RGBA{255, 220, 120, 255})
 		}
 
 		// Truck HUD line
@@ -517,7 +530,7 @@ func DrawSwarmHUD(screen *ebiten.Image, s *simulation.Simulation, fps float64) {
 			}
 			tInfo := fmt.Sprintf("LKW %d/%d | Pakete: %d/%d | Punkte: %d",
 				ts.TruckNum, ts.TrucksPerRound, total-remaining, total, ts.Score)
-			printColoredAt(screen, tInfo, 420, 32, color.RGBA{220, 150, 50, 255})
+			printColoredAt(screen, tInfo, 420, 32, color.RGBA{255, 180, 80, 255})
 		}
 	}
 

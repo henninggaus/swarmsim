@@ -355,9 +355,17 @@ func ExecuteNeuroTruckAction(actionIdx int, bot *SwarmBot, ss *SwarmState, botId
 		}
 		bot.Speed = SwarmBotSpeed
 	case 5: // GOTO_RAMP — navigate to the truck ramp to pick up packages
-		if ss.TruckState != nil && ss.TruckState.CurrentTruck != nil {
+		if bot.CarryingPkg >= 0 {
+			// Already carrying → redirect to dropoff (don't go back to ramp!)
+			if bot.NearestDropoffIdx >= 0 {
+				st := &ss.Stations[bot.NearestDropoffIdx]
+				dx, dy := NeighborDelta(bot.X, bot.Y, st.X, st.Y, ss)
+				bot.Angle = math.Atan2(dy, dx)
+				bot.Speed = SwarmBotSpeed
+			}
+		} else if ss.TruckState != nil && ss.TruckState.CurrentTruck != nil {
 			ts := ss.TruckState
-			// Target ramp edge, spread bots
+			// Target ramp edge, spread bots along ramp
 			cx := ts.RampX + ts.RampW + 20
 			slots := 20
 			slot := botIdx % slots
@@ -369,9 +377,14 @@ func ExecuteNeuroTruckAction(actionIdx int, bot *SwarmBot, ss *SwarmState, botId
 			bot.Speed = SwarmBotSpeed
 		}
 	case 6: // DROP
-		if bot.CarryingPkg >= 0 && bot.DropoffMatch && bot.NearestDropoffDist < 30 {
+		if bot.CarryingPkg >= 0 && bot.NearestDropoffDist < 40 {
+			// Navigate closer to dropoff for auto-drop to trigger
+			if bot.NearestDropoffIdx >= 0 {
+				st := &ss.Stations[bot.NearestDropoffIdx]
+				dx, dy := NeighborDelta(bot.X, bot.Y, st.X, st.Y, ss)
+				bot.Angle = math.Atan2(dy, dx)
+			}
 			bot.Speed = SwarmBotSpeed
-			// Actual drop handled by delivery system
 		}
 	case 7: // GOTO_DROPOFF
 		if bot.CarryingPkg >= 0 && bot.NearestDropoffIdx >= 0 {
@@ -379,6 +392,17 @@ func ExecuteNeuroTruckAction(actionIdx int, bot *SwarmBot, ss *SwarmState, botId
 			dx, dy := NeighborDelta(bot.X, bot.Y, st.X, st.Y, ss)
 			bot.Angle = math.Atan2(dy, dx)
 			bot.Speed = SwarmBotSpeed
+		} else if bot.CarryingPkg < 0 {
+			// Not carrying → redirect to ramp instead of wandering
+			if ss.TruckState != nil && ss.TruckState.CurrentTruck != nil {
+				ts := ss.TruckState
+				cx := ts.RampX + ts.RampW + 20
+				cy := ts.RampY + ts.RampH*0.5
+				dx := cx - bot.X
+				dy := cy - bot.Y
+				bot.Angle = math.Atan2(dy, dx)
+				bot.Speed = SwarmBotSpeed
+			}
 		}
 	}
 
@@ -413,15 +437,32 @@ func ExecuteNeuroTruckAction(actionIdx int, bot *SwarmBot, ss *SwarmState, botId
 // Rewards: score (packages delivered to correct station), pickups, proximity to ramp.
 // Penalties: idle time, anti-stuck.
 func EvaluateNeuroTruckFitness(bot *SwarmBot, ss *SwarmState) float64 {
-	f := float64(bot.Stats.TotalDeliveries)*40 +
-		float64(bot.Stats.TotalPickups)*20 +
-		bot.Stats.TotalDistance*0.005 -
-		float64(bot.Stats.AntiStuckCount)*10 -
-		float64(bot.Stats.TicksIdle)*0.05
-	// Bonus for being near truck/ramp when not carrying
-	if bot.CarryingPkg < 0 && bot.TruckHere {
-		f += 5
+	// Main rewards: delivery is king, pickup is crucial
+	f := float64(bot.Stats.TotalDeliveries)*100 +
+		float64(bot.Stats.TotalPickups)*40
+
+	// Intermediate: reward carrying toward dropoff (closer = more reward)
+	if bot.CarryingPkg >= 0 && bot.NearestDropoffIdx >= 0 {
+		// Max 15 points for being right at dropoff, 0 for 500+ away
+		closeness := 1.0 - math.Min(bot.NearestDropoffDist, 500)/500
+		f += closeness * 15
 	}
+
+	// Intermediate: reward being near ramp when not carrying
+	if bot.CarryingPkg < 0 && bot.TruckHere {
+		f += 10
+		if bot.OnRamp {
+			f += 15 // extra for actually being on the ramp
+		}
+	}
+
+	// Small exploration reward
+	f += bot.Stats.TotalDistance * 0.002
+
+	// Penalties
+	f -= float64(bot.Stats.AntiStuckCount) * 15
+	f -= float64(bot.Stats.TicksIdle) * 0.08
+
 	return f
 }
 

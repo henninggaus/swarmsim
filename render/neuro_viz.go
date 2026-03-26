@@ -85,14 +85,22 @@ func drawNeuroVisualization(screen *ebiten.Image, ss *swarm.SwarmState) {
 	printColoredAt(screen, "10% komplett neue Zufalls-Netze.", x+2, y, color.RGBA{140, 140, 160, 200})
 	y += lineH + 2
 
-	// Fitness function explanation
+	// Fitness function explanation (context-sensitive)
 	printColoredAt(screen, "FITNESS-FORMEL:", x+2, y, color.RGBA{200, 160, 255, 220})
 	y += lineH
-	printColoredAt(screen, " Lieferung x30 + Pickup x15", x+2, y, color.RGBA{80, 255, 80, 200})
-	y += lineH
-	printColoredAt(screen, " + Distanz x0.01", x+2, y, color.RGBA{80, 255, 80, 200})
-	y += lineH
-	printColoredAt(screen, " - AntiStuck x10 - Idle x0.05", x+2, y, color.RGBA{255, 100, 80, 200})
+	if ss.TruckToggle {
+		printColoredAt(screen, " Lieferung x100 + Pickup x40", x+2, y, color.RGBA{80, 255, 80, 200})
+		y += lineH
+		printColoredAt(screen, " + Rampe x15 + Naehe-Dropoff x15", x+2, y, color.RGBA{80, 255, 80, 200})
+		y += lineH
+		printColoredAt(screen, " - AntiStuck x15 - Idle x0.08", x+2, y, color.RGBA{255, 100, 80, 200})
+	} else {
+		printColoredAt(screen, " Lieferung x30 + Pickup x15", x+2, y, color.RGBA{80, 255, 80, 200})
+		y += lineH
+		printColoredAt(screen, " + Distanz x0.01", x+2, y, color.RGBA{80, 255, 80, 200})
+		y += lineH
+		printColoredAt(screen, " - AntiStuck x10 - Idle x0.05", x+2, y, color.RGBA{255, 100, 80, 200})
+	}
 	y += lineH + 4
 
 	// Current generation stats

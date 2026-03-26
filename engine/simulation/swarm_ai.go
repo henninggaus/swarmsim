@@ -340,8 +340,14 @@ func (s *Simulation) updateSwarmMode() {
 			}
 			// Auto-pickup/drop for neuro bots: the net navigates, the system handles interaction
 			if ss.DeliveryOn {
-				if bot.CarryingPkg < 0 && bot.NearestPickupDist < 20 && bot.NearestPickupHasPkg {
-					executeSwarmAction(swarmscript.Action{Type: swarmscript.ActPickup}, bot, ss, i)
+				if bot.CarryingPkg < 0 {
+					if ss.TruckToggle && bot.OnRamp {
+						// Truck mode: pickup at ramp via crane
+						executeSwarmAction(swarmscript.Action{Type: swarmscript.ActPickup}, bot, ss, i)
+					} else if bot.NearestPickupDist < 20 && bot.NearestPickupHasPkg {
+						// Delivery mode: pickup at station
+						executeSwarmAction(swarmscript.Action{Type: swarmscript.ActPickup}, bot, ss, i)
+					}
 				}
 				if bot.CarryingPkg >= 0 && bot.DropoffMatch && bot.NearestDropoffDist < 30 {
 					executeSwarmAction(swarmscript.Action{Type: swarmscript.ActDrop}, bot, ss, i)
