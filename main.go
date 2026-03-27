@@ -184,9 +184,49 @@ func (g *Game) Update() (retErr error) {
 			g.maybeStartTutorial()
 			return nil
 		}
+		// F4: Algo-Labor (dedicated optimization algorithm visualization)
+		if inpututil.IsKeyJustPressed(ebiten.KeyF4) {
+			g.sim.LoadSwarmScenario()
+			g.tickAcc = 0
+			g.showWelcome = false
+			ss := g.sim.SwarmState
+			ss.AlgoLaborMode = true
+			ss.DeliveryOn = false
+			ss.TruckToggle = false
+			ss.NeuroEnabled = false
+			ss.GPEnabled = false
+			ss.EvolutionOn = false
+			// Initialize fitness landscape
+			if ss.SwarmAlgo == nil {
+				ss.SwarmAlgo = &swarm.SwarmAlgorithmState{}
+			}
+			swarm.InitAlgoLabor(ss)
+			return nil
+		}
 
-		// Any other key or mouse click → load Swarm Lab (default) and dismiss
+		// Mouse click on welcome screen — check which button was hit
 		if inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) {
+			mx, my := ebiten.CursorPosition()
+			btn4 := g.renderer.WelcomeBtn4
+			if btn4[2] > 0 && mx >= btn4[0] && mx < btn4[0]+btn4[2] && my >= btn4[1] && my < btn4[1]+btn4[3] {
+				// Algo-Labor button clicked
+				g.sim.LoadSwarmScenario()
+				g.tickAcc = 0
+				g.showWelcome = false
+				ss := g.sim.SwarmState
+				ss.AlgoLaborMode = true
+				ss.DeliveryOn = false
+				ss.TruckToggle = false
+				ss.NeuroEnabled = false
+				ss.GPEnabled = false
+				ss.EvolutionOn = false
+				if ss.SwarmAlgo == nil {
+					ss.SwarmAlgo = &swarm.SwarmAlgorithmState{}
+				}
+				swarm.InitAlgoLabor(ss)
+				return nil
+			}
+			// Default: load Swarm Lab
 			g.sim.LoadSwarmScenario()
 			g.tickAcc = 0
 			g.showWelcome = false
@@ -425,6 +465,28 @@ func (g *Game) handleGlobalInput() {
 		g.renderer.FadeLoad = func() {
 			g.sim.LoadSwarmScenario()
 			g.tickAcc = 0
+		}
+	}
+
+	// F4: Algo-Labor (dedicated optimization algorithm mode)
+	if inpututil.IsKeyJustPressed(ebiten.KeyF4) && g.renderer.FadeDir == 0 {
+		logger.Info("KEY", "F4 pressed -> Loading Algo-Labor")
+		g.renderer.FadeDir = -1
+		g.renderer.FadeAlpha = 0
+		g.renderer.FadeLoad = func() {
+			g.sim.LoadSwarmScenario()
+			g.tickAcc = 0
+			ss := g.sim.SwarmState
+			ss.AlgoLaborMode = true
+			ss.DeliveryOn = false
+			ss.TruckToggle = false
+			ss.NeuroEnabled = false
+			ss.GPEnabled = false
+			ss.EvolutionOn = false
+			if ss.SwarmAlgo == nil {
+				ss.SwarmAlgo = &swarm.SwarmAlgorithmState{}
+			}
+			swarm.InitAlgoLabor(ss)
 		}
 	}
 
@@ -722,6 +784,21 @@ func (g *Game) handleSwarmInput() {
 		}
 		if ss.TabScrollY < 0 {
 			ss.TabScrollY = 0
+		}
+	}
+
+	// Algo-Labor scroll (algorithm list: 20 algos, 10 visible)
+	if ss.AlgoLaborMode && mx < 350 && wy != 0 {
+		if wy < 0 {
+			ss.AlgoLaborScrollY++
+		} else {
+			ss.AlgoLaborScrollY--
+		}
+		if ss.AlgoLaborScrollY < 0 {
+			ss.AlgoLaborScrollY = 0
+		}
+		if ss.AlgoLaborScrollY > 10 { // 20 total - 10 visible = 10 max scroll
+			ss.AlgoLaborScrollY = 10
 		}
 	}
 
@@ -1069,6 +1146,11 @@ func (g *Game) handleSwarmClick(mx, my int) {
 		ss.BotCountEdit = false
 
 	case "evolution":
+		// Block if GP or Neuro is active (user must turn those off first)
+		if !ss.EvolutionOn && (ss.GPEnabled || ss.NeuroEnabled) {
+			logger.Info("SWARM", "Evolution gesperrt — erst GP/Neuro ausschalten")
+			break
+		}
 		ss.EvolutionOn = !ss.EvolutionOn
 		if ss.EvolutionOn {
 			ss.GPEnabled = false // mutually exclusive
@@ -1106,6 +1188,10 @@ func (g *Game) handleSwarmClick(mx, my int) {
 		ss.BotCountEdit = false
 
 	case "gp":
+		if !ss.GPEnabled && (ss.EvolutionOn || ss.NeuroEnabled) {
+			logger.Info("SWARM", "GP gesperrt — erst Evolution/Neuro ausschalten")
+			break
+		}
 		ss.GPEnabled = !ss.GPEnabled
 		if ss.GPEnabled {
 			// Turn off regular evolution and neuro (mutually exclusive)
@@ -1123,6 +1209,10 @@ func (g *Game) handleSwarmClick(mx, my int) {
 		ss.BotCountEdit = false
 
 	case "neuro":
+		if !ss.NeuroEnabled && (ss.EvolutionOn || ss.GPEnabled) {
+			logger.Info("SWARM", "Neuro gesperrt — erst Evolution/GP ausschalten")
+			break
+		}
 		ss.NeuroEnabled = !ss.NeuroEnabled
 		if ss.NeuroEnabled {
 			// Turn off regular evolution and GP (mutually exclusive)
@@ -1147,8 +1237,11 @@ func (g *Game) handleSwarmClick(mx, my int) {
 		ss.BotCountEdit = false
 
 	// ==================== TAB SYSTEM ====================
-	case "tab:0", "tab:1", "tab:2", "tab:3", "tab:4":
+	case "tab:0", "tab:1", "tab:2", "tab:3":
 		tabIdx := int(hit[4] - '0')
+		if tabIdx > 3 {
+			tabIdx = 3
+		}
 		ss.EditorTab = tabIdx
 		ss.TabScrollY = 0
 		ed.Focused = false
@@ -1156,9 +1249,17 @@ func (g *Game) handleSwarmClick(mx, my int) {
 
 	// --- Tab 1 (Evo) new toggles ---
 	case "pareto":
+		if !ss.EvolutionOn && !ss.GPEnabled {
+			logger.Info("SWARM", "Pareto braucht Evolution oder GP")
+			break
+		}
 		ss.ParetoEnabled = !ss.ParetoEnabled
 		logger.Info("SWARM", "Pareto: %v", ss.ParetoEnabled)
 	case "speciation":
+		if !ss.EvolutionOn {
+			logger.Info("SWARM", "Artbildung braucht Evolution")
+			break
+		}
 		ss.SpeciationOn = !ss.SpeciationOn
 		if ss.SpeciationOn && ss.Speciation == nil {
 			swarm.InitSpeciation(ss)
@@ -1210,9 +1311,15 @@ func (g *Game) handleSwarmClick(mx, my int) {
 		ss.ShowMsgWaves = !ss.ShowMsgWaves
 		logger.Info("SWARM", "MsgWaves: %v", ss.ShowMsgWaves)
 	case "genomeviz":
+		if ss.NeuroEnabled || ss.GPEnabled {
+			break // only for parametric evolution
+		}
 		ss.ShowGenomeViz = !ss.ShowGenomeViz
 		logger.Info("SWARM", "GenomeViz: %v", ss.ShowGenomeViz)
 	case "genomebrowser":
+		if ss.NeuroEnabled || ss.GPEnabled {
+			break // only for parametric evolution
+		}
 		ss.GenomeBrowserOn = !ss.GenomeBrowserOn
 		logger.Info("SWARM", "GenomeBrowser: %v", ss.GenomeBrowserOn)
 	case "swarmcenter":
@@ -1238,7 +1345,7 @@ func (g *Game) handleSwarmClick(mx, my int) {
 			logger.Info("SWARM", "Algo-Tournament gestartet")
 		}
 
-	// --- Tab 4 (Tools) ---
+	// --- Tab 3 (Werkzeuge) ---
 	case "speed:0.5":
 		g.sim.Speed = 0.5
 		ss.CurrentSpeed = 0.5
@@ -1309,7 +1416,14 @@ func (g *Game) handleSwarmClick(mx, my int) {
 		logger.Info("SWARM", "ArenaEditMode: %v", ss.ArenaEditMode)
 
 	default:
-		// Handle algo:N clicks (algorithm toggle from tab 3)
+		// Handle Algo-Labor clicks (alglab:* IDs)
+		if len(hit) > 7 && hit[:7] == "alglab:" {
+			g.handleAlgoLaborClick(hit)
+			return
+		}
+		// NOTE: algo:N clicks from the old Algo tab are dead code since the
+		// Algo tab was removed (algorithms now live in F4 Algo-Labor mode,
+		// handled via "alglab:algo:N" above). Kept as safety fallback.
 		if len(hit) > 5 && hit[:5] == "algo:" {
 			idx := 0
 			fmt.Sscanf(hit[5:], "%d", &idx)
@@ -1317,11 +1431,10 @@ func (g *Game) handleSwarmClick(mx, my int) {
 			if idx >= 0 && idx < len(entries) {
 				e := entries[idx]
 				if !*e.OnPtr {
-					// Turning ON: call Init
 					e.Init(ss)
 				}
 				*e.ShowPtr = !*e.ShowPtr
-				logger.Info("SWARM", "Algo %s: %v", e.Name, *e.ShowPtr)
+				logger.Info("SWARM", "Algo %s: %v (legacy path)", e.Name, *e.ShowPtr)
 			}
 			return
 		}
@@ -2525,4 +2638,86 @@ func main() {
 	}
 	StopProfile() // ensure profiling stops on clean exit
 	logger.Info("INIT", "SwarmSim exiting cleanly")
+}
+
+// handleAlgoLaborClick processes click hits from the Algo-Labor panel.
+func (g *Game) handleAlgoLaborClick(hit string) {
+	ss := g.sim.SwarmState
+
+	switch {
+	case hit == "alglab:f2back":
+		// Switch back to Swarm Lab
+		ss.AlgoLaborMode = false
+		// Turn off all algo overlays
+		entries := render.GetAlgoEntries(ss)
+		for _, e := range entries {
+			*e.ShowPtr = false
+		}
+		ss.ShowPSO = false
+		logger.Info("ALGO-LABOR", "Zurueck zu Swarm Lab")
+
+	case len(hit) > 11 && hit[:11] == "alglab:fit:":
+		// Fitness function selection
+		idx := 0
+		fmt.Sscanf(hit[11:], "%d", &idx)
+		fitFuncs := []swarm.FitnessLandscapeType{swarm.FitGaussian, swarm.FitRastrigin, swarm.FitAckley, swarm.FitRosenbrock}
+		if idx >= 0 && idx < len(fitFuncs) && ss.SwarmAlgo != nil {
+			ss.SwarmAlgo.FitnessFunc = fitFuncs[idx]
+			// Force fresh Gaussian peaks when switching back to Gauss
+			ss.SwarmAlgo.FitPeakX = nil
+			ss.SwarmAlgo.FitPeakY = nil
+			ss.SwarmAlgo.FitPeakH = nil
+			ss.SwarmAlgo.FitPeakS = nil
+			// Re-generate peaks for Gaussian mode
+			swarm.RegenerateFitnessPeaks(ss)
+			// Invalidate renderer cache
+			g.renderer.InvalidateFitnessCache()
+			logger.Info("ALGO-LABOR", "Fitness-Funktion: %s", swarm.FitnessLandscapeName(fitFuncs[idx]))
+		}
+
+	case len(hit) > 12 && hit[:12] == "alglab:algo:":
+		// Algorithm toggle (ON ↔ OFF)
+		idx := 0
+		fmt.Sscanf(hit[12:], "%d", &idx)
+		entries := render.GetAlgoEntries(ss)
+		if idx >= 0 && idx < len(entries) {
+			e := entries[idx]
+			if !*e.ShowPtr {
+				// Turning ON: init if needed, then show
+				if !*e.OnPtr {
+					e.Init(ss)
+				}
+				*e.ShowPtr = true
+			} else {
+				// Turning OFF
+				*e.ShowPtr = false
+			}
+			logger.Info("ALGO-LABOR", "Algo %s: %v", e.Name, *e.ShowPtr)
+		}
+
+	case hit == "alglab:radar":
+		ss.ShowAlgoRadar = !ss.ShowAlgoRadar
+
+	case hit == "alglab:tourney":
+		if !ss.AlgoTournamentOn {
+			swarm.StartAlgoTournament(ss)
+			logger.Info("ALGO-LABOR", "Auto-Turnier gestartet")
+		}
+
+	case hit == "alglab:speed:1":
+		g.sim.Speed = 1.0
+		ss.CurrentSpeed = 1.0
+	case hit == "alglab:speed:2":
+		g.sim.Speed = 2.0
+		ss.CurrentSpeed = 2.0
+	case hit == "alglab:speed:5":
+		g.sim.Speed = 5.0
+		ss.CurrentSpeed = 5.0
+	case hit == "alglab:speed:10":
+		g.sim.Speed = 10.0
+		ss.CurrentSpeed = 10.0
+	case hit == "alglab:speed:50":
+		g.sim.Speed = 50.0
+		ss.CurrentSpeed = 50.0
+	}
 }

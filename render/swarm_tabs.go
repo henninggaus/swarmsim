@@ -26,7 +26,7 @@ const (
 )
 
 // Tab names
-var tabNames = [5]string{"Arena", "Evo", "Anzeige", "Algo", "Werkzeuge"}
+var tabNames = [4]string{"Arena", "Evo", "Anzeige", "Werkzeuge"}
 
 // Tab colors (active vs inactive)
 var (
@@ -37,7 +37,7 @@ var (
 	tabBorderColor   = color.RGBA{80, 100, 160, 180}
 )
 
-// drawTabBar renders the 5 tab buttons.
+// drawTabBar renders the 4 tab buttons.
 func drawTabBar(screen *ebiten.Image, ss *swarm.SwarmState) {
 	// Background strip
 	vector.DrawFilledRect(screen, 0, float32(tabBarY), float32(editorPanelW), float32(tabBarH), color.RGBA{15, 18, 30, 255}, false)
@@ -76,17 +76,16 @@ func drawTabContent(screen *ebiten.Image, ss *swarm.SwarmState) {
 	case 2:
 		drawTabDisplay(screen, ss)
 	case 3:
-		drawTabAlgorithms(screen, ss)
-	case 4:
 		drawTabTools(screen, ss)
 	}
 }
 
 // tabToggle is a helper to draw a toggle button in the tab content area.
 type tabToggle struct {
-	label   string
-	on      bool
-	onColor color.RGBA
+	label    string
+	on       bool
+	onColor  color.RGBA
+	disabled bool // greyed out, not clickable
 }
 
 func drawTabToggles(screen *ebiten.Image, toggles []tabToggle, startY int) {
@@ -100,7 +99,9 @@ func drawTabToggles(screen *ebiten.Image, toggles []tabToggle, startY int) {
 		y := startY + row*(tabToggleH+tabToggleGap)
 
 		bgCol := ColorSwarmBtnToggleOff
-		if t.on {
+		if t.disabled {
+			bgCol = color.RGBA{25, 25, 35, 200} // very dark = disabled
+		} else if t.on {
 			bgCol = t.onColor
 		}
 		drawSwarmButton(screen, x, y, tabToggleW, tabToggleH, t.label, bgCol)
@@ -113,16 +114,16 @@ func drawTabArena(screen *ebiten.Image, ss *swarm.SwarmState) {
 	y := tabContentY + 2
 
 	toggles := []tabToggle{
-		{fmtToggle("Hindernisse", ss.ObstaclesOn), ss.ObstaclesOn, ColorSwarmBtnToggleOn},
-		{fmtToggle("Labyrinth", ss.MazeOn), ss.MazeOn, ColorSwarmBtnToggleOn},
-		{fmtToggle("Lichtquelle", ss.Light.Active), ss.Light.Active, ColorSwarmBtnToggleOn},
-		{fmtWallToggle(ss.WrapMode), ss.WrapMode, color.RGBA{60, 60, 140, 255}},
-		{fmtDelivToggle(ss), ss.DeliveryOn, color.RGBA{200, 120, 40, 255}},
-		{fmtTruckToggle(ss), ss.TruckToggle, color.RGBA{180, 100, 40, 255}},
-		{fmtToggle("Energie", ss.EnergyEnabled), ss.EnergyEnabled, color.RGBA{220, 180, 50, 255}},
-		{fmtToggle("Dynamisch", ss.DynamicEnv), ss.DynamicEnv, color.RGBA{255, 150, 50, 255}},
-		{fmtToggle("Tag/Nacht", ss.DayNightOn), ss.DayNightOn, color.RGBA{100, 100, 200, 255}},
-		{fmtToggle("Arena-Editor", ss.ArenaEditMode), ss.ArenaEditMode, color.RGBA{180, 180, 80, 255}},
+		{fmtToggle("Hindernisse", ss.ObstaclesOn), ss.ObstaclesOn, ColorSwarmBtnToggleOn, false},
+		{fmtToggle("Labyrinth", ss.MazeOn), ss.MazeOn, ColorSwarmBtnToggleOn, false},
+		{fmtToggle("Lichtquelle", ss.Light.Active), ss.Light.Active, ColorSwarmBtnToggleOn, false},
+		{fmtWallToggle(ss.WrapMode), ss.WrapMode, color.RGBA{60, 60, 140, 255}, false},
+		{fmtDelivToggle(ss), ss.DeliveryOn, color.RGBA{200, 120, 40, 255}, false},
+		{fmtTruckToggle(ss), ss.TruckToggle, color.RGBA{180, 100, 40, 255}, false},
+		{fmtToggle("Energie", ss.EnergyEnabled), ss.EnergyEnabled, color.RGBA{220, 180, 50, 255}, false},
+		{fmtToggle("Dynamisch", ss.DynamicEnv), ss.DynamicEnv, color.RGBA{255, 150, 50, 255}, false},
+		{fmtToggle("Tag/Nacht", ss.DayNightOn), ss.DayNightOn, color.RGBA{100, 100, 200, 255}, false},
+		{fmtToggle("Arena-Editor", ss.ArenaEditMode), ss.ArenaEditMode, color.RGBA{180, 180, 80, 255}, false},
 	}
 	drawTabToggles(screen, toggles, y)
 }
@@ -132,18 +133,51 @@ func drawTabArena(screen *ebiten.Image, ss *swarm.SwarmState) {
 func drawTabEvolution(screen *ebiten.Image, ss *swarm.SwarmState) {
 	y := tabContentY + 2
 
+	// Mutual exclusion: Evolution, GP, Neuro can't run simultaneously
+	evoBlocked := ss.GPEnabled || ss.NeuroEnabled
+	gpBlocked := ss.EvolutionOn || ss.NeuroEnabled
+	neuroBlocked := ss.EvolutionOn || ss.GPEnabled
+	// Pareto & Artbildung need parametric Evolution
+	paretoBlocked := !ss.EvolutionOn && !ss.GPEnabled
+	specBlocked := !ss.EvolutionOn
+
+	evoLabel := fmtToggle("Evolution", ss.EvolutionOn)
+	gpLabel := fmtToggle("GP", ss.GPEnabled)
+	neuroLabel := fmtToggle("Neuro", ss.NeuroEnabled)
+	if evoBlocked && !ss.EvolutionOn {
+		evoLabel = "Evolution: ---"
+	}
+	if gpBlocked && !ss.GPEnabled {
+		gpLabel = "GP: ---"
+	}
+	if neuroBlocked && !ss.NeuroEnabled {
+		neuroLabel = "Neuro: ---"
+	}
+
 	toggles := []tabToggle{
-		{fmtToggle("Evolution", ss.EvolutionOn), ss.EvolutionOn, color.RGBA{180, 50, 180, 255}},
-		{fmtToggle("GP", ss.GPEnabled), ss.GPEnabled, color.RGBA{0, 180, 160, 255}},
-		{fmtToggle("Neuro", ss.NeuroEnabled), ss.NeuroEnabled, color.RGBA{255, 140, 50, 255}},
-		{fmtToggle("Teams", ss.TeamsEnabled), ss.TeamsEnabled, color.RGBA{100, 100, 255, 255}},
-		{fmtToggle("Pareto", ss.ParetoEnabled), ss.ParetoEnabled, color.RGBA{200, 100, 200, 255}},
-		{fmtToggle("Artbildung", ss.SpeciationOn), ss.SpeciationOn, color.RGBA{160, 200, 100, 255}},
-		{fmtToggle("Sensorrauschen", ss.SensorNoiseOn), ss.SensorNoiseOn, color.RGBA{255, 120, 80, 255}},
-		{fmtToggle("Gedaechtnis", ss.MemoryEnabled), ss.MemoryEnabled, color.RGBA{200, 150, 255, 255}},
-		{fmtToggle("Bestenliste", ss.ShowLeaderboard), ss.ShowLeaderboard, color.RGBA{255, 200, 80, 255}},
+		{evoLabel, ss.EvolutionOn, color.RGBA{180, 50, 180, 255}, evoBlocked && !ss.EvolutionOn},
+		{gpLabel, ss.GPEnabled, color.RGBA{0, 180, 160, 255}, gpBlocked && !ss.GPEnabled},
+		{neuroLabel, ss.NeuroEnabled, color.RGBA{255, 140, 50, 255}, neuroBlocked && !ss.NeuroEnabled},
+		{fmtToggle("Teams", ss.TeamsEnabled), ss.TeamsEnabled, color.RGBA{100, 100, 255, 255}, false},
+		{fmtToggle("Pareto", ss.ParetoEnabled), ss.ParetoEnabled, color.RGBA{200, 100, 200, 255}, paretoBlocked},
+		{fmtToggle("Artbildung", ss.SpeciationOn), ss.SpeciationOn, color.RGBA{160, 200, 100, 255}, specBlocked},
+		{fmtToggle("Sensorrauschen", ss.SensorNoiseOn), ss.SensorNoiseOn, color.RGBA{255, 120, 80, 255}, false},
+		{fmtToggle("Gedaechtnis", ss.MemoryEnabled), ss.MemoryEnabled, color.RGBA{200, 150, 255, 255}, false},
+		{fmtToggle("Bestenliste", ss.ShowLeaderboard), ss.ShowLeaderboard, color.RGBA{255, 200, 80, 255}, false},
 	}
 	drawTabToggles(screen, toggles, y)
+
+	// Hint: explain why buttons are disabled
+	if ss.NeuroEnabled {
+		hintY := y + 5*(tabToggleH+tabToggleGap) + 2
+		printColoredAt(screen, "Neuro aktiv: Evolution/GP gesperrt", 5, hintY, color.RGBA{255, 140, 50, 150})
+	} else if ss.GPEnabled {
+		hintY := y + 5*(tabToggleH+tabToggleGap) + 2
+		printColoredAt(screen, "GP aktiv: Evolution/Neuro gesperrt", 5, hintY, color.RGBA{0, 180, 160, 150})
+	} else if ss.EvolutionOn {
+		hintY := y + 5*(tabToggleH+tabToggleGap) + 2
+		printColoredAt(screen, "Evolution aktiv: GP/Neuro gesperrt", 5, hintY, color.RGBA{180, 50, 180, 150})
+	}
 
 	// Evo status line at bottom
 	statusY := tabContentY + tabContentH - lineH - 2
@@ -171,26 +205,29 @@ func drawTabEvolution(screen *ebiten.Image, ss *swarm.SwarmState) {
 func drawTabDisplay(screen *ebiten.Image, ss *swarm.SwarmState) {
 	y := tabContentY + 2
 
+	// Genom-Balken/Liste only make sense with parametric Evolution (not Neuro/GP)
+	genomDisabled := ss.NeuroEnabled || ss.GPEnabled
+
 	toggles := []tabToggle{
-		{fmtToggle("Dashboard", ss.DashboardOn), ss.DashboardOn, color.RGBA{80, 140, 220, 255}},
-		{fmtToggle("Minimap", ss.ShowMinimap), ss.ShowMinimap, color.RGBA{80, 140, 220, 255}},
-		{fmtToggle("Spuren", ss.ShowTrails), ss.ShowTrails, color.RGBA{80, 140, 220, 255}},
-		{fmtToggle("Heatmap", ss.ShowHeatmap), ss.ShowHeatmap, color.RGBA{200, 80, 80, 255}},
-		{fmtToggle("Lieferwege", ss.ShowRoutes), ss.ShowRoutes, color.RGBA{80, 140, 220, 255}},
-		{fmtToggle("Live-Diagramm", ss.ShowLiveChart), ss.ShowLiveChart, color.RGBA{80, 200, 80, 255}},
-		{fmtToggle("Kom.-Graph", ss.ShowCommGraph), ss.ShowCommGraph, color.RGBA{100, 200, 255, 255}},
-		{fmtToggle("Broadcast", ss.ShowMsgWaves), ss.ShowMsgWaves, color.RGBA{100, 200, 255, 255}},
-		{fmtToggle("Genom-Balken", ss.ShowGenomeViz), ss.ShowGenomeViz, color.RGBA{200, 160, 255, 255}},
-		{fmtToggle("Genom-Liste", ss.GenomeBrowserOn), ss.GenomeBrowserOn, color.RGBA{200, 160, 255, 255}},
-		{fmtToggle("Schwarm-Mitte", ss.ShowSwarmCenter), ss.ShowSwarmCenter, color.RGBA{255, 255, 100, 255}},
-		{fmtToggle("Stau-Zonen", ss.ShowZones), ss.ShowZones, color.RGBA{255, 120, 80, 255}},
-		{fmtToggle("Vorhersage", ss.ShowPrediction), ss.ShowPrediction, color.RGBA{150, 200, 255, 255}},
-		{fmtColorFilter(ss.ColorFilter), ss.ColorFilter > 0, color.RGBA{200, 200, 80, 255}},
+		{fmtToggle("Dashboard", ss.DashboardOn), ss.DashboardOn, color.RGBA{80, 140, 220, 255}, false},
+		{fmtToggle("Minimap", ss.ShowMinimap), ss.ShowMinimap, color.RGBA{80, 140, 220, 255}, false},
+		{fmtToggle("Spuren", ss.ShowTrails), ss.ShowTrails, color.RGBA{80, 140, 220, 255}, false},
+		{fmtToggle("Heatmap", ss.ShowHeatmap), ss.ShowHeatmap, color.RGBA{200, 80, 80, 255}, false},
+		{fmtToggle("Lieferwege", ss.ShowRoutes), ss.ShowRoutes, color.RGBA{80, 140, 220, 255}, false},
+		{fmtToggle("Live-Diagramm", ss.ShowLiveChart), ss.ShowLiveChart, color.RGBA{80, 200, 80, 255}, false},
+		{fmtToggle("Kom.-Graph", ss.ShowCommGraph), ss.ShowCommGraph, color.RGBA{100, 200, 255, 255}, false},
+		{fmtToggle("Broadcast", ss.ShowMsgWaves), ss.ShowMsgWaves, color.RGBA{100, 200, 255, 255}, false},
+		{fmtToggle("Genom-Balken", ss.ShowGenomeViz), ss.ShowGenomeViz, color.RGBA{200, 160, 255, 255}, genomDisabled},
+		{fmtToggle("Genom-Liste", ss.GenomeBrowserOn), ss.GenomeBrowserOn, color.RGBA{200, 160, 255, 255}, genomDisabled},
+		{fmtToggle("Schwarm-Mitte", ss.ShowSwarmCenter), ss.ShowSwarmCenter, color.RGBA{255, 255, 100, 255}, false},
+		{fmtToggle("Stau-Zonen", ss.ShowZones), ss.ShowZones, color.RGBA{255, 120, 80, 255}, false},
+		{fmtToggle("Vorhersage", ss.ShowPrediction), ss.ShowPrediction, color.RGBA{150, 200, 255, 255}, false},
+		{fmtColorFilter(ss.ColorFilter), ss.ColorFilter > 0, color.RGBA{200, 200, 80, 255}, false},
 	}
 	drawTabToggles(screen, toggles, y)
 }
 
-// ==================== Tab 3: Algorithmen ====================
+// ==================== Algo entries (used by F4 Algo-Labor) ====================
 
 // AlgoEntry defines one algorithm for the scrollable list.
 type AlgoEntry struct {
@@ -227,57 +264,7 @@ func GetAlgoEntries(ss *swarm.SwarmState) []AlgoEntry {
 	}
 }
 
-func drawTabAlgorithms(screen *ebiten.Image, ss *swarm.SwarmState) {
-	y := tabContentY + 2
-
-	// Action buttons at top
-	radarCol := color.RGBA{60, 80, 140, 255}
-	if ss.ShowAlgoRadar {
-		radarCol = color.RGBA{80, 140, 220, 255}
-	}
-	drawSwarmButton(screen, tabPadX, y, 110, 18, "Radar-Vergleich", radarCol)
-
-	tourneyCol := color.RGBA{60, 80, 140, 255}
-	if ss.AlgoTournamentOn {
-		tourneyCol = color.RGBA{200, 120, 40, 255}
-	}
-	drawSwarmButton(screen, tabPadX+115, y, 110, 18, "Auto-Turnier", tourneyCol)
-
-	y += 22
-
-	// Scrollable algorithm list
-	entries := GetAlgoEntries(ss)
-	maxVisible := (tabContentH - 26) / (tabToggleH + 2)
-	startIdx := ss.TabScrollY
-	if startIdx > len(entries)-maxVisible {
-		startIdx = len(entries) - maxVisible
-	}
-	if startIdx < 0 {
-		startIdx = 0
-	}
-
-	for i := startIdx; i < len(entries) && i < startIdx+maxVisible; i++ {
-		e := entries[i]
-		ey := y + (i-startIdx)*(tabToggleH+2)
-
-		label := e.Name + ": OFF"
-		bgCol := ColorSwarmBtnToggleOff
-		if *e.OnPtr {
-			label = e.Name + ": ON"
-			bgCol = e.Color
-		}
-		drawSwarmButton(screen, tabPadX, ey, editorPanelW-10, tabToggleH, label, bgCol)
-	}
-
-	// Scroll indicator
-	if len(entries) > maxVisible {
-		scrollInfo := fmt.Sprintf("%d-%d / %d", startIdx+1, min(startIdx+maxVisible, len(entries)), len(entries))
-		printColoredAt(screen, scrollInfo, editorPanelW-len(scrollInfo)*charW-10, tabContentY+tabContentH-lineH,
-			color.RGBA{100, 100, 120, 200})
-	}
-}
-
-// ==================== Tab 4: Tools ====================
+// ==================== Tab 3: Werkzeuge/Tools ====================
 
 func drawTabTools(screen *ebiten.Image, ss *swarm.SwarmState) {
 	y := tabContentY + 2
@@ -304,8 +291,8 @@ func drawTabTools(screen *ebiten.Image, ss *swarm.SwarmState) {
 
 	// Replay
 	toggles := []tabToggle{
-		{fmtToggle("Zeitreise", ss.ReplayMode), ss.ReplayMode, color.RGBA{200, 100, 100, 255}},
-		{fmtToggle("Turnier", ss.TournamentOn), ss.TournamentOn, color.RGBA{200, 160, 80, 255}},
+		{fmtToggle("Zeitreise", ss.ReplayMode), ss.ReplayMode, color.RGBA{200, 100, 100, 255}, false},
+		{fmtToggle("Turnier", ss.TournamentOn), ss.TournamentOn, color.RGBA{200, 160, 80, 255}, false},
 	}
 	drawTabToggles(screen, toggles, y)
 	y += (tabToggleH + tabToggleGap) + 6
@@ -329,9 +316,9 @@ func drawTabTools(screen *ebiten.Image, ss *swarm.SwarmState) {
 
 func fmtToggle(name string, on bool) string {
 	if on {
-		return name + ": ON"
+		return name + ": AN"
 	}
-	return name + ": OFF"
+	return name + ": AUS"
 }
 
 func fmtWallToggle(wrap bool) string {
@@ -343,16 +330,16 @@ func fmtWallToggle(wrap bool) string {
 
 func fmtDelivToggle(ss *swarm.SwarmState) string {
 	if ss.DeliveryOn {
-		return "Delivery: ON"
+		return "Lieferung: AN"
 	}
-	return "Delivery: OFF"
+	return "Lieferung: AUS"
 }
 
 func fmtTruckToggle(ss *swarm.SwarmState) string {
 	if ss.TruckToggle {
-		return "Trucks: ON"
+		return "LKW: AN"
 	}
-	return "Trucks: OFF"
+	return "LKW: AUS"
 }
 
 func fmtColorFilter(filter int) string {
@@ -360,7 +347,7 @@ func fmtColorFilter(filter int) string {
 	if filter >= 0 && filter < len(names) {
 		return names[filter]
 	}
-	return "Farbfilter: OFF"
+	return "Farbfilter: AUS"
 }
 
 // drawCompactStats renders a single-line stats summary at the bottom.
@@ -424,8 +411,6 @@ func TabContentHitTest(mx, my int, ss *swarm.SwarmState) string {
 	case 2:
 		return tabDisplayHitTest(mx, my)
 	case 3:
-		return tabAlgoHitTest(mx, my, ss)
-	case 4:
 		return tabToolsHitTest(mx, my)
 	}
 	return ""
@@ -441,6 +426,7 @@ func toggleHitAt(mx, my, startY, index int) bool {
 
 func tabArenaHitTest(mx, my int) string {
 	y := tabContentY + 2
+
 	ids := []string{"obstacles", "maze", "light", "walls", "delivery", "trucks",
 		"energy", "dynamicenv", "daynight", "arenaeditor"}
 	for i, id := range ids {
@@ -471,38 +457,6 @@ func tabDisplayHitTest(mx, my int) string {
 	for i, id := range ids {
 		if toggleHitAt(mx, my, y, i) {
 			return id
-		}
-	}
-	return ""
-}
-
-func tabAlgoHitTest(mx, my int, ss *swarm.SwarmState) string {
-	y := tabContentY + 2
-
-	// Radar Chart button
-	if mx >= tabPadX && mx < tabPadX+110 && my >= y && my < y+18 {
-		return "algo:radar"
-	}
-	// Auto-Turnier button
-	if mx >= tabPadX+115 && mx < tabPadX+225 && my >= y && my < y+18 {
-		return "algo:tourney"
-	}
-
-	y += 22
-	entries := GetAlgoEntries(ss)
-	maxVisible := (tabContentH - 26) / (tabToggleH + 2)
-	startIdx := ss.TabScrollY
-	if startIdx > len(entries)-maxVisible {
-		startIdx = len(entries) - maxVisible
-	}
-	if startIdx < 0 {
-		startIdx = 0
-	}
-
-	for i := startIdx; i < len(entries) && i < startIdx+maxVisible; i++ {
-		ey := y + (i-startIdx)*(tabToggleH+2)
-		if mx >= tabPadX && mx < editorPanelW-5 && my >= ey && my < ey+tabToggleH {
-			return fmt.Sprintf("algo:%d", i)
 		}
 	}
 	return ""

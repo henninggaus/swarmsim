@@ -61,7 +61,8 @@ func NewSwarmState(rng *rand.Rand, botCount int) *SwarmState {
 		SwarmCamX:    SwarmArenaSize / 2,
 		SwarmCamY:    SwarmArenaSize / 2,
 		SwarmCamZoom:  1.0,
-		CurrentSpeed: 1.0,
+		CurrentSpeed:  1.0,
+		StatsTracker:  NewStatsTracker(),
 	}
 
 	// Set up presets as type-safe pairs (name + source always stay together)

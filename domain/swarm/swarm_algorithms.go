@@ -1,6 +1,9 @@
 package swarm
 
-import "math"
+import (
+	"math"
+	"swarmsim/logger"
+)
 
 // FitnessLandscapeType selects which fitness function the optimisation
 // algorithms use. Cycling through them lets users compare convergence
@@ -974,6 +977,11 @@ func tickBoids(ss *SwarmState, sa *SwarmAlgorithmState) {
 // landscape if one does not already exist. The landscape is stored in
 // SwarmAlgorithmState and persists across algorithm switches so users can
 // compare convergence behaviour on the same landscape.
+// RegenerateFitnessPeaks forces creation of new Gaussian peaks for the fitness landscape.
+func RegenerateFitnessPeaks(ss *SwarmState) {
+	initFitnessLandscape(ss)
+}
+
 func initFitnessLandscape(ss *SwarmState) {
 	sa := ss.SwarmAlgo
 	if sa == nil {
@@ -1467,4 +1475,30 @@ func AlgorithmNames() []string {
 		"Equilibrium Optimizer (EO)",
 		"Jaya Algorithm (Rao)",
 	}
+}
+
+// InitAlgoLabor sets up the Algo-Labor mode with sensible defaults:
+// randomized bot positions, Gaussian fitness landscape, no delivery/trucks.
+func InitAlgoLabor(ss *SwarmState) {
+	// Scatter bots randomly across arena
+	for i := range ss.Bots {
+		ss.Bots[i].X = ss.ArenaW*0.1 + ss.Rng.Float64()*ss.ArenaW*0.8
+		ss.Bots[i].Y = ss.ArenaH*0.1 + ss.Rng.Float64()*ss.ArenaH*0.8
+		ss.Bots[i].Angle = ss.Rng.Float64() * 360
+	}
+
+	// Initialize fitness landscape (preserve current FitnessFunc if already set)
+	if ss.SwarmAlgo == nil {
+		ss.SwarmAlgo = &SwarmAlgorithmState{}
+		ss.SwarmAlgo.FitnessFunc = FitGaussian
+	}
+	// Force fresh Gaussian peaks (only used when FitGaussian is active)
+	ss.SwarmAlgo.FitPeakX = nil
+	initFitnessLandscape(ss)
+
+	// Show PSO overlay by default (enables fitness landscape rendering)
+	ss.ShowPSO = true
+
+	logger.Info("ALGO-LABOR", "Initialisiert: %d Bots, %d Fitness-Peaks",
+		len(ss.Bots), len(ss.SwarmAlgo.FitPeakX))
 }

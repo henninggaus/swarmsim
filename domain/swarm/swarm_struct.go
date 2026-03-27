@@ -627,7 +627,7 @@ type SwarmState struct {
 	BotCountEdit bool   // is bot count field focused
 
 	// Tabbed editor panel (replaces hardcoded toggle rows)
-	EditorTab  int // 0=Arena, 1=Evo, 2=Anzeige, 3=Algo, 4=Tools
+	EditorTab  int // 0=Arena, 1=Evo, 2=Anzeige, 3=Werkzeuge
 	TabScrollY int // vertical scroll offset within active tab content
 
 	// Obstacles / Maze / Environment toggles
@@ -895,6 +895,10 @@ type SwarmState struct {
 	// Convergence curve archive — stores best-fitness convergence curves of
 	// previously tested algorithms for visual overlay comparison in the graph.
 	ConvergenceArchive []ConvergenceArchiveEntry
+
+	// Algo-Labor mode (F4) — dedicated mode for optimization algorithm visualization
+	AlgoLaborMode    bool
+	AlgoLaborScrollY int // vertical scroll offset for algorithm list in Algo-Labor panel
 
 	// Auto-Tournament — automatically benchmarks all optimization algorithms
 	// on the current fitness landscape and fills the scoreboard.

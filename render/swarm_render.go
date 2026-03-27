@@ -323,9 +323,8 @@ func (r *Renderer) DrawSwarmMode(screen *ebiten.Image, s *simulation.Simulation,
 		drawShepherdOverlay(a, ss)
 	}
 
-	// Draw fitness landscape heatmap overlay (Shift+P toggle)
-	// Works for any algorithm that uses the shared fitness landscape.
-	if ss.ShowPSO && ss.SwarmAlgo != nil && (len(ss.SwarmAlgo.FitPeakX) > 0 || ss.SwarmAlgo.FitnessFunc != swarm.FitGaussian) {
+	// Draw fitness landscape heatmap overlay — only in Algo-Labor mode (F4)
+	if ss.AlgoLaborMode && ss.ShowPSO && ss.SwarmAlgo != nil {
 		r.drawFitnessLandscapeOverlay(a, ss)
 	}
 
@@ -378,6 +377,9 @@ func (r *Renderer) DrawSwarmMode(screen *ebiten.Image, s *simulation.Simulation,
 	if ss.ShowACO && ss.ACOOn && ss.ACO != nil {
 		drawACOOverlay(a, ss)
 	}
+
+	// ── Algo overlays — only rendered in Algo-Labor mode (F4) ──
+	if ss.AlgoLaborMode {
 
 	// Draw GWO overlay (6 key toggle) — lines from wolves to alpha/beta/delta
 	if ss.ShowGWO && ss.GWOOn && ss.GWO != nil {
@@ -478,6 +480,8 @@ func (r *Renderer) DrawSwarmMode(screen *ebiten.Image, s *simulation.Simulation,
 	if ss.ShowJaya && ss.JayaOn && ss.Jaya != nil {
 		drawJayaOverlay(a, ss)
 	}
+
+	} // end AlgoLaborMode guard
 
 	// Draw message wave rings
 	if ss.ShowMsgWaves {
@@ -899,19 +903,22 @@ func (r *Renderer) DrawSwarmMode(screen *ebiten.Image, s *simulation.Simulation,
 		drawFitnessHistogram(screen, ss)
 	}
 
-	// Algorithm performance scoreboard (shows when 2+ algorithms have been tested)
-	if len(ss.AlgoScoreboard) >= 1 {
-		drawAlgoScoreboard(screen, ss)
-	}
+	// Algorithm overlays — only in Algo-Labor mode (F4)
+	if ss.AlgoLaborMode {
+		// Algorithm performance scoreboard (shows when 2+ algorithms have been tested)
+		if len(ss.AlgoScoreboard) >= 1 {
+			drawAlgoScoreboard(screen, ss)
+		}
 
-	// Algorithm radar chart (shows when 2+ algorithms have been tested and toggled on)
-	if ss.ShowAlgoRadar && len(ss.AlgoScoreboard) >= 2 {
-		drawAlgoRadarChart(screen, ss)
-	}
+		// Algorithm radar chart (shows when 2+ algorithms have been tested and toggled on)
+		if ss.ShowAlgoRadar && len(ss.AlgoScoreboard) >= 2 {
+			drawAlgoRadarChart(screen, ss)
+		}
 
-	// Algorithm auto-tournament progress bar
-	if ss.AlgoTournamentOn {
-		drawAlgoTournamentProgress(screen, ss)
+		// Algorithm auto-tournament progress bar
+		if ss.AlgoTournamentOn {
+			drawAlgoTournamentProgress(screen, ss)
+		}
 	}
 
 	// Minimap
@@ -2753,7 +2760,7 @@ func (r *Renderer) drawFitnessLandscapeOverlay(a *ebiten.Image, ss *swarm.SwarmS
 	printColoredAt(a, " -> ", 28, legendY, color.RGBA{200, 200, 200, 180})
 	printColoredAt(a, "High", 50, legendY, color.RGBA{255, 0, 0, 200})
 	legendY += 14
-	printColoredAt(a, "Funktion wechseln: Tab Algo", 10, legendY, color.RGBA{180, 180, 180, 160})
+	printColoredAt(a, "Funktion wechseln: linkes Panel", 10, legendY, color.RGBA{180, 180, 180, 160})
 	if sa.DynamicLandscape {
 		legendY += 14
 		printColoredAt(a, "DYNAMISCH", 10, legendY, color.RGBA{255, 180, 0, 220})

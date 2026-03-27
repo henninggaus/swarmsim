@@ -25,8 +25,7 @@ var tooltipRegistry = map[string]string{
 	"tab:0": "Arena: Alles rund um die Spielwelt — Hindernisse, Labyrinth, Lichtquelle, Pakete, LKW, Energie.",
 	"tab:1": "Evo: Evolution und Lernen — Genetischer Algorithmus, Genetische Programmierung, Neuronale Netze, Teams.",
 	"tab:2": "Anzeige: Visualisierungen ein-/ausschalten — Dashboard, Spuren, Heatmap, Minimap und mehr.",
-	"tab:3": "Algo: 20 Optimierungs-Algorithmen per Klick aktivieren und im Radar-Chart vergleichen.",
-	"tab:4": "Werkzeuge: Geschwindigkeit, Zeitreise, Turnier, Bildschirmfoto, GIF, Daten-Export.",
+	"tab:3": "Werkzeuge: Geschwindigkeit, Zeitreise, Turnier, Bildschirmfoto, GIF, Daten-Export.",
 
 	// Buttons
 	"deploy":     "Laedt das aktuelle Programm auf alle Bots. Alle Bots fuehren danach die Regeln im Editor aus.",
@@ -103,11 +102,11 @@ var tooltipRegistry = map[string]string{
 	"prediction":   "Vorhersage-Pfeile: Zeigt wohin sich jeder Bot im naechsten Tick bewegen wird. Gut zum Debuggen.",
 	"colorfilter":  "Farbfilter: Hebt Bots nach Kriterium hervor — Rot, Gruen, Blau, Traegt Paket, oder Idle. Zyklisch durchklicken.",
 
-	// Tab 3 (Algo) — buttons
+	// Algo-Labor (F4) — buttons
 	"algo:radar":   "Algorithmus-Radar: Spider-Chart das die Performance aller aktiven Algorithmen auf 4 Achsen vergleicht. Braucht 2+ aktive Algorithmen.",
 	"algo:tourney": "Auto-Turnier: Testet alle Optimierungs-Algorithmen automatisch nacheinander auf der aktuellen Fitness-Landschaft und vergleicht die Ergebnisse.",
 
-	// Tab 3 (Algo) — individual algorithms (Aha-Effekt: Natur → Kernidee → Was du SIEHST)
+	// Algo-Labor (F4) — individual algorithms (Aha-Effekt: Natur → Kernidee → Was du SIEHST)
 	"algo:0":  "GWO — Wolfsrudel-Jagd: Ein Rudel hat Alpha (bester Bot), Beta, Delta. Die Woelfe kreisen die Beute ein — anfangs weit ausschweifen (Exploration), dann immer enger (Exploitation). DU SIEHST: Die Punkte im Overlay konvergieren langsam zum Optimum, wie Woelfe die Beute einkreisen. Einer der zuverlaessigsten Algorithmen!",
 	"algo:1":  "WOA — Buckelwal-Blasennetz: Buckelwale jagen mit einer Spirale aus Luftblasen, die Fische einschliesst. Jeder Wal entscheidet: einkreisen ODER Spirale fliegen (50/50). DU SIEHST: Die Punkte bewegen sich in Spiralen um das Optimum — wie ein Blasennetz, das sich zusammenzieht. Besonders schoen bei glatten Fitnesslandschaften.",
 	"algo:2":  "BFO — E.coli-Bakterien: Bakterien navigieren per Tumble-and-Run: geradeaus schwimmen solange es besser wird, zufaellig taumeln wenn nicht. Die Besten vermehren sich, die Schlechtesten sterben. DU SIEHST: Hektisches Zickzack-Muster das sich langsam verdichtet — wie Bakterien die eine Nahrungsquelle finden. Robust bei Rauschen!",
@@ -129,7 +128,7 @@ var tooltipRegistry = map[string]string{
 	"algo:18": "EO — Physikalisches Gleichgewicht: Partikel streben einen Gleichgewichtszustand an (Mittelwert der 4 Besten). Exponentieller Zerfall steuert: anfangs weit weg, spaeter kaum noch Bewegung. DU SIEHST: Schnelle Konvergenz! Die Punkte rasen anfangs zum Zentrum und pendeln sich dann ein. Gut fuer Probleme wo schnelle Antworten zaehlen.",
 	"algo:19": "Jaya — Der Einfachste: Sanskrit fuer 'Sieg'. Regel: Bewege dich zum Besten hin UND vom Schlechtesten weg. Das wars! NULL Parameter, trotzdem ueberraschend gut. DU SIEHST: Alle Punkte wandern gleichmaessig in eine Richtung — weg vom Schlechtesten, hin zum Besten. Proof dass Einfachheit siegt!",
 
-	// Tab 4 (Tools)
+	// Tab 3 (Tools/Werkzeuge)
 	"newround":   "Startet eine neue Runde — setzt Team-Scores und Delivery-Statistiken zurueck. Bei Trucks: neuer LKW faehrt vor.",
 	"replay":     "Replay-Modus: Pausiert die Simulation und erlaubt Zeitreisen durch aufgezeichnete Snapshots.",
 	"tournament": "Turnier-Modus: Verschiedene Programme treten in der gleichen Arena gegeneinander an.",

@@ -200,7 +200,8 @@ func halfScale(src []byte, srcW, srcH int) *image.RGBA {
 func DrawCaptureOverlay(screen *ebiten.Image, r *Renderer) {
 	sw := screen.Bounds().Dx()
 
-	// Overlay snackbar (screenshot saved / GIF saved)
+	// Overlay snackbar — positioned bottom-right, above the log area
+	sh := screen.Bounds().Dy()
 	if r.OverlayTimer > 0 {
 		r.OverlayTimer--
 		alpha := 255
@@ -212,16 +213,16 @@ func DrawCaptureOverlay(screen *ebiten.Image, r *Renderer) {
 		textW := len(text) * charW
 		barW := textW + 30
 		barH := 28
-		x := sw/2 - barW/2
-		y := 55
+		x := sw - barW - 20
+		y := sh - 120
 
-		// Solid dark background with accent border
-		bgAlpha := uint8(alpha * 220 / 255)
+		// Solid dark background with green accent border
+		bgAlpha := uint8(alpha * 230 / 255)
 		borderAlpha := uint8(alpha * 255 / 255)
-		vector.DrawFilledRect(screen, float32(x), float32(y), float32(barW), float32(barH),
-			color.RGBA{15, 20, 40, bgAlpha}, false)
-		vector.DrawFilledRect(screen, float32(x), float32(y+barH-3), float32(barW), 3,
+		vector.DrawFilledRect(screen, float32(x-2), float32(y-2), float32(barW+4), float32(barH+4),
 			color.RGBA{80, 200, 120, borderAlpha}, false)
+		vector.DrawFilledRect(screen, float32(x), float32(y), float32(barW), float32(barH),
+			color.RGBA{10, 15, 30, bgAlpha}, false)
 
 		// Centered white text
 		textX := x + (barW-textW)/2

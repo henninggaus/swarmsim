@@ -185,8 +185,27 @@ func (r *Renderer) DrawWelcomeScreen(screen *ebiten.Image, tick int) {
 	printColoredAt(screen, tutDesc, sw/2-tutDescW/2, tutY+22, dimCol)
 	r.WelcomeBtn2 = [4]int{btnX, tutY, btnW, btnH}
 
-	// ---- Button 3: Classic Mode (dezent) ----
-	classicY := tutY + btnH + 10
+	// ---- Button 3: Algo-Labor (orange accent) ----
+	algoY := tutY + btnH + 10
+	pulse4 := 0.7 + 0.3*math.Sin(float64(tick)*0.04+2.0)
+	glowAlpha4 := uint8(float64(30) * pulse4)
+	vector.DrawFilledRect(screen, float32(btnX), float32(algoY), float32(btnW), float32(btnH),
+		color.RGBA{50, 35, 15, 200}, false)
+	vector.DrawFilledRect(screen, float32(btnX), float32(algoY), float32(btnW), float32(btnH),
+		color.RGBA{100, 70, 20, glowAlpha4}, false)
+	vector.StrokeRect(screen, float32(btnX), float32(algoY), float32(btnW), float32(btnH),
+		2, color.RGBA{200, 150, 50, uint8(float64(100) * pulse4)}, false)
+
+	algoTitle := "Algo-Labor — Optimierungsalgorithmen (F4)"
+	algoTitleW := len(algoTitle) * charW
+	printColoredAt(screen, algoTitle, sw/2-algoTitleW/2, algoY+6, color.RGBA{255, 220, 150, 255})
+	algoDesc := "20 Algorithmen vergleichen: Woelfe, Wale, Bienen & mehr"
+	algoDescW := len(algoDesc) * charW
+	printColoredAt(screen, algoDesc, sw/2-algoDescW/2, algoY+22, dimCol)
+	r.WelcomeBtn4 = [4]int{btnX, algoY, btnW, btnH}
+
+	// ---- Button 4: Classic Mode (dezent) ----
+	classicY := algoY + btnH + 10
 	vector.DrawFilledRect(screen, float32(btnX), float32(classicY), float32(btnW), 38,
 		color.RGBA{30, 30, 45, 180}, false)
 	vector.StrokeRect(screen, float32(btnX), float32(classicY), float32(btnW), 38,
@@ -230,7 +249,7 @@ func (r *Renderer) DrawWelcomeScreen(screen *ebiten.Image, tick int) {
 	// Hint text (blinking)
 	hintY := featureY + len(features)*(lineH+4) + 14
 	hintAlpha := uint8(120 + int(80*math.Sin(float64(tick)*0.08)))
-	hint := "Klicke auf einen Button oben oder druecke F1 / F2 / F3"
+	hint := "Klicke auf einen Button oben oder druecke F1 / F2 / F3 / F4"
 	hintW := len(hint) * charW
 	printColoredAt(screen, hint, sw/2-hintW/2, hintY,
 		color.RGBA{180, 180, 200, hintAlpha})

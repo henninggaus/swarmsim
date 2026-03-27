@@ -65,7 +65,7 @@ var TutorialSteps = []TutorialStep{
 	},
 	// Step 6: Delivery on
 	{
-		Lines:     [3]string{"Im Tab 'Arena' klicke auf 'Delivery: ON'.", "Farbige Stationen erscheinen: Gefuellte Kreise = Pickup,", "Ringe = Dropoff (Paket zur gleichen Farbe bringen)."},
+		Lines:     [3]string{"Im Tab 'Arena' klicke auf 'Lieferung: AN'.", "Farbige Stationen erscheinen: Gefuellte Kreise = Pickup,", "Ringe = Dropoff (Paket zur gleichen Farbe bringen)."},
 		ArrowX:    88, ArrowY: 680,
 		WaitInput: "click:delivery",
 	},
@@ -99,7 +99,7 @@ var TutorialSteps = []TutorialStep{
 	},
 	// Step 12: Tabs
 	{
-		Lines:     [3]string{"Unten links: 5 Tabs fuer alle Features.", "Arena = Umgebung, Evo = Evolution, Anzeige = Visualisierung,", "Algo = 20 Optimierungs-Algorithmen, Tools = Speed/Export."},
+		Lines:     [3]string{"Unten links: 4 Tabs fuer alle Features.", "Arena = Umgebung, Evo = Evolution, Anzeige = Visualisierung,", "Werkzeuge = Speed/Export. Algorithmen: F4 Algo-Labor."},
 		ArrowX:    175, ArrowY: 650,
 		WaitInput: "",
 	},
@@ -110,7 +110,7 @@ var TutorialSteps = []TutorialStep{
 	},
 	// Step 14: Finish
 	{
-		Lines:     [3]string{"Fertig! Tipps: 'Evolving Delivery' + Tab Evo: Evolution ON.", "GP: Random Start + GP ON = Programme evolvieren sich!", "Tab Algo: 20 Algorithmen per Klick testen. Viel Spass!"},
+		Lines:     [3]string{"Fertig! Tipps: 'Evolving Delivery' + Tab Evo: Evolution ON.", "GP: Random Start + GP ON = Programme evolvieren sich!", "F4 Algo-Labor: 20 Algorithmen per Klick testen. Viel Spass!"},
 		WaitInput: "",
 	},
 }

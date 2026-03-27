@@ -93,15 +93,15 @@ func DrawHelpOverlay(screen *ebiten.Image, isSwarmMode bool, scrollY int) {
 		"  H             Diese Hilfe ein/ausblenden",
 		"  ESC           Beenden / Overlay schliessen",
 		"",
-		"Alle Features sind ueber die 5 Tabs links steuerbar:",
+		"Alle Features sind ueber die 4 Tabs links steuerbar (Algo via F4):",
 	})
 	ly += 2
 	helpKV(screen, px, &ly, []kv{
 		{"Arena", "Hindernisse, Labyrinth, Licht, Pakete, LKW"},
 		{"Evo", "Evolution, Gen. Programmierung, Neuro, Teams"},
 		{"Anzeige", "Dashboard, Spuren, Heatmap, Minimap, ..."},
-		{"Algo", "20 Optimierungs-Algorithmen per Klick"},
 		{"Werkzeuge", "Tempo, Zeitreise, Bildschirmfoto, Export"},
+		{"F4 Algo-Labor", "20 Optimierungs-Algorithmen per Klick"},
 	})
 	ly += 8
 
@@ -833,7 +833,7 @@ func DrawHelpOverlay(screen *ebiten.Image, isSwarmMode bool, scrollY int) {
 		"Wolpert & Macready (1997):",
 		"Kein Algorithmus ist fuer ALLE Probleme der Beste!",
 		"Jeder Algo hat Staerken bei bestimmten Landschaften.",
-		"Deshalb: Algo-Tab -> mehrere testen -> Radar Chart!",
+		"Deshalb: F4 Algo-Labor -> mehrere testen -> Radar Chart!",
 		"",
 		"Nutze das Auto-Turnier um alle 20 zu vergleichen.",
 	})

@@ -70,6 +70,10 @@ const (
 
 // DrawSwarmEditor renders the editor panel on the left side of the screen.
 func DrawSwarmEditor(screen *ebiten.Image, ss *swarm.SwarmState) {
+	if ss.AlgoLaborMode {
+		DrawAlgoLabor(screen, ss)
+		return
+	}
 	if ss == nil || ss.Editor == nil {
 		return
 	}
@@ -381,6 +385,29 @@ func drawSwarmStats(screen *ebiten.Image, ss *swarm.SwarmState) {
 			avgTime = sum / len(ds.DeliveryTimes)
 		}
 		printColoredAt(screen, fmt.Sprintf("Durchschn. Lieferzeit: %d Ticks", avgTime), 10, y, dimCol)
+		y += lineH
+	}
+
+	// Truck stats (in left panel, replaces old arena snackbar)
+	if ss.TruckToggle && ss.TruckState != nil {
+		ts := ss.TruckState
+		vector.DrawFilledRect(screen, 5, float32(y), float32(editorPanelW-10), float32(lineH), color.RGBA{35, 30, 20, 180}, false)
+		printColoredAt(screen, "LKW-ENTLADUNG", 10, y, color.RGBA{255, 180, 80, 200})
+		y += lineH + 2
+
+		remaining := 0
+		total := 0
+		if ts.CurrentTruck != nil {
+			total = len(ts.CurrentTruck.Packages)
+			for _, p := range ts.CurrentTruck.Packages {
+				if !p.PickedUp {
+					remaining++
+				}
+			}
+		}
+		printColoredAt(screen, fmt.Sprintf("LKW %d/%d | Pakete: %d/%d", ts.TruckNum, ts.TrucksPerRound, total-remaining, total), 10, y, col)
+		y += lineH
+		printColoredAt(screen, fmt.Sprintf("Punkte: %d", ts.Score), 10, y, color.RGBA{255, 200, 100, 200})
 	}
 }
 
@@ -484,58 +511,11 @@ func DrawSwarmHUD(screen *ebiten.Image, s *simulation.Simulation, fps float64) {
 			printColoredAt(screen, "RESET", 700, 35, color.RGBA{255, 255, 50, flashAlpha})
 		}
 
-		// Delivery & Truck HUD bar with dark background for readability
-		hudLines := 0
-		if ss.DeliveryOn {
-			hudLines++
-		}
-		if ss.TruckToggle && ss.TruckState != nil {
-			hudLines++
-		}
-		if hudLines > 0 {
-			barH := float64(hudLines*18 + 6)
-			ebitenutil.DrawRect(screen, 415, 10, float64(screen.Bounds().Dx()-420), barH, color.RGBA{10, 12, 25, 200})
-		}
-
-		// Delivery HUD line
-		if ss.DeliveryOn {
-			ds := &ss.DeliveryStats
-			avgTime := 0
-			if len(ds.DeliveryTimes) > 0 {
-				sum := 0
-				for _, t := range ds.DeliveryTimes {
-					sum += t
-				}
-				avgTime = sum / len(ds.DeliveryTimes)
-			}
-			dInfo := fmt.Sprintf("Lieferungen: %d | Richtig: %d | Falsch: %d | Schnitt: %d",
-				ds.TotalDelivered, ds.CorrectDelivered, ds.WrongDelivered, avgTime)
-			printColoredAt(screen, dInfo, 420, 15, color.RGBA{255, 220, 120, 255})
-		}
-
-		// Truck HUD line
-		if ss.TruckToggle && ss.TruckState != nil {
-			ts := ss.TruckState
-			remaining := 0
-			if ts.CurrentTruck != nil {
-				for _, p := range ts.CurrentTruck.Packages {
-					if !p.PickedUp {
-						remaining++
-					}
-				}
-			}
-			total := 0
-			if ts.CurrentTruck != nil {
-				total = len(ts.CurrentTruck.Packages)
-			}
-			tInfo := fmt.Sprintf("LKW %d/%d | Pakete: %d/%d | Punkte: %d",
-				ts.TruckNum, ts.TrucksPerRound, total-remaining, total, ts.Score)
-			printColoredAt(screen, tInfo, 420, 32, color.RGBA{255, 180, 80, 255})
-		}
+		// Delivery & Truck stats are shown in the left editor panel (STATISTIKEN section)
 	}
 
 	// Help hint at very bottom
-	printColoredAt(screen, "SPACE:Pause  H:Hilfe  |  Alle Features per Maus in den 5 Tabs links steuerbar",
+	printColoredAt(screen, "SPACE:Pause  H:Hilfe  |  Alle Features per Maus in den 4 Tabs links steuerbar",
 		360, sh-14, color.RGBA{120, 130, 150, 180})
 
 	// Scenario title overlay
@@ -833,6 +813,11 @@ func swarmTokenColor(t swarmscript.SwarmTokenType) color.RGBA {
 func SwarmEditorHitTest(mx, my int, ss *swarm.SwarmState) string {
 	if mx > editorPanelW {
 		return ""
+	}
+
+	// Algo-Labor mode has its own hit test
+	if ss.AlgoLaborMode {
+		return AlgoLaborHitTest(mx, my, ss)
 	}
 
 	// TEXT/BLOCKS toggle buttons (in title bar area)

@@ -70,6 +70,7 @@ type Renderer struct {
 	WelcomeBtn1 [4]int // [x, y, w, h] hit zone for Swarm Lab button
 	WelcomeBtn2 [4]int // [x, y, w, h] hit zone for Tutorial button
 	WelcomeBtn3 [4]int // [x, y, w, h] hit zone for Classic button
+	WelcomeBtn4 [4]int // [x, y, w, h] hit zone for Algo-Labor button
 
 	// Fade transition
 	FadeAlpha float32 // 0.0 = transparent, 1.0 = fully black
@@ -87,6 +88,14 @@ type Renderer struct {
 	psoContourSegs []contourSegment // all contour line segments
 	psoContourW    int              // grid width used when computing contours
 	psoContourH    int              // grid height used when computing contours
+}
+
+// InvalidateFitnessCache forces the fitness landscape heatmap to be recomputed
+// on the next frame. Call after changing the fitness function.
+func (r *Renderer) InvalidateFitnessCache() {
+	r.psoLandscapeImg = nil
+	r.psoLandscapeHash = 0
+	r.psoContourSegs = nil
 }
 
 // NewRenderer creates a new renderer with a particle system.
