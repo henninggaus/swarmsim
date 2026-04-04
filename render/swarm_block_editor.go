@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"image/color"
 	"swarmsim/domain/swarm"
+	"swarmsim/locale"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/vector"
@@ -54,11 +55,11 @@ func DrawBlockEditor(screen *ebiten.Image, ss *swarm.SwarmState) {
 	hdrCol := color.RGBA{90, 100, 120, 200}
 	hintCol := color.RGBA{65, 70, 85, 180}
 	printColoredAt(screen, "IF", blockPadX, hdrY, hdrCol)
-	printColoredAt(screen, "Sensor", blockPadX+blockIfW, hdrY, hdrCol)
-	printColoredAt(screen, "Op", blockPadX+blockIfW+blockSensorW+2, hdrY, hdrCol)
-	printColoredAt(screen, "Wert", blockPadX+blockIfW+blockSensorW+blockOpW+4, hdrY, hdrCol)
+	printColoredAt(screen, locale.T("blockeditor.hdr.sensor"), blockPadX+blockIfW, hdrY, hdrCol)
+	printColoredAt(screen, locale.T("blockeditor.hdr.op"), blockPadX+blockIfW+blockSensorW+2, hdrY, hdrCol)
+	printColoredAt(screen, locale.T("blockeditor.hdr.value"), blockPadX+blockIfW+blockSensorW+blockOpW+4, hdrY, hdrCol)
 	ax := blockPadX + blockIfW + blockSensorW + blockOpW + blockValueW + 8
-	printColoredAt(screen, "THEN Aktion", ax, hdrY, hdrCol)
+	printColoredAt(screen, locale.T("blockeditor.hdr.action"), ax, hdrY, hdrCol)
 	vector.DrawFilledRect(screen, float32(blockPadX), float32(hdrY+12), float32(editorPanelW-blockPadX*2), 1, color.RGBA{50, 55, 70, 150}, false)
 	// Sub-hints for columns
 	printColoredAt(screen, "(0-100)", blockPadX+blockIfW+blockSensorW+blockOpW+1, hdrY+11, hintCol)
@@ -134,7 +135,7 @@ func DrawBlockEditor(screen *ebiten.Image, ss *swarm.SwarmState) {
 
 			// [X] delete button
 			delX := editorPanelW - blockPadX - blockDeleteW - 2
-			drawBlockBtn(screen, delX, y+1, blockDeleteW, blockDeleteW, "X", colorBlockDeleteBg, color.RGBA{255, 100, 100, 255})
+			drawBlockBtn(screen, delX, y+1, blockDeleteW, blockDeleteW, "X", colorBlockDeleteBg, ColorLightRed)
 		}
 
 		// [+AND] mini button below the rule
@@ -150,7 +151,7 @@ func DrawBlockEditor(screen *ebiten.Image, ss *swarm.SwarmState) {
 	// [+ New Rule] button at bottom
 	if y >= editorCodeY && y < editorCodeY+editorCodeH-blockNewRuleH {
 		drawSwarmButton(screen, blockPadX, y, editorPanelW-blockPadX*2, blockNewRuleH,
-			"+ Neue Regel", colorBlockNewRule)
+			locale.T("blockeditor.new_rule"), colorBlockNewRule)
 	}
 
 	// Active dropdown overlay (drawn on top of everything)

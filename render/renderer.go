@@ -71,6 +71,7 @@ type Renderer struct {
 	WelcomeBtn2 [4]int // [x, y, w, h] hit zone for Tutorial button
 	WelcomeBtn3 [4]int // [x, y, w, h] hit zone for Classic button
 	WelcomeBtn4 [4]int // [x, y, w, h] hit zone for Algo-Labor button
+	WelcomeBtn5 [4]int // [x, y, w, h] hit zone for Factory button
 
 	// Fade transition
 	FadeAlpha float32 // 0.0 = transparent, 1.0 = fully black
@@ -126,7 +127,7 @@ func (r *Renderer) initBotSprites() {
 	for i := 0; i < 5; i++ {
 		img := ebiten.NewImage(botSpriteSize, botSpriteSize)
 		// Draw white triangle; color is applied at render time via ColorScale
-		white := color.RGBA{255, 255, 255, 255}
+		white := ColorWhite
 		vector.StrokeLine(img, float32(ax), float32(ay), float32(bx), float32(by), 1.5, white, false)
 		vector.StrokeLine(img, float32(bx), float32(by), float32(cx), float32(cy), 1.5, white, false)
 		vector.StrokeLine(img, float32(cx), float32(cy), float32(ax), float32(ay), 1.5, white, false)
@@ -136,6 +137,12 @@ func (r *Renderer) initBotSprites() {
 
 // Draw renders the entire simulation to the screen.
 func (r *Renderer) Draw(screen *ebiten.Image, s *simulation.Simulation) {
+	// Factory mode: completely separate rendering path
+	if s.FactoryMode && s.FactoryState != nil {
+		DrawFactoryMode(screen, s.FactoryState)
+		return
+	}
+
 	// Swarm mode: completely separate rendering path
 	if s.SwarmMode && s.SwarmState != nil {
 		sw, sh := screen.Bounds().Dx(), screen.Bounds().Dy()
@@ -395,7 +402,7 @@ func (r *Renderer) drawBots(screen *ebiten.Image, s *simulation.Simulation, sw, 
 			energy/100.0, ColorEnergyBar, ColorEnergyBg)
 
 		if s.SelectedBotID == b.ID() {
-			vector.StrokeCircle(screen, float32(sx), float32(sy), float32(rad+4), 1.5, color.RGBA{255, 255, 255, 200}, false)
+			vector.StrokeCircle(screen, float32(sx), float32(sy), float32(rad+4), 1.5, ColorWhiteFaded, false)
 		}
 	}
 }
@@ -520,7 +527,7 @@ func BotColor(t bot.BotType) color.RGBA {
 	case bot.TypeHealer:
 		return ColorHealer
 	}
-	return color.RGBA{255, 255, 255, 255}
+	return ColorWhite
 }
 
 // ObstacleAt returns the obstacle at world position (wx, wy), if any.

@@ -5,6 +5,7 @@ import (
 	"image/color"
 	"math"
 	"swarmsim/domain/swarm"
+	"swarmsim/locale"
 
 	"github.com/hajimehoshi/ebiten/v2/vector"
 
@@ -23,21 +24,21 @@ func drawNeuroVisualization(screen *ebiten.Image, ss *swarm.SwarmState) {
 	y := editorCodeY + 4
 
 	// ── Header: Was ist Neuroevolution? ──
-	printColoredAt(screen, "NEUROEVOLUTION", x+2, y, color.RGBA{255, 140, 50, 255})
+	printColoredAt(screen, locale.T("neuro.title"), x+2, y, color.RGBA{255, 140, 50, 255})
 	y += lineH
-	printColoredAt(screen, "Jeder Bot hat ein kleines neuronales", x+2, y, color.RGBA{160, 160, 180, 255})
+	printColoredAt(screen, locale.T("neuro.desc1"), x+2, y, color.RGBA{160, 160, 180, 255})
 	y += lineH
-	printColoredAt(screen, "Netz das durch Evolution lernt.", x+2, y, color.RGBA{160, 160, 180, 255})
+	printColoredAt(screen, locale.T("neuro.desc2"), x+2, y, color.RGBA{160, 160, 180, 255})
 	y += lineH
-	printColoredAt(screen, "Kein Programmieren noetig!", x+2, y, color.RGBA{100, 255, 100, 220})
+	printColoredAt(screen, locale.T("neuro.desc3"), x+2, y, color.RGBA{100, 255, 100, 220})
 	y += lineH + 4
 
 	// ── Architecture summary ──
-	printColoredAt(screen, "ARCHITEKTUR", x+2, y, color.RGBA{136, 204, 255, 220})
+	printColoredAt(screen, locale.T("neuro.architecture"), x+2, y, ColorInfoCyan)
 	y += lineH
-	printColoredAt(screen, "12 Sensoren -> 6 Hidden -> 8 Aktionen", x+2, y, color.RGBA{180, 180, 200, 200})
+	printColoredAt(screen, locale.T("neuro.arch_layout"), x+2, y, color.RGBA{180, 180, 200, 200})
 	y += lineH
-	printColoredAt(screen, fmt.Sprintf("%d Gewichte pro Bot (evolvierbar)", swarm.NeuroWeights), x+2, y, color.RGBA{140, 140, 160, 200})
+	printColoredAt(screen, locale.Tf("neuro.arch_weights", swarm.NeuroWeights), x+2, y, color.RGBA{140, 140, 160, 200})
 	y += lineH + 6
 
 	// ── Separator ──
@@ -47,7 +48,7 @@ func drawNeuroVisualization(screen *ebiten.Image, ss *swarm.SwarmState) {
 	// ── Network diagram ──
 	// Get reference bot (selected or first)
 	if len(ss.Bots) == 0 {
-		printColoredAt(screen, "(Keine Bots in der Arena)", x+2, y, color.RGBA{120, 120, 140, 200})
+		printColoredAt(screen, locale.T("neuro.no_bots"), x+2, y, color.RGBA{120, 120, 140, 200})
 		return
 	}
 	botIdx := 0
@@ -61,7 +62,7 @@ func drawNeuroVisualization(screen *ebiten.Image, ss *swarm.SwarmState) {
 	y += lineH + 2
 
 	if brain == nil {
-		printColoredAt(screen, "(Kein Netz — warte auf Initialisierung)", x+2, y, color.RGBA{120, 120, 140, 200})
+		printColoredAt(screen, locale.T("neuro.no_net"), x+2, y, color.RGBA{120, 120, 140, 200})
 		return
 	}
 
@@ -74,32 +75,32 @@ func drawNeuroVisualization(screen *ebiten.Image, ss *swarm.SwarmState) {
 	y += 6
 
 	// ── Evolution info ──
-	printColoredAt(screen, "EVOLUTION", x+2, y, color.RGBA{136, 204, 255, 220})
+	printColoredAt(screen, locale.T("neuro.evolution"), x+2, y, ColorInfoCyan)
 	y += lineH
-	printColoredAt(screen, "Alle 2000 Ticks: Fitness bewerten,", x+2, y, color.RGBA{140, 140, 160, 200})
+	printColoredAt(screen, locale.T("neuro.evo1"), x+2, y, color.RGBA{140, 140, 160, 200})
 	y += lineH
-	printColoredAt(screen, "beste 20% Netze weitervererben.", x+2, y, color.RGBA{140, 140, 160, 200})
+	printColoredAt(screen, locale.T("neuro.evo2"), x+2, y, color.RGBA{140, 140, 160, 200})
 	y += lineH
-	printColoredAt(screen, "Crossover + Mutation der Gewichte.", x+2, y, color.RGBA{140, 140, 160, 200})
+	printColoredAt(screen, locale.T("neuro.evo3"), x+2, y, color.RGBA{140, 140, 160, 200})
 	y += lineH
-	printColoredAt(screen, "10% komplett neue Zufalls-Netze.", x+2, y, color.RGBA{140, 140, 160, 200})
+	printColoredAt(screen, locale.T("neuro.evo4"), x+2, y, color.RGBA{140, 140, 160, 200})
 	y += lineH + 2
 
 	// Fitness function explanation (context-sensitive)
-	printColoredAt(screen, "FITNESS-FORMEL:", x+2, y, color.RGBA{200, 160, 255, 220})
+	printColoredAt(screen, locale.T("neuro.fitness_formula"), x+2, y, color.RGBA{200, 160, 255, 220})
 	y += lineH
 	if ss.TruckToggle {
-		printColoredAt(screen, " Lieferung x100 + Pickup x40", x+2, y, color.RGBA{80, 255, 80, 200})
+		printColoredAt(screen, locale.T("neuro.fit_truck1"), x+2, y, color.RGBA{80, 255, 80, 200})
 		y += lineH
-		printColoredAt(screen, " + Rampe x15 + Naehe-Dropoff x15", x+2, y, color.RGBA{80, 255, 80, 200})
+		printColoredAt(screen, locale.T("neuro.fit_truck2"), x+2, y, color.RGBA{80, 255, 80, 200})
 		y += lineH
-		printColoredAt(screen, " - AntiStuck x15 - Idle x0.08", x+2, y, color.RGBA{255, 100, 80, 200})
+		printColoredAt(screen, locale.T("neuro.fit_truck3"), x+2, y, color.RGBA{255, 100, 80, 200})
 	} else {
-		printColoredAt(screen, " Lieferung x30 + Pickup x15", x+2, y, color.RGBA{80, 255, 80, 200})
+		printColoredAt(screen, locale.T("neuro.fit_deliv1"), x+2, y, color.RGBA{80, 255, 80, 200})
 		y += lineH
-		printColoredAt(screen, " + Distanz x0.01", x+2, y, color.RGBA{80, 255, 80, 200})
+		printColoredAt(screen, locale.T("neuro.fit_deliv2"), x+2, y, color.RGBA{80, 255, 80, 200})
 		y += lineH
-		printColoredAt(screen, " - AntiStuck x10 - Idle x0.05", x+2, y, color.RGBA{255, 100, 80, 200})
+		printColoredAt(screen, locale.T("neuro.fit_deliv3"), x+2, y, color.RGBA{255, 100, 80, 200})
 	}
 	y += lineH + 4
 
@@ -111,10 +112,10 @@ func drawNeuroVisualization(screen *ebiten.Image, ss *swarm.SwarmState) {
 		y += lineH
 		printColoredAt(screen, fmt.Sprintf("Avg Fitness:  %.0f", ss.AvgFitness), x+2, y, color.RGBA{255, 200, 50, 220})
 	} else {
-		printColoredAt(screen, "Warte auf erste Generation...", x+2, y, color.RGBA{120, 120, 140, 180})
+		printColoredAt(screen, locale.T("neuro.waiting_gen"), x+2, y, color.RGBA{120, 120, 140, 180})
 		y += lineH
 		progress := float64(ss.NeuroTimer) / 2000.0 * 100.0
-		printColoredAt(screen, fmt.Sprintf("Fortschritt: %.0f%%", progress), x+2, y, color.RGBA{255, 140, 50, 180})
+		printColoredAt(screen, locale.Tf("neuro.progress", progress), x+2, y, color.RGBA{255, 140, 50, 180})
 	}
 }
 
@@ -135,9 +136,9 @@ func drawNeuroNetDiagram(screen *ebiten.Image, brain *swarm.NeuroBrain, gx, gy, 
 	outputSpacing := float32(gh) / float32(swarm.NeuroOutputs+1)
 
 	// Column headers
-	printColoredAt(screen, "Sensor", gx+2, gy, color.RGBA{100, 200, 255, 200})
-	printColoredAt(screen, "Hidden", int(colHidden)-15, gy, color.RGBA{200, 200, 100, 200})
-	printColoredAt(screen, "Aktion", int(colOutput)-10, gy, color.RGBA{255, 180, 100, 200})
+	printColoredAt(screen, locale.T("neuro.col_sensor"), gx+2, gy, color.RGBA{100, 200, 255, 200})
+	printColoredAt(screen, locale.T("neuro.col_hidden"), int(colHidden)-15, gy, color.RGBA{200, 200, 100, 200})
+	printColoredAt(screen, locale.T("neuro.col_action"), int(colOutput)-10, gy, color.RGBA{255, 180, 100, 200})
 
 	// Compute node positions
 	type nodePos struct {

@@ -5,6 +5,7 @@ import (
 	"image/color"
 	"math"
 	"swarmsim/domain/swarm"
+	"swarmsim/locale"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/vector"
@@ -29,7 +30,7 @@ func DrawPatternOverlay(screen *ebiten.Image, ss *swarm.SwarmState) {
 		1, color.RGBA{80, 80, 120, 255}, false)
 
 	// Title
-	printColoredAt(screen, "MUSTER-ERKENNUNG", x+5, y+5, color.RGBA{255, 220, 100, 255})
+	printColoredAt(screen, locale.T("patterns.title"), x+5, y+5, color.RGBA{255, 220, 100, 255})
 
 	// Primary pattern with large indicator
 	patternCol := patternColor(pr.Primary)
@@ -39,7 +40,7 @@ func DrawPatternOverlay(screen *ebiten.Image, ss *swarm.SwarmState) {
 	vector.StrokeRect(screen, float32(x+5), float32(ly), float32(w-10), 12,
 		1, color.RGBA{80, 80, 100, 200}, false)
 	label := fmt.Sprintf("%s (%.0f%%)", swarm.PatternName(pr.Primary), pr.PrimaryScore*100)
-	printColoredAt(screen, label, x+10, ly+1, color.RGBA{255, 255, 255, 255})
+	printColoredAt(screen, label, x+10, ly+1, ColorWhite)
 
 	// Secondary pattern
 	ly += 18
@@ -50,17 +51,17 @@ func DrawPatternOverlay(screen *ebiten.Image, ss *swarm.SwarmState) {
 	ly += 16
 
 	// Metrics
-	drawMetricBar(screen, x+5, ly, w-10, "Ausrichtung", pr.Alignment, color.RGBA{100, 200, 255, 200})
+	drawMetricBar(screen, x+5, ly, w-10, locale.T("patterns.alignment"), pr.Alignment, color.RGBA{100, 200, 255, 200})
 	ly += 16
-	drawMetricBar(screen, x+5, ly, w-10, "Kohaesion", pr.Cohesion, color.RGBA{100, 255, 100, 200})
+	drawMetricBar(screen, x+5, ly, w-10, locale.T("patterns.cohesion"), pr.Cohesion, color.RGBA{100, 255, 100, 200})
 	ly += 16
-	drawMetricBar(screen, x+5, ly, w-10, "Zirkularitaet", pr.Circularity, color.RGBA{255, 200, 100, 200})
+	drawMetricBar(screen, x+5, ly, w-10, locale.T("patterns.circularity"), pr.Circularity, color.RGBA{255, 200, 100, 200})
 	ly += 16
-	drawMetricBar(screen, x+5, ly, w-10, "Entropie", pr.Entropy, color.RGBA{255, 100, 100, 200})
+	drawMetricBar(screen, x+5, ly, w-10, locale.T("patterns.entropy"), pr.Entropy, color.RGBA{255, 100, 100, 200})
 	ly += 16
 
 	// Cluster count
-	clusterInfo := fmt.Sprintf("Cluster: %d", pr.ClusterCount)
+	clusterInfo := locale.Tf("patterns.cluster_count", pr.ClusterCount)
 	printColoredAt(screen, clusterInfo, x+5, ly, color.RGBA{180, 180, 200, 255})
 }
 

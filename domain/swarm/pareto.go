@@ -2,6 +2,7 @@ package swarm
 
 import (
 	"sort"
+	"swarmsim/locale"
 )
 
 // ParetoObjective represents one objective value for multi-objective optimization.
@@ -200,5 +201,9 @@ func ParetoFrontSize(pf *ParetoFront) int {
 
 // ObjectiveNames returns the names of the objectives used in Pareto optimization.
 func ObjectiveNames() []string {
-	return []string{"Lieferungen", "Exploration", "Effizienz"}
+	return []string{
+		locale.T("pareto.obj.deliveries"),
+		locale.T("pareto.obj.exploration"),
+		locale.T("pareto.obj.efficiency"),
+	}
 }

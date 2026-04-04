@@ -569,12 +569,7 @@ func ApplyPredator(bot *SwarmBot, ss *SwarmState, idx int) {
 			targetAngle += math.Pi
 		}
 		diff := targetAngle - bot.Angle
-		for diff > math.Pi {
-			diff -= 2 * math.Pi
-		}
-		for diff < -math.Pi {
-			diff += 2 * math.Pi
-		}
+		diff = WrapAngle(diff)
 		steer := 0.2
 		if diff > steer {
 			diff = steer

@@ -1,8 +1,8 @@
 package render
 
 import (
-	"fmt"
 	"image/color"
+	"swarmsim/locale"
 	"swarmsim/logger"
 
 	"github.com/hajimehoshi/ebiten/v2"
@@ -17,7 +17,7 @@ const (
 // Console colors by level
 var (
 	colorConsoleInfo  = color.RGBA{160, 160, 175, 255}
-	colorConsoleWarn  = color.RGBA{255, 200, 80, 255}
+	colorConsoleWarn  = ColorSectionGold
 	colorConsoleError = color.RGBA{255, 80, 80, 255}
 	colorConsoleBg    = color.RGBA{5, 5, 12, 210}
 	colorConsoleLine  = color.RGBA{60, 60, 80, 200}
@@ -48,9 +48,9 @@ func DrawConsole(screen *ebiten.Image, entries []logger.LogEntry, isSwarmMode bo
 
 	// Title with legend
 	if filterBotID >= 0 {
-		printColoredAt(screen, fmt.Sprintf("~ Bot #%d Logs [Tab:all]", filterBotID), panelX+consolePadding, panelY+2, color.RGBA{0, 220, 255, 255})
+		printColoredAt(screen, locale.Tf("console.bot_logs", filterBotID), panelX+consolePadding, panelY+2, color.RGBA{0, 220, 255, 255})
 	} else {
-		printColoredAt(screen, "~ Log [`/Oe oeffnen]", panelX+consolePadding, panelY+2, color.RGBA{100, 100, 120, 255})
+		printColoredAt(screen, locale.T("console.title"), panelX+consolePadding, panelY+2, color.RGBA{100, 100, 120, 255})
 		// Color legend on right side
 		legendX := panelX + panelW - 220
 		printColoredAt(screen, "Info", legendX, panelY+2, colorConsoleInfo)

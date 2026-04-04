@@ -42,7 +42,7 @@ const (
 	hsoDivThreshold       = 50.0  // min RMS spread before injection
 	hsoDivInjectFrac      = 0.3   // fraction of HM to replace when clustered
 	hsoGridRescanInterval  = 150   // ticks between grid re-scans
-	hsoGridRescanSide      = 20    // grid side for re-scan (20x20=400)
+	hsoGridRescanSide      = AlgoGridRescanSize // grid side for re-scan (20x20=400)
 	hsoGridInjectCount     = 20    // best grid positions to inject per rescan
 	hsoGridJitter          = 0.15  // grid position jitter fraction (15% of cell width)
 	hsoLocalRefineRadius   = 60.0  // radius for local refinement around best grid point
@@ -458,9 +458,6 @@ func TickHSO(ss *SwarmState) {
 		usableW := ss.ArenaW - 2*margin
 		usableH := ss.ArenaH - 2*margin
 
-		type gridPt struct {
-			x, y, f float64
-		}
 		gridPts := make([]gridPt, 0, hsoGridRescanSide*hsoGridRescanSide+hsoLocalRefineSide*hsoLocalRefineSide)
 		var scanBestF float64 = -1e9
 		var scanBestX, scanBestY float64

@@ -1,6 +1,9 @@
 package swarm
 
-import "math"
+import (
+	"math"
+	"sort"
+)
 
 // Equilibrium Optimizer (EO): Physics-inspired metaheuristic based on the
 // mass balance equation describing control volume dynamics. Particles
@@ -32,7 +35,7 @@ const (
 	eoSpeedMult      = 5.0  // movement speed multiplier (7.5 px/tick)
 	eoGridRescanRate = 300  // periodic grid rescan every N ticks
 	eoGridSize       = 14   // grid resolution (14x14 = 196 samples)
-	eoGridInjectTop  = 10   // best grid positions to inject per rescan
+	eoGridInjectTop  = AlgoGridInjectTop // best grid positions to inject per rescan
 )
 
 // EOState holds Equilibrium Optimizer state for the swarm.
@@ -141,10 +144,6 @@ func TickEO(ss *SwarmState) {
 
 	// Build equilibrium pool: top-K best personal positions + average
 	// Collect all personal bests and find top K-1
-	type idxFit struct {
-		idx int
-		fit float64
-	}
 	candidates := make([]idxFit, len(ss.Bots))
 	for i := range ss.Bots {
 		candidates[i] = idxFit{i, st.PersonalF[i]}
@@ -157,14 +156,14 @@ func TickEO(ss *SwarmState) {
 	for k := 0; k < poolCount; k++ {
 		best := k
 		for j := k + 1; j < len(candidates); j++ {
-			if candidates[j].fit > candidates[best].fit {
+			if candidates[j].f > candidates[best].f {
 				best = j
 			}
 		}
 		candidates[k], candidates[best] = candidates[best], candidates[k]
 		st.PoolX[k] = st.PersonalX[candidates[k].idx]
 		st.PoolY[k] = st.PersonalY[candidates[k].idx]
-		st.PoolF[k] = candidates[k].fit
+		st.PoolF[k] = candidates[k].f
 	}
 
 	// Last pool entry = average of the pool members (Ceq_avg)
@@ -361,9 +360,6 @@ func eoGridRescan(ss *SwarmState, st *EOState) {
 	usableH := ss.ArenaH - 2*margin
 	n := len(ss.Bots)
 
-	type gridPt struct {
-		x, y, f float64
-	}
 	gridPts := make([]gridPt, 0, eoGridSize*eoGridSize)
 	for gx := 0; gx < eoGridSize; gx++ {
 		for gy := 0; gy < eoGridSize; gy++ {
@@ -378,13 +374,7 @@ func eoGridRescan(ss *SwarmState, st *EOState) {
 	}
 
 	// Sort grid points by fitness descending
-	for i := 0; i < len(gridPts)-1; i++ {
-		for j := i + 1; j < len(gridPts); j++ {
-			if gridPts[j].f > gridPts[i].f {
-				gridPts[i], gridPts[j] = gridPts[j], gridPts[i]
-			}
-		}
-	}
+	sort.Slice(gridPts, func(i, j int) bool { return gridPts[i].f > gridPts[j].f })
 
 	// Update GlobalBest from grid findings
 	if len(gridPts) > 0 && gridPts[0].f > st.BestFit {
@@ -394,22 +384,12 @@ func eoGridRescan(ss *SwarmState, st *EOState) {
 	}
 
 	// Find worst particles by fitness
-	type idxFit struct {
-		idx int
-		f   float64
-	}
 	agents := make([]idxFit, n)
 	for i := range ss.Bots {
 		agents[i] = idxFit{i, st.Fitness[i]}
 	}
 	// Sort ascending (worst first)
-	for i := 0; i < len(agents)-1; i++ {
-		for j := i + 1; j < len(agents); j++ {
-			if agents[j].f < agents[i].f {
-				agents[i], agents[j] = agents[j], agents[i]
-			}
-		}
-	}
+	sort.Slice(agents, func(i, j int) bool { return agents[i].f < agents[j].f })
 
 	// Teleport worst particles to best grid points
 	inject := eoGridInjectTop

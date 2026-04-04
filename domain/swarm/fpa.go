@@ -1,6 +1,9 @@
 package swarm
 
-import "math"
+import (
+	"math"
+	"sort"
+)
 
 // Flower Pollination Algorithm (FPA): Nature-inspired optimization by Yang (2012).
 // Mimics the pollination process of flowering plants:
@@ -25,7 +28,7 @@ const (
 	fpaSpeedMult      = 5.0   // movement speed multiplier (7.5 px/tick)
 	fpaGridRescanRate = 300   // periodic grid rescan every N ticks
 	fpaGridRescanSize = 14    // grid resolution (14×14 = 196 samples)
-	fpaGridInjectTop  = 10    // teleport worst N flowers to best grid positions
+	fpaGridInjectTop  = AlgoGridInjectTop // teleport worst N flowers to best grid positions
 	fpaDirectTobestP  = 0.55  // max probability of direct-to-best in late phase
 )
 
@@ -269,9 +272,6 @@ func fpaGridRescan(ss *SwarmState, st *FPAState) {
 	usableH := ss.ArenaH - 2*margin
 	n := len(ss.Bots)
 
-	type gridPt struct {
-		x, y, f float64
-	}
 	gridPts := make([]gridPt, 0, fpaGridRescanSize*fpaGridRescanSize)
 	for gx := 0; gx < fpaGridRescanSize; gx++ {
 		for gy := 0; gy < fpaGridRescanSize; gy++ {
@@ -285,13 +285,7 @@ func fpaGridRescan(ss *SwarmState, st *FPAState) {
 	}
 
 	// Sort grid points by fitness descending
-	for i := 0; i < len(gridPts)-1; i++ {
-		for j := i + 1; j < len(gridPts); j++ {
-			if gridPts[j].f > gridPts[i].f {
-				gridPts[i], gridPts[j] = gridPts[j], gridPts[i]
-			}
-		}
-	}
+	sort.Slice(gridPts, func(i, j int) bool { return gridPts[i].f > gridPts[j].f })
 
 	// Update GlobalBest from grid findings
 	if len(gridPts) > 0 && gridPts[0].f > st.GlobalBestF {
@@ -301,22 +295,12 @@ func fpaGridRescan(ss *SwarmState, st *FPAState) {
 	}
 
 	// Find worst flowers by fitness
-	type idxFit struct {
-		idx int
-		f   float64
-	}
 	flowers := make([]idxFit, n)
 	for i := range ss.Bots {
 		flowers[i] = idxFit{i, st.Fitness[i]}
 	}
 	// Sort ascending by fitness (worst first)
-	for i := 0; i < len(flowers)-1; i++ {
-		for j := i + 1; j < len(flowers); j++ {
-			if flowers[j].f < flowers[i].f {
-				flowers[i], flowers[j] = flowers[j], flowers[i]
-			}
-		}
-	}
+	sort.Slice(flowers, func(i, j int) bool { return flowers[i].f < flowers[j].f })
 
 	// Teleport worst flowers to best grid points
 	inject := fpaGridInjectTop

@@ -1805,8 +1805,19 @@ var ActionGrouped = [][]string{
 	{"-- Metaheuristics 2 --", "CUCKOO", "DE", "ABC", "HSO", "BAT", "SSA", "GSA"},
 }
 
+// CondTypeName returns a short human-readable name for a condition type.
+func CondTypeName(t ConditionType) string {
+	for name, ct := range conditionNames {
+		if ct == t {
+			return name
+		}
+	}
+	return "unknown"
+}
+
 // wordPos tracks a word and its column position in a line.
 type wordPos struct {
 	text string
 	col  int
 }
+

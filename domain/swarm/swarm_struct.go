@@ -672,6 +672,10 @@ type SwarmState struct {
 	CompareBot  int // -1 = none, Shift+click to set second bot for comparison
 	HoveredBot  int // -1 = none, set by mouse hover detection
 
+	// Live math trace overlay (K key)
+	MathTrace     *MathTrace // live calculation trace for selected bot (nil when inactive)
+	ShowMathTrace bool       // toggle: K key shows/hides math overlay
+
 	// Follow-cam
 	FollowCamBot int     // bot index being followed (-1 = off)
 	SwarmCamX    float64 // current camera center (arena coords)
@@ -1066,6 +1070,9 @@ type SwarmState struct {
 	ShowFirefly bool // 9 key: firefly flash overlay
 	ShowVortex  bool // 0 key: vortex rotation overlay
 
+	// Session save flash (Ctrl+S)
+	SessionSaveFlash int // countdown frames for "Session saved" overlay
+
 	// Lévy-Flight Foraging
 	Levy   *LevyState
 	LevyOn bool
@@ -1274,6 +1281,14 @@ type SwarmState struct {
 	// Voronoi territory overlay (Ctrl+V)
 	ShowVoronoi bool
 
+	// Learning path system
+	Learning       *LearningState
+	ShowLessonMenu bool
+
+	// Emergence detection
+	EmergencePopup *EmergencePopup
+	EmergenceShown map[EmergenceEvent]bool
+
 	// Block editor
 	BlockEditorActive bool
 	BlockRules        []BlockRule
@@ -1283,6 +1298,70 @@ type SwarmState struct {
 	BlockValueRuleIdx int  // which rule's value is being edited
 	BlockValueCondIdx int  // which condition's value (-1 = action param)
 	BlockValueText    string
+
+	// --- Educational features ---
+
+	// Decision trace for selected bot (D key toggle)
+	DecisionTrace     []DecisionStep // last evaluation of all rules for selected bot
+	ShowDecisionTrace bool
+
+	// Concept overlay (C key toggle)
+	ShowConceptOverlay bool
+
+	// Did You Know tips (auto-rotating educational tips)
+	DidYouKnowIdx   int // current tip index
+	DidYouKnowTimer int // display timer (counts down)
+
+	// Glossary overlay (G key toggle)
+	ShowGlossary  bool
+	GlossaryScroll int // scroll offset for glossary list
+
+	// Parameter tweaker overlay (Shift+P toggle)
+	ShowParamTweaker bool
+
+	// Performance monitor overlay (F12 toggle)
+	ShowPerfMonitor bool
+	LastTickDuration float64 // duration of last simulation tick in seconds
+
+	// Self-Programming Swarm (Collective AI)
+	IssueBoard     *IssueBoardState
+	ShowIssueBoard bool
+	IssueBoardScroll int           // scroll offset in issue board
+	BotChatLog     [][]BotChatEntry // per-bot chat history (sparse: nil for bots without issues)
+	CollectiveAIOn bool             // master toggle
+
+	// Shortcut card overlay (? toggle)
+	ShowShortcutCard bool
+
+	// ActiveOverlay tracks which educational overlay is currently showing (only one at a time).
+	// "" = none, "math" = K, "decision" = D, "concept" = C, "glossary" = G, "lessons" = Shift+L, "issues" = I, "perf" = F12, "tweaker" = Shift+P, "shortcuts" = ?
+	ActiveOverlay string
+
+	// Confirmation for destructive actions (reset, new round)
+	PendingConfirm     string // "" = none, "reset" = confirming reset, "newround" = confirming new round
+	PendingConfirmTick int    // auto-dismiss after 180 ticks (3 seconds)
+
+	// Deploy success flash
+	DeployFlash     int // countdown frames for deploy success toast
+	DeployRuleCount int // number of rules in last deploy
+}
+
+// DecisionStep records evaluation of a single rule for the decision trace.
+type DecisionStep struct {
+	RuleIdx    int               // which rule (0-based)
+	RuleText   string            // "IF carry == 0 AND p_dist < 20 THEN PICKUP"
+	Matched    bool              // did all conditions match?
+	Conditions []ConditionResult // per-condition results
+	ActionName string            // action that would fire
+}
+
+// ConditionResult records evaluation of a single condition.
+type ConditionResult struct {
+	SensorName  string // "carry"
+	Operator    string // "=="
+	Threshold   string // "0"
+	ActualValue string // "0"
+	Passed      bool
 }
 
 // BlockRule represents a single rule in the visual block editor.

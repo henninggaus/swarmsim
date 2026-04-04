@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"image/color"
 	"swarmsim/domain/swarm"
+	"swarmsim/locale"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/vector"
@@ -25,8 +26,10 @@ const (
 	tabPadX    = 5
 )
 
-// Tab names
-var tabNames = [4]string{"Arena", "Evo", "Anzeige", "Werkzeuge"}
+// tabNames returns localized tab names.
+func tabNamesLocalized() [4]string {
+	return [4]string{locale.T("tab.arena"), locale.T("tab.evo"), locale.T("tab.display"), locale.T("tab.tools")}
+}
 
 // Tab colors (active vs inactive)
 var (
@@ -42,7 +45,8 @@ func drawTabBar(screen *ebiten.Image, ss *swarm.SwarmState) {
 	// Background strip
 	vector.DrawFilledRect(screen, 0, float32(tabBarY), float32(editorPanelW), float32(tabBarH), color.RGBA{15, 18, 30, 255}, false)
 
-	for i, name := range tabNames {
+	names := tabNamesLocalized()
+	for i, name := range names {
 		x := tabPadX + i*(tabBtnW+tabBtnGap)
 		bgCol := tabInactiveColor
 		textCol := tabTextInactive
@@ -52,14 +56,25 @@ func drawTabBar(screen *ebiten.Image, ss *swarm.SwarmState) {
 		}
 		vector.DrawFilledRect(screen, float32(x), float32(tabBarY), float32(tabBtnW), float32(tabBarH), bgCol, false)
 		if ss.EditorTab == i {
-			// Active tab: bright top border
-			vector.StrokeLine(screen, float32(x), float32(tabBarY), float32(x+tabBtnW), float32(tabBarY), 2, tabBorderColor, false)
+			// Active tab: bright top border (3px) + bottom accent connecting tab to content
+			vector.StrokeLine(screen, float32(x), float32(tabBarY), float32(x+tabBtnW), float32(tabBarY), 3, tabBorderColor, false)
+			vector.StrokeLine(screen, float32(x), float32(tabBarY+tabBarH), float32(x+tabBtnW), float32(tabBarY+tabBarH), 1, tabBorderColor, false)
 		}
 		// Center text
-		textW := len(name) * charW
+		textW := runeLen(name) * charW
 		tx := x + (tabBtnW-textW)/2
 		printColoredAt(screen, name, tx, tabBarY+4, textCol)
 	}
+
+	// Language button (right side of tab bar)
+	langLabel := locale.LangDisplayName()
+	langX := editorPanelW - 35
+	langBtnW := 30
+	bgCol := color.RGBA{60, 50, 80, 255}
+	vector.DrawFilledRect(screen, float32(langX), float32(tabBarY), float32(langBtnW), float32(tabBarH), bgCol, false)
+	textW := runeLen(langLabel) * charW
+	tx := langX + (langBtnW-textW)/2
+	printColoredAt(screen, langLabel, tx, tabBarY+4, color.RGBA{200, 180, 255, 255})
 }
 
 // drawTabContent renders the content for the active tab.
@@ -114,16 +129,16 @@ func drawTabArena(screen *ebiten.Image, ss *swarm.SwarmState) {
 	y := tabContentY + 2
 
 	toggles := []tabToggle{
-		{fmtToggle("Hindernisse", ss.ObstaclesOn), ss.ObstaclesOn, ColorSwarmBtnToggleOn, false},
-		{fmtToggle("Labyrinth", ss.MazeOn), ss.MazeOn, ColorSwarmBtnToggleOn, false},
-		{fmtToggle("Lichtquelle", ss.Light.Active), ss.Light.Active, ColorSwarmBtnToggleOn, false},
+		{fmtToggle("toggle.obstacles", ss.ObstaclesOn), ss.ObstaclesOn, ColorSwarmBtnToggleOn, false},
+		{fmtToggle("toggle.maze", ss.MazeOn), ss.MazeOn, ColorSwarmBtnToggleOn, false},
+		{fmtToggle("toggle.light", ss.Light.Active), ss.Light.Active, ColorSwarmBtnToggleOn, false},
 		{fmtWallToggle(ss.WrapMode), ss.WrapMode, color.RGBA{60, 60, 140, 255}, false},
 		{fmtDelivToggle(ss), ss.DeliveryOn, color.RGBA{200, 120, 40, 255}, false},
 		{fmtTruckToggle(ss), ss.TruckToggle, color.RGBA{180, 100, 40, 255}, false},
-		{fmtToggle("Energie", ss.EnergyEnabled), ss.EnergyEnabled, color.RGBA{220, 180, 50, 255}, false},
-		{fmtToggle("Dynamisch", ss.DynamicEnv), ss.DynamicEnv, color.RGBA{255, 150, 50, 255}, false},
-		{fmtToggle("Tag/Nacht", ss.DayNightOn), ss.DayNightOn, color.RGBA{100, 100, 200, 255}, false},
-		{fmtToggle("Arena-Editor", ss.ArenaEditMode), ss.ArenaEditMode, color.RGBA{180, 180, 80, 255}, false},
+		{fmtToggle("toggle.energy", ss.EnergyEnabled), ss.EnergyEnabled, color.RGBA{220, 180, 50, 255}, false},
+		{fmtToggle("toggle.dynamic", ss.DynamicEnv), ss.DynamicEnv, color.RGBA{255, 150, 50, 255}, false},
+		{fmtToggle("toggle.daynight", ss.DayNightOn), ss.DayNightOn, color.RGBA{100, 100, 200, 255}, false},
+		{fmtToggle("toggle.arenaeditor", ss.ArenaEditMode), ss.ArenaEditMode, color.RGBA{180, 180, 80, 255}, false},
 	}
 	drawTabToggles(screen, toggles, y)
 }
@@ -141,42 +156,44 @@ func drawTabEvolution(screen *ebiten.Image, ss *swarm.SwarmState) {
 	paretoBlocked := !ss.EvolutionOn && !ss.GPEnabled
 	specBlocked := !ss.EvolutionOn
 
-	evoLabel := fmtToggle("Evolution", ss.EvolutionOn)
-	gpLabel := fmtToggle("GP", ss.GPEnabled)
-	neuroLabel := fmtToggle("Neuro", ss.NeuroEnabled)
+	evoLabel := fmtToggle("toggle.evolution", ss.EvolutionOn)
+	gpLabel := fmtToggle("toggle.gp", ss.GPEnabled)
+	neuroLabel := fmtToggle("toggle.neuro", ss.NeuroEnabled)
+	blocked := locale.T("toggle.blocked")
 	if evoBlocked && !ss.EvolutionOn {
-		evoLabel = "Evolution: ---"
+		evoLabel = locale.T("toggle.evolution") + ": " + blocked
 	}
 	if gpBlocked && !ss.GPEnabled {
-		gpLabel = "GP: ---"
+		gpLabel = locale.T("toggle.gp") + ": " + blocked
 	}
 	if neuroBlocked && !ss.NeuroEnabled {
-		neuroLabel = "Neuro: ---"
+		neuroLabel = locale.T("toggle.neuro") + ": " + blocked
 	}
 
 	toggles := []tabToggle{
 		{evoLabel, ss.EvolutionOn, color.RGBA{180, 50, 180, 255}, evoBlocked && !ss.EvolutionOn},
 		{gpLabel, ss.GPEnabled, color.RGBA{0, 180, 160, 255}, gpBlocked && !ss.GPEnabled},
 		{neuroLabel, ss.NeuroEnabled, color.RGBA{255, 140, 50, 255}, neuroBlocked && !ss.NeuroEnabled},
-		{fmtToggle("Teams", ss.TeamsEnabled), ss.TeamsEnabled, color.RGBA{100, 100, 255, 255}, false},
-		{fmtToggle("Pareto", ss.ParetoEnabled), ss.ParetoEnabled, color.RGBA{200, 100, 200, 255}, paretoBlocked},
-		{fmtToggle("Artbildung", ss.SpeciationOn), ss.SpeciationOn, color.RGBA{160, 200, 100, 255}, specBlocked},
-		{fmtToggle("Sensorrauschen", ss.SensorNoiseOn), ss.SensorNoiseOn, color.RGBA{255, 120, 80, 255}, false},
-		{fmtToggle("Gedaechtnis", ss.MemoryEnabled), ss.MemoryEnabled, color.RGBA{200, 150, 255, 255}, false},
-		{fmtToggle("Bestenliste", ss.ShowLeaderboard), ss.ShowLeaderboard, color.RGBA{255, 200, 80, 255}, false},
+		{fmtToggle("toggle.teams", ss.TeamsEnabled), ss.TeamsEnabled, color.RGBA{100, 100, 255, 255}, false},
+		{fmtToggle("toggle.pareto", ss.ParetoEnabled), ss.ParetoEnabled, color.RGBA{200, 100, 200, 255}, paretoBlocked},
+		{fmtToggle("toggle.speciation", ss.SpeciationOn), ss.SpeciationOn, color.RGBA{160, 200, 100, 255}, specBlocked},
+		{fmtToggle("toggle.sensornoise", ss.SensorNoiseOn), ss.SensorNoiseOn, color.RGBA{255, 120, 80, 255}, false},
+		{fmtToggle("toggle.memory", ss.MemoryEnabled), ss.MemoryEnabled, color.RGBA{200, 150, 255, 255}, false},
+		{fmtToggle("toggle.leaderboard", ss.ShowLeaderboard), ss.ShowLeaderboard, ColorSectionGold, false},
+		{fmtToggle("toggle.collective_ai", ss.CollectiveAIOn), ss.CollectiveAIOn, color.RGBA{255, 180, 50, 255}, false},
 	}
 	drawTabToggles(screen, toggles, y)
 
 	// Hint: explain why buttons are disabled
 	if ss.NeuroEnabled {
 		hintY := y + 5*(tabToggleH+tabToggleGap) + 2
-		printColoredAt(screen, "Neuro aktiv: Evolution/GP gesperrt", 5, hintY, color.RGBA{255, 140, 50, 150})
+		printColoredAt(screen, locale.T("hint.neuro_active"), 5, hintY, color.RGBA{255, 140, 50, 150})
 	} else if ss.GPEnabled {
 		hintY := y + 5*(tabToggleH+tabToggleGap) + 2
-		printColoredAt(screen, "GP aktiv: Evolution/Neuro gesperrt", 5, hintY, color.RGBA{0, 180, 160, 150})
+		printColoredAt(screen, locale.T("hint.gp_active"), 5, hintY, color.RGBA{0, 180, 160, 150})
 	} else if ss.EvolutionOn {
 		hintY := y + 5*(tabToggleH+tabToggleGap) + 2
-		printColoredAt(screen, "Evolution aktiv: GP/Neuro gesperrt", 5, hintY, color.RGBA{180, 50, 180, 150})
+		printColoredAt(screen, locale.T("hint.evo_active"), 5, hintY, color.RGBA{180, 50, 180, 150})
 	}
 
 	// Evo status line at bottom
@@ -209,22 +226,46 @@ func drawTabDisplay(screen *ebiten.Image, ss *swarm.SwarmState) {
 	genomDisabled := ss.NeuroEnabled || ss.GPEnabled
 
 	toggles := []tabToggle{
-		{fmtToggle("Dashboard", ss.DashboardOn), ss.DashboardOn, color.RGBA{80, 140, 220, 255}, false},
-		{fmtToggle("Minimap", ss.ShowMinimap), ss.ShowMinimap, color.RGBA{80, 140, 220, 255}, false},
-		{fmtToggle("Spuren", ss.ShowTrails), ss.ShowTrails, color.RGBA{80, 140, 220, 255}, false},
-		{fmtToggle("Heatmap", ss.ShowHeatmap), ss.ShowHeatmap, color.RGBA{200, 80, 80, 255}, false},
-		{fmtToggle("Lieferwege", ss.ShowRoutes), ss.ShowRoutes, color.RGBA{80, 140, 220, 255}, false},
-		{fmtToggle("Live-Diagramm", ss.ShowLiveChart), ss.ShowLiveChart, color.RGBA{80, 200, 80, 255}, false},
-		{fmtToggle("Kom.-Graph", ss.ShowCommGraph), ss.ShowCommGraph, color.RGBA{100, 200, 255, 255}, false},
-		{fmtToggle("Broadcast", ss.ShowMsgWaves), ss.ShowMsgWaves, color.RGBA{100, 200, 255, 255}, false},
-		{fmtToggle("Genom-Balken", ss.ShowGenomeViz), ss.ShowGenomeViz, color.RGBA{200, 160, 255, 255}, genomDisabled},
-		{fmtToggle("Genom-Liste", ss.GenomeBrowserOn), ss.GenomeBrowserOn, color.RGBA{200, 160, 255, 255}, genomDisabled},
-		{fmtToggle("Schwarm-Mitte", ss.ShowSwarmCenter), ss.ShowSwarmCenter, color.RGBA{255, 255, 100, 255}, false},
-		{fmtToggle("Stau-Zonen", ss.ShowZones), ss.ShowZones, color.RGBA{255, 120, 80, 255}, false},
-		{fmtToggle("Vorhersage", ss.ShowPrediction), ss.ShowPrediction, color.RGBA{150, 200, 255, 255}, false},
+		{fmtToggle("toggle.dashboard", ss.DashboardOn), ss.DashboardOn, ColorToggleBlue, false},
+		{fmtToggle("toggle.minimap", ss.ShowMinimap), ss.ShowMinimap, ColorToggleBlue, false},
+		{fmtToggle("toggle.trails", ss.ShowTrails), ss.ShowTrails, ColorToggleBlue, false},
+		{fmtToggle("toggle.heatmap", ss.ShowHeatmap), ss.ShowHeatmap, color.RGBA{200, 80, 80, 255}, false},
+		{fmtToggle("toggle.routes", ss.ShowRoutes), ss.ShowRoutes, ColorToggleBlue, false},
+		{fmtToggle("toggle.livechart", ss.ShowLiveChart), ss.ShowLiveChart, color.RGBA{80, 200, 80, 255}, false},
+		{fmtToggle("toggle.commgraph", ss.ShowCommGraph), ss.ShowCommGraph, color.RGBA{100, 200, 255, 255}, false},
+		{fmtToggle("toggle.broadcast", ss.ShowMsgWaves), ss.ShowMsgWaves, color.RGBA{100, 200, 255, 255}, false},
+		{fmtToggle("toggle.genomeviz", ss.ShowGenomeViz), ss.ShowGenomeViz, color.RGBA{200, 160, 255, 255}, genomDisabled},
+		{fmtToggle("toggle.genomebrowser", ss.GenomeBrowserOn), ss.GenomeBrowserOn, color.RGBA{200, 160, 255, 255}, genomDisabled},
+		{fmtToggle("toggle.swarmcenter", ss.ShowSwarmCenter), ss.ShowSwarmCenter, color.RGBA{255, 255, 100, 255}, false},
+		{fmtToggle("toggle.congestion", ss.ShowZones), ss.ShowZones, color.RGBA{255, 120, 80, 255}, false},
+		{fmtToggle("toggle.prediction", ss.ShowPrediction), ss.ShowPrediction, color.RGBA{150, 200, 255, 255}, false},
 		{fmtColorFilter(ss.ColorFilter), ss.ColorFilter > 0, color.RGBA{200, 200, 80, 255}, false},
 	}
 	drawTabToggles(screen, toggles, y)
+
+	// Educational overlay quick-access buttons
+	overlayY := y + 8*(tabToggleH+tabToggleGap)
+	overlayCol := color.RGBA{100, 120, 160, 255}
+	overlayActiveCol := color.RGBA{80, 180, 220, 255}
+	type overlayBtn struct {
+		label string
+		key   string // matches ActiveOverlay values
+	}
+	overlays := []overlayBtn{
+		{"K:Math", "math"},
+		{"D:Logic", "decision"},
+		{"C:Visual", "concept"},
+		{"G:Glossar", "glossary"},
+		{"I:Issues", "issues"},
+	}
+	for i, ov := range overlays {
+		bx := tabPadX + i*68
+		col := overlayCol
+		if ss.ActiveOverlay == ov.key {
+			col = overlayActiveCol
+		}
+		drawSwarmButton(screen, bx, overlayY, 65, 16, ov.label, col)
+	}
 }
 
 // ==================== Algo entries (used by F4 Algo-Labor) ====================
@@ -254,7 +295,7 @@ func GetAlgoEntries(ss *swarm.SwarmState) []AlgoEntry {
 		{"SSA (Salp Swarm)", &ss.SSAOn, &ss.ShowSSA, color.RGBA{100, 180, 100, 255}, swarm.InitSSA},
 		{"GSA (Gravitational)", &ss.GSAOn, &ss.ShowGSA, color.RGBA{160, 160, 200, 255}, swarm.InitGSA},
 		{"FPA (Flower)", &ss.FPAOn, &ss.ShowFPA, color.RGBA{255, 120, 180, 255}, swarm.InitFPA},
-		{"SA (Sim. Annealing)", &ss.SAOn, &ss.ShowSA, color.RGBA{255, 100, 100, 255}, swarm.InitSA},
+		{"SA (Sim. Annealing)", &ss.SAOn, &ss.ShowSA, ColorLightRed, swarm.InitSA},
 		{"AO (Aquila)", &ss.AOOn, &ss.ShowAO, color.RGBA{140, 100, 60, 255}, swarm.InitAO},
 		{"SCA (Sine Cosine)", &ss.SCAOn, &ss.ShowSCA, color.RGBA{100, 200, 255, 255}, swarm.InitSCA},
 		{"DA (Dragonfly)", &ss.DAOn, &ss.ShowDA, color.RGBA{80, 180, 120, 255}, swarm.InitDA},
@@ -271,7 +312,7 @@ func drawTabTools(screen *ebiten.Image, ss *swarm.SwarmState) {
 	dimCol := color.RGBA{140, 150, 170, 255}
 
 	// Speed section
-	printColoredAt(screen, "Tempo:", tabPadX, y+2, dimCol)
+	printColoredAt(screen, locale.T("tools.speed"), tabPadX, y+2, dimCol)
 	speeds := [5]struct {
 		label string
 		val   float64
@@ -291,63 +332,63 @@ func drawTabTools(screen *ebiten.Image, ss *swarm.SwarmState) {
 
 	// Replay
 	toggles := []tabToggle{
-		{fmtToggle("Zeitreise", ss.ReplayMode), ss.ReplayMode, color.RGBA{200, 100, 100, 255}, false},
-		{fmtToggle("Turnier", ss.TournamentOn), ss.TournamentOn, color.RGBA{200, 160, 80, 255}, false},
+		{fmtToggle("toggle.replay", ss.ReplayMode), ss.ReplayMode, color.RGBA{200, 100, 100, 255}, false},
+		{fmtToggle("toggle.tournament", ss.TournamentOn), ss.TournamentOn, color.RGBA{200, 160, 80, 255}, false},
 	}
 	drawTabToggles(screen, toggles, y)
 	y += (tabToggleH + tabToggleGap) + 6
 
 	// Action buttons
-	printColoredAt(screen, "Aktionen:", tabPadX, y+2, dimCol)
+	printColoredAt(screen, locale.T("tools.actions"), tabPadX, y+2, dimCol)
 	y += lineH + 2
 
 	actionCol := color.RGBA{60, 80, 120, 255}
-	drawSwarmButton(screen, tabPadX, y, 110, 20, "Neue Runde", actionCol)
-	drawSwarmButton(screen, tabPadX+115, y, 110, 20, "Bildschirmfoto", actionCol)
+	drawSwarmButton(screen, tabPadX, y, 110, 20, locale.T("btn.newround"), actionCol)
+	drawSwarmButton(screen, tabPadX+115, y, 110, 20, locale.T("btn.screenshot"), actionCol)
 	y += 24
-	drawSwarmButton(screen, tabPadX, y, 110, 20, "GIF aufnehmen", actionCol)
-	drawSwarmButton(screen, tabPadX+115, y, 110, 20, "CSV Export", actionCol)
+	drawSwarmButton(screen, tabPadX, y, 110, 20, locale.T("btn.gif"), actionCol)
+	drawSwarmButton(screen, tabPadX+115, y, 110, 20, locale.T("btn.exportcsv"), actionCol)
 	y += 24
-	drawSwarmButton(screen, tabPadX, y, 110, 20, "Zustand speichern", actionCol)
-	drawSwarmButton(screen, tabPadX+115, y, 110, 20, "Zustand laden", actionCol)
+	drawSwarmButton(screen, tabPadX, y, 110, 20, locale.T("btn.savestate"), actionCol)
+	drawSwarmButton(screen, tabPadX+115, y, 110, 20, locale.T("btn.loadstate"), actionCol)
 }
 
 // ==================== Helpers ====================
 
-func fmtToggle(name string, on bool) string {
+func fmtToggle(key string, on bool) string {
 	if on {
-		return name + ": AN"
+		return locale.T(key) + ": " + locale.T("toggle.on")
 	}
-	return name + ": AUS"
+	return locale.T(key) + ": " + locale.T("toggle.off")
 }
 
 func fmtWallToggle(wrap bool) string {
 	if wrap {
-		return "Rand: Durchlauf"
+		return locale.T("toggle.walls.wrap")
 	}
-	return "Rand: Abprall"
+	return locale.T("toggle.walls.bounce")
 }
 
 func fmtDelivToggle(ss *swarm.SwarmState) string {
 	if ss.DeliveryOn {
-		return "Lieferung: AN"
+		return locale.T("toggle.delivery.on")
 	}
-	return "Lieferung: AUS"
+	return locale.T("toggle.delivery.off")
 }
 
 func fmtTruckToggle(ss *swarm.SwarmState) string {
 	if ss.TruckToggle {
-		return "LKW: AN"
+		return locale.T("toggle.truck.on")
 	}
-	return "LKW: AUS"
+	return locale.T("toggle.truck.off")
 }
 
 func fmtColorFilter(filter int) string {
-	names := []string{"Farbfilter: AUS", "Filter: Rot", "Filter: Gruen", "Filter: Blau", "Filter: Traegt", "Filter: Wartend"}
-	if filter >= 0 && filter < len(names) {
-		return names[filter]
+	keys := []string{"colorfilter.off", "colorfilter.red", "colorfilter.green", "colorfilter.blue", "colorfilter.carry", "colorfilter.idle"}
+	if filter >= 0 && filter < len(keys) {
+		return locale.T(keys[filter])
 	}
-	return "Farbfilter: AUS"
+	return locale.T("colorfilter.off")
 }
 
 // drawCompactStats renders a single-line stats summary at the bottom.
@@ -388,11 +429,17 @@ func TabBarHitTest(mx, my int) string {
 	if my < tabBarY || my >= tabBarY+tabBarH {
 		return ""
 	}
-	for i := range tabNames {
+	names := tabNamesLocalized()
+	for i := range names {
 		x := tabPadX + i*(tabBtnW+tabBtnGap)
 		if mx >= x && mx < x+tabBtnW {
 			return fmt.Sprintf("tab:%d", i)
 		}
+	}
+	// Language button on right
+	langX := editorPanelW - 35
+	if mx >= langX && mx < langX+30 && my >= tabBarY && my < tabBarY+tabBarH {
+		return "language"
 	}
 	return ""
 }
@@ -440,7 +487,7 @@ func tabArenaHitTest(mx, my int) string {
 func tabEvoHitTest(mx, my int) string {
 	y := tabContentY + 2
 	ids := []string{"evolution", "gp", "neuro", "teams", "pareto",
-		"speciation", "sensornoise", "memory", "leaderboard"}
+		"speciation", "sensornoise", "memory", "leaderboard", "collective_ai"}
 	for i, id := range ids {
 		if toggleHitAt(mx, my, y, i) {
 			return id
@@ -456,6 +503,16 @@ func tabDisplayHitTest(mx, my int) string {
 		"swarmcenter", "congestion", "prediction", "colorfilter"}
 	for i, id := range ids {
 		if toggleHitAt(mx, my, y, i) {
+			return id
+		}
+	}
+
+	// Educational overlay quick-access buttons
+	overlayY := y + 8*(tabToggleH+tabToggleGap)
+	overlayIDs := []string{"overlay_math", "overlay_decision", "overlay_concept", "overlay_glossary", "overlay_issues"}
+	for i, id := range overlayIDs {
+		bx := tabPadX + i*68
+		if mx >= bx && mx < bx+65 && my >= overlayY && my < overlayY+16 {
 			return id
 		}
 	}

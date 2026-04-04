@@ -6,9 +6,9 @@ import (
 	"swarmsim/domain/swarm"
 	"swarmsim/engine/simulation"
 	"swarmsim/engine/swarmscript"
+	"swarmsim/locale"
 
 	"github.com/hajimehoshi/ebiten/v2"
-	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 	"github.com/hajimehoshi/ebiten/v2/vector"
 )
 
@@ -60,8 +60,6 @@ const (
 
 	editorTextX    = 40 // code text start x (after line numbers)
 	editorLineNumX = 5  // line number x
-	charW          = 6  // monospace char width for DebugPrintAt
-	lineH          = 16 // line height in pixels
 
 	// Toggle button dimensions
 	toggleBtnW = 165
@@ -81,7 +79,7 @@ func DrawSwarmEditor(screen *ebiten.Image, ss *swarm.SwarmState) {
 	ed := ss.Editor
 
 	// Title bar with TEXT/BLOCKS toggle
-	ebitenutil.DebugPrintAt(screen, "SwarmScript Editor", 10, editorTitleY)
+	printColoredAt(screen, "SwarmScript Editor", 10, editorTitleY, ColorWhite)
 	// TEXT/BLOCKS mode toggle
 	textBtnCol := ColorSwarmBtnDeploy
 	blockBtnCol := color.RGBA{50, 50, 65, 255}
@@ -104,6 +102,16 @@ func DrawSwarmEditor(screen *ebiten.Image, ss *swarm.SwarmState) {
 	}
 	drawSwarmButton(screen, 300, editorBarY, 23, editorBarH, "CP", copyCol)
 	drawSwarmButton(screen, 325, editorBarY, 23, editorBarH, "PA", pasteCol)
+
+	// Confirmation message for destructive actions
+	if ss.PendingConfirm != "" {
+		msg := locale.T("confirm." + ss.PendingConfirm)
+		printColoredAt(screen, msg, 10, editorBarY+editorBarH+2, color.RGBA{255, 200, 50, 255})
+		ss.PendingConfirmTick--
+		if ss.PendingConfirmTick <= 0 {
+			ss.PendingConfirm = ""
+		}
+	}
 
 	// Code area: neuro visualization, text editor, or block editor
 	if ss.NeuroEnabled {
@@ -213,17 +221,34 @@ func drawSwarmEditorBottom(screen *ebiten.Image, ss *swarm.SwarmState, ed *swarm
 		}
 		printColoredAt(screen, errText, 10, editorErrorY, ColorSwarmError)
 	} else if ss.ProgramName == "" || ss.ProgramName == "Custom" {
-		printColoredAt(screen, "Tipp: Preset waehlen oder eigenes Programm schreiben", 10, editorErrorY, color.RGBA{80, 100, 130, 200})
+		printColoredAt(screen, locale.T("editor.hint_preset"), 10, editorErrorY, color.RGBA{80, 100, 130, 200})
 	}
 
 	// Status bar
-	lightStatus := "AUS"
+	lightStatus := locale.T("editor.off")
 	if ss.Light.Active {
-		lightStatus = "AN"
+		lightStatus = locale.T("editor.on")
 	}
-	statusText := fmt.Sprintf("Tick: %d | Bots: %d | Programm: %s | Licht: %s",
+	statusText := locale.Tf("editor.status_bar",
 		ss.Tick, ss.BotCount, ss.ProgramName, lightStatus)
-	printColoredAt(screen, statusText, 10, editorStatusY, color.RGBA{180, 180, 180, 255})
+	printColoredAt(screen, statusText, 10, editorStatusY, ColorMediumGray)
+
+	// Collective AI status indicator (always visible when enabled)
+	if ss.CollectiveAIOn {
+		aiStatus := locale.T("collective.active_short")
+		issueCount := 0
+		resolvedCount := 0
+		if ss.IssueBoard != nil {
+			issueCount = len(ss.IssueBoard.Issues)
+			for _, iss := range ss.IssueBoard.Issues {
+				if iss.Status == swarm.IssueResolved {
+					resolvedCount++
+				}
+			}
+		}
+		aiStatusText := fmt.Sprintf("%s [%d/%d]", aiStatus, resolvedCount, issueCount)
+		printColoredAt(screen, aiStatusText, 220, editorStatusY, color.RGBA{255, 180, 50, 200})
+	}
 
 	// Separator
 	vector.StrokeLine(screen, 5, float32(editorSep1Y), float32(editorPanelW-5), float32(editorSep1Y), 1, ColorSwarmEditorSep, false)
@@ -256,11 +281,11 @@ func drawSwarmStats(screen *ebiten.Image, ss *swarm.SwarmState) {
 	y := editorStatsY
 	col := color.RGBA{160, 180, 200, 255}
 	dimCol := color.RGBA{120, 120, 140, 255}
-	headerCol := color.RGBA{136, 204, 255, 220}
+	headerCol := ColorInfoCyan
 
 	// Section header with subtle background
 	vector.DrawFilledRect(screen, 5, float32(y), float32(editorPanelW-10), float32(lineH), color.RGBA{30, 35, 50, 200}, false)
-	printColoredAt(screen, "STATISTIKEN", 10, y, headerCol)
+	printColoredAt(screen, locale.T("stats.title"), 10, y, headerCol)
 	y += lineH + 2
 
 	// Count chains and max chain length
@@ -293,13 +318,13 @@ func drawSwarmStats(screen *ebiten.Image, ss *swarm.SwarmState) {
 		avgNeighbors = float64(totalNeighbors) / float64(ss.BotCount)
 	}
 
-	chainInfo := fmt.Sprintf("Ketten: %d  Laengste: %d", chains, maxChain)
+	chainInfo := locale.Tf("stat.chains_info", chains, maxChain)
 	if chains == 0 {
-		chainInfo = "Ketten: keine (FOLLOW_NEAREST noetig)"
+		chainInfo = locale.T("stat.chains_none")
 	}
 	printColoredAt(screen, chainInfo, 10, y, col)
 	y += lineH
-	printColoredAt(screen, fmt.Sprintf("Avg Nachbarn: %.1f (in 120px)", avgNeighbors), 10, y, col)
+	printColoredAt(screen, locale.Tf("stat.avg_neighbors", avgNeighbors), 10, y, col)
 	y += lineH
 
 	// Coverage: how much of the arena is "covered" (divide into 20x20 grid, count occupied cells)
@@ -326,25 +351,25 @@ func drawSwarmStats(screen *ebiten.Image, ss *swarm.SwarmState) {
 	}
 	coverage := float64(len(occupied)) / float64(gridRes*gridRes) * 100
 
-	coverageHint := "verteilt"
+	coverageHint := locale.T("stat.distributed")
 	if coverage < 25 {
-		coverageHint = "geclustert"
+		coverageHint = locale.T("stat.clustered")
 	} else if coverage > 75 {
-		coverageHint = "gut verteilt"
+		coverageHint = locale.T("stat.well_distributed")
 	}
-	printColoredAt(screen, fmt.Sprintf("Abdeckung: %.0f%% (%s)", coverage, coverageHint), 10, y, col)
+	printColoredAt(screen, locale.Tf("stat.coverage", coverage, coverageHint), 10, y, col)
 	y += lineH
 
 	// Trails status
-	trailStatus := "AUS"
+	trailStatus := locale.T("toggle.off")
 	if ss.ShowTrails {
-		trailStatus = "AN"
+		trailStatus = locale.T("toggle.on")
 	}
-	wrapStatus := "Abprall"
+	wrapStatus := locale.T("stat.bounce")
 	if ss.WrapMode {
-		wrapStatus = "Durchlauf"
+		wrapStatus = locale.T("stat.wrap")
 	}
-	printColoredAt(screen, fmt.Sprintf("Spuren: %s | Rand: %s", trailStatus, wrapStatus), 10, y, dimCol)
+	printColoredAt(screen, locale.Tf("stat.trails_walls", trailStatus, wrapStatus), 10, y, dimCol)
 	y += lineH
 
 	// Delivery stats
@@ -352,17 +377,17 @@ func drawSwarmStats(screen *ebiten.Image, ss *swarm.SwarmState) {
 		ds := &ss.DeliveryStats
 		// Delivery section header
 		vector.DrawFilledRect(screen, 5, float32(y), float32(editorPanelW-10), float32(lineH), color.RGBA{30, 35, 50, 180}, false)
-		printColoredAt(screen, "LIEFERUNG", 10, y, color.RGBA{255, 200, 100, 200})
+		printColoredAt(screen, locale.T("stat.delivery_header"), 10, y, color.RGBA{255, 200, 100, 200})
 		y += lineH + 2
 
 		correctRate := 0
 		if ds.TotalDelivered > 0 {
 			correctRate = ds.CorrectDelivered * 100 / ds.TotalDelivered
 		}
-		printColoredAt(screen, fmt.Sprintf("Geliefert: %d | Richtig: %d (%d%%)", ds.TotalDelivered, ds.CorrectDelivered, correctRate), 10, y, col)
+		printColoredAt(screen, locale.Tf("stat.delivered_correct", ds.TotalDelivered, ds.CorrectDelivered, correctRate), 10, y, col)
 		y += lineH
 		if ds.WrongDelivered > 0 {
-			printColoredAt(screen, fmt.Sprintf("Falsch: %d", ds.WrongDelivered), 10, y, color.RGBA{255, 100, 80, 200})
+			printColoredAt(screen, locale.Tf("stat.wrong_count", ds.WrongDelivered), 10, y, color.RGBA{255, 100, 80, 200})
 			y += lineH
 		}
 		carrying := 0
@@ -374,7 +399,7 @@ func drawSwarmStats(screen *ebiten.Image, ss *swarm.SwarmState) {
 				idle++
 			}
 		}
-		printColoredAt(screen, fmt.Sprintf("Tragen: %d | Suchen: %d", carrying, idle), 10, y, col)
+		printColoredAt(screen, locale.Tf("stat.carrying_searching", carrying, idle), 10, y, col)
 		y += lineH
 		avgTime := 0
 		if len(ds.DeliveryTimes) > 0 {
@@ -384,7 +409,7 @@ func drawSwarmStats(screen *ebiten.Image, ss *swarm.SwarmState) {
 			}
 			avgTime = sum / len(ds.DeliveryTimes)
 		}
-		printColoredAt(screen, fmt.Sprintf("Durchschn. Lieferzeit: %d Ticks", avgTime), 10, y, dimCol)
+		printColoredAt(screen, locale.Tf("stat.avg_delivery_time", avgTime), 10, y, dimCol)
 		y += lineH
 	}
 
@@ -392,7 +417,7 @@ func drawSwarmStats(screen *ebiten.Image, ss *swarm.SwarmState) {
 	if ss.TruckToggle && ss.TruckState != nil {
 		ts := ss.TruckState
 		vector.DrawFilledRect(screen, 5, float32(y), float32(editorPanelW-10), float32(lineH), color.RGBA{35, 30, 20, 180}, false)
-		printColoredAt(screen, "LKW-ENTLADUNG", 10, y, color.RGBA{255, 180, 80, 200})
+		printColoredAt(screen, locale.T("stat.truck_header"), 10, y, color.RGBA{255, 180, 80, 200})
 		y += lineH + 2
 
 		remaining := 0
@@ -405,9 +430,9 @@ func drawSwarmStats(screen *ebiten.Image, ss *swarm.SwarmState) {
 				}
 			}
 		}
-		printColoredAt(screen, fmt.Sprintf("LKW %d/%d | Pakete: %d/%d", ts.TruckNum, ts.TrucksPerRound, total-remaining, total), 10, y, col)
+		printColoredAt(screen, locale.Tf("stat.truck_packages", ts.TruckNum, ts.TrucksPerRound, total-remaining, total), 10, y, col)
 		y += lineH
-		printColoredAt(screen, fmt.Sprintf("Punkte: %d", ts.Score), 10, y, color.RGBA{255, 200, 100, 200})
+		printColoredAt(screen, locale.Tf("stat.points", ts.Score), 10, y, color.RGBA{255, 200, 100, 200})
 	}
 }
 
@@ -421,39 +446,39 @@ func DrawSwarmHUD(screen *ebiten.Image, s *simulation.Simulation, fps float64) {
 	if s.Speed < 1.0 {
 		speedStr = fmt.Sprintf("%.3gx", s.Speed) // show 0.25x, 0.125x properly
 	}
-	info := fmt.Sprintf("FPS: %.0f  Tempo: %s", fps, speedStr)
+	info := locale.Tf("ui.fps_speed", fps, speedStr)
 	if s.Paused {
 		info += " [PAUSE]"
 	}
-	ebitenutil.DebugPrintAt(screen, info, 360, 10)
+	printColoredAt(screen, info, 360, 10, ColorWhite)
 
 	// Slow-motion indicator
 	if s.Speed < 1.0 && !s.Paused {
-		label := fmt.Sprintf("ZEITLUPE %s", speedStr)
+		label := locale.Tf("ui.slowmo", speedStr)
 		printColoredAt(screen, label, 600, 10, color.RGBA{100, 200, 255, 230})
 	}
 
 	// Arena info line
 	if ss != nil {
-		arenaInfo := fmt.Sprintf("Bots: %d | %s | Tick: %d",
-			ss.BotCount, ss.ProgramName, ss.Tick)
-		ebitenutil.DebugPrintAt(screen, arenaInfo, 420, 35)
+		arenaInfo := fmt.Sprintf("Bots: %s | %s | Tick: %s (%s)",
+			fmtNum(ss.BotCount), ss.ProgramName, fmtNum(ss.Tick), fmtTime(ss.Tick))
+		printColoredAt(screen, arenaInfo, 420, 35, ColorWhite)
 
 		// Active algorithm indicator
 		if ss.SwarmAlgo != nil {
-			algoLabel := fmt.Sprintf("Algorithmus: %s",
+			algoLabel := locale.Tf("ui.algorithm_label",
 				swarm.SwarmAlgorithmName(ss.SwarmAlgo.ActiveAlgo))
 			printColoredAt(screen, algoLabel, 420, 50, color.RGBA{200, 255, 100, 230})
 		}
 
 		// Dynamic environment indicator
 		if ss.DynamicEnv {
-			printColoredAt(screen, "DYNAMISCH", 750, 35, color.RGBA{255, 150, 50, 220})
+			printColoredAt(screen, locale.T("ui.dynamic"), 750, 35, color.RGBA{255, 150, 50, 220})
 		}
 
 		// Color filter indicator
 		if ss.ColorFilter > 0 {
-			filterNames := []string{"", "Filter: Rot", "Filter: Gruen", "Filter: Blau", "Filter: Traegt", "Filter: Wartend"}
+			filterNames := []string{"", locale.T("colorfilter.red"), locale.T("colorfilter.green"), locale.T("colorfilter.blue"), locale.T("colorfilter.carry"), locale.T("colorfilter.idle")}
 			filterColors := []color.RGBA{
 				{}, {255, 80, 80, 255}, {80, 255, 80, 255}, {80, 80, 255, 255},
 				{255, 200, 50, 255}, {150, 150, 150, 255},
@@ -463,7 +488,7 @@ func DrawSwarmHUD(screen *ebiten.Image, s *simulation.Simulation, fps float64) {
 
 		// Message wave indicator
 		if ss.ShowMsgWaves {
-			printColoredAt(screen, "WELLEN", 950, 35, color.RGBA{100, 200, 255, 220})
+			printColoredAt(screen, locale.T("ui.waves"), 950, 35, color.RGBA{100, 200, 255, 220})
 		}
 
 		// Memory indicator
@@ -473,19 +498,19 @@ func DrawSwarmHUD(screen *ebiten.Image, s *simulation.Simulation, fps float64) {
 
 		// Sensor noise indicator
 		if ss.SensorNoiseOn {
-			printColoredAt(screen, "RAUSCHEN", 1110, 35, color.RGBA{255, 120, 80, 220})
+			printColoredAt(screen, locale.T("ui.noise"), 1110, 35, color.RGBA{255, 120, 80, 220})
 		}
 
 		// Day/Night indicator
 		if ss.DayNightOn {
 			brightness := swarm.DayNightBrightness(ss)
-			timeLabel := "TAG"
+			timeLabel := locale.T("ui.day")
 			timeCol := color.RGBA{255, 220, 80, 220}
 			if brightness < 0.3 {
-				timeLabel = "NACHT"
+				timeLabel = locale.T("ui.night")
 				timeCol = color.RGBA{80, 80, 200, 220}
 			} else if brightness < 0.7 {
-				timeLabel = "DAEMMERUNG"
+				timeLabel = locale.T("ui.dusk")
 				timeCol = color.RGBA{200, 150, 100, 220}
 			}
 			printColoredAt(screen, timeLabel, 1200, 35, timeCol)
@@ -499,7 +524,7 @@ func DrawSwarmHUD(screen *ebiten.Image, s *simulation.Simulation, fps float64) {
 		// Achievement counter
 		if ss.AchievementState != nil && ss.AchievementState.TotalUnlocked > 0 {
 			achLabel := fmt.Sprintf("%d/%d", ss.AchievementState.TotalUnlocked, int(swarm.AchCount))
-			printColoredAt(screen, achLabel, 1200, 48, color.RGBA{255, 215, 0, 200})
+			printColoredAt(screen, achLabel, 1200, 48, ColorGoldFaded)
 		}
 
 		// Reset flash indicator
@@ -512,10 +537,35 @@ func DrawSwarmHUD(screen *ebiten.Image, s *simulation.Simulation, fps float64) {
 		}
 
 		// Delivery & Truck stats are shown in the left editor panel (STATISTIKEN section)
+
+		// Session save flash (Ctrl+S)
+		if ss.SessionSaveFlash > 0 {
+			flashAlpha := uint8(255)
+			if ss.SessionSaveFlash < 15 {
+				flashAlpha = uint8(ss.SessionSaveFlash * 17)
+			}
+			printColoredAt(screen, "Session saved", 600, 35, color.RGBA{80, 220, 120, flashAlpha})
+		}
+
+		// Deploy success flash
+		if ss.DeployFlash > 0 {
+			alpha := uint8(255)
+			if ss.DeployFlash < 15 {
+				alpha = uint8(ss.DeployFlash * 17)
+			}
+			msg := locale.Tf("deploy.success", ss.DeployRuleCount)
+			printColoredAt(screen, msg, 370, 30, color.RGBA{80, 220, 80, alpha})
+		}
+	}
+
+	// --- Quick-stats bar at very top of arena area ---
+	if ss != nil {
+		sw := screen.Bounds().Dx()
+		drawSwarmQuickStats(screen, ss, s, fps, sw)
 	}
 
 	// Help hint at very bottom
-	printColoredAt(screen, "SPACE:Pause  H:Hilfe  |  Alle Features per Maus in den 4 Tabs links steuerbar",
+	printColoredAt(screen, locale.T("ui.bottom_hint"),
 		360, sh-14, color.RGBA{120, 130, 150, 180})
 
 	// Scenario title overlay
@@ -523,48 +573,6 @@ func DrawSwarmHUD(screen *ebiten.Image, s *simulation.Simulation, fps float64) {
 		sw := screen.Bounds().Dx()
 		drawScenarioTitle(screen, s.ScenarioTitle, sw, sh, s.ScenarioTimer)
 	}
-}
-
-// --- Helper drawing functions ---
-
-func drawSwarmButton(screen *ebiten.Image, x, y, w, h int, label string, bgCol color.RGBA) {
-	// Main body
-	vector.DrawFilledRect(screen, float32(x), float32(y), float32(w), float32(h), bgCol, false)
-	// Top highlight (subtle light edge)
-	highlightCol := color.RGBA{
-		uint8(min(int(bgCol.R)+30, 255)),
-		uint8(min(int(bgCol.G)+30, 255)),
-		uint8(min(int(bgCol.B)+30, 255)),
-		bgCol.A,
-	}
-	vector.DrawFilledRect(screen, float32(x), float32(y), float32(w), 1, highlightCol, false)
-	// Bottom shadow
-	shadowCol := color.RGBA{
-		uint8(max(int(bgCol.R)-25, 0)),
-		uint8(max(int(bgCol.G)-25, 0)),
-		uint8(max(int(bgCol.B)-25, 0)),
-		bgCol.A,
-	}
-	vector.DrawFilledRect(screen, float32(x), float32(y+h-1), float32(w), 1, shadowCol, false)
-	// Border
-	vector.StrokeRect(screen, float32(x), float32(y), float32(w), float32(h), 1, color.RGBA{180, 180, 200, 80}, false)
-	textX := x + (w-len(label)*charW)/2
-	textY := y + (h-12)/2
-	ebitenutil.DebugPrintAt(screen, label, textX, textY)
-}
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-
-func max(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
 }
 
 func drawSwarmDropdownButton(screen *ebiten.Image, ss *swarm.SwarmState) {
@@ -579,43 +587,57 @@ func drawSwarmDropdownButton(screen *ebiten.Image, ss *swarm.SwarmState) {
 	}
 	textX := x + 5
 	textY := y + (h-12)/2
-	ebitenutil.DebugPrintAt(screen, label, textX, textY)
+	printColoredAt(screen, label, textX, textY, ColorWhite)
 }
 
 // presetCategories assigns category labels to preset indices for the dropdown.
-var presetCategories = map[int]string{
-	0:  "Einfache Beispiele",
-	10: "Paket-Lieferung",
-	13: "LKW-Entladung",
-	15: "Selbstlernend",
-	17: "Fortgeschritten",
-	20: "Neuronale Netze",
+// presetCategoryKeys maps preset index to locale key for category labels.
+var presetCategoryKeys = map[int]string{
+	0:  "preset.cat_simple",
+	10: "preset.cat_delivery",
+	13: "preset.cat_truck",
+	15: "preset.cat_selflearn",
+	17: "preset.cat_advanced",
+	20: "preset.cat_neural",
+	22: "preset.cat_explore",
+}
+
+func presetCategory(idx int) (string, bool) {
+	key, ok := presetCategoryKeys[idx]
+	if !ok {
+		return "", false
+	}
+	return locale.T(key), true
 }
 
 // presetShortDesc gives a brief one-line description for each preset.
-var presetShortDesc = map[string]string{
-	"Aggregation":        "Bots finden sich zu Gruppen",
-	"Dispersion":         "Bots verteilen sich im Raum",
-	"Orbit":              "Bots kreisen ums Licht",
-	"Color Wave":         "Farbwelle breitet sich aus",
-	"Flocking":           "Vogelschwarm-Verhalten",
-	"Snake Formation":    "Bots bilden Ketten",
-	"Obstacle Nav":       "Hindernisse umfahren",
-	"Pulse Sync":         "Gluehwuermchen-Blinken",
-	"Trail Follow":       "Farben vom Nachbarn kopieren",
-	"Ant Colony":         "Ameisenkolonie mit Nachrichten",
-	"Simple Delivery":    "Pakete aufheben und abliefern",
-	"Delivery Comm":      "Liefern mit Kommunikation",
-	"Delivery Roles":     "Spaeh-Bots + Liefer-Bots",
-	"Simple Unload":      "LKW entladen ohne Absprache",
-	"Coordinated Unload": "LKW entladen mit Wegweisern",
-	"Evolving Delivery":  "Werte optimieren sich selbst",
-	"Evolving Truck":     "Truck-Werte optimieren sich",
-	"Maze Explorer":      "Immer rechts an der Wand lang",
-	"GP: Random Start":   "Programme entstehen von Null",
-	"GP: Seeded Start":   "Gutes Programm wird besser",
-	"Neuro: Delivery":    "Gehirn lernt ohne Regeln!",
-	"Neuro: LKW":         "Gehirn lernt LKW entladen!",
+// presetShortDescKeys maps preset name to locale key for short descriptions.
+var presetShortDescKeys = map[string]string{
+	"Aggregation":        "preset.desc_aggregation",
+	"Dispersion":         "preset.desc_dispersion",
+	"Orbit":              "preset.desc_orbit",
+	"Color Wave":         "preset.desc_color_wave",
+	"Flocking":           "preset.desc_flocking",
+	"Snake Formation":    "preset.desc_snake",
+	"Obstacle Nav":       "preset.desc_obstacle",
+	"Pulse Sync":         "preset.desc_pulse_sync",
+	"Trail Follow":       "preset.desc_trail_follow",
+	"Ant Colony":         "preset.desc_ant_colony",
+	"Simple Delivery":    "preset.desc_simple_delivery",
+	"Delivery Comm":      "preset.desc_delivery_comm",
+	"Delivery Roles":     "preset.desc_delivery_roles",
+	"Simple Unload":      "preset.desc_simple_unload",
+	"Coordinated Unload": "preset.desc_coord_unload",
+	"Evolving Delivery":  "preset.desc_evolving_delivery",
+	"Evolving Truck":     "preset.desc_evolving_truck",
+	"Maze Explorer":      "preset.desc_maze",
+	"GP: Random Start":   "preset.desc_gp_random",
+	"GP: Seeded Start":   "preset.desc_gp_seeded",
+	"Neuro: Delivery":    "preset.desc_neuro_delivery",
+	"Neuro: LKW":         "preset.desc_neuro_truck",
+	"Phototaxis":         "preset.desc_phototaxis",
+	"Braitenberg 2b":     "preset.desc_braitenberg",
+	"Stigmergy":          "preset.desc_stigmergy",
 }
 
 func drawSwarmDropdownOverlay(screen *ebiten.Image, ss *swarm.SwarmState) {
@@ -636,9 +658,9 @@ func drawSwarmDropdownOverlay(screen *ebiten.Image, ss *swarm.SwarmState) {
 		iy := y + i*itemH
 
 		// Category separator
-		if cat, ok := presetCategories[i]; ok && i > 0 {
+		if cat, ok := presetCategory(i); ok && i > 0 {
 			vector.DrawFilledRect(screen, float32(x), float32(iy-1), float32(w), 1, color.RGBA{80, 100, 140, 150}, false)
-			printColoredAt(screen, cat, x+w-len(cat)*charW-5, iy+5, color.RGBA{100, 140, 200, 150})
+			printColoredAt(screen, cat, x+w-runeLen(cat)*charW-5, iy+5, color.RGBA{100, 140, 200, 150})
 		}
 
 		bgCol := color.RGBA{35, 45, 70, 240}
@@ -653,92 +675,11 @@ func drawSwarmDropdownOverlay(screen *ebiten.Image, ss *swarm.SwarmState) {
 		}
 		printColoredAt(screen, name, x+12, iy+3, color.RGBA{220, 225, 240, 255})
 		// Short description on second line (if available)
-		if desc, ok := presetShortDesc[name]; ok {
+		if key, ok := presetShortDescKeys[name]; ok {
+			desc := locale.T(key)
 			printColoredAt(screen, desc, x+12, iy+13, color.RGBA{100, 110, 130, 200})
 		}
 	}
-}
-
-// textCacheEntry holds a cached colored text image.
-type textCacheEntry struct {
-	img      *ebiten.Image
-	lastUsed int
-}
-
-var (
-	textCache      = make(map[string]*textCacheEntry, 128)
-	textCacheFrame int
-)
-
-// tickTextCache increments the frame counter and evicts stale entries.
-// Call once per frame from the draw entry point.
-func tickTextCache() {
-	textCacheFrame++
-	if textCacheFrame%120 == 0 {
-		for k, e := range textCache {
-			if textCacheFrame-e.lastUsed > 120 {
-				e.img.Deallocate()
-				delete(textCache, k)
-			}
-		}
-	}
-}
-
-// cachedTextImage returns a cached white-text image for the given string.
-// Used by HUD functions that need a scaled text image.
-func cachedTextImage(text string) *ebiten.Image {
-	key := "__hud__" + text
-	entry, ok := textCache[key]
-	if !ok {
-		tw := len(text)*6 + 10
-		if tw < 1 {
-			tw = 1
-		}
-		th := 16
-		img := ebiten.NewImage(tw, th)
-		ebitenutil.DebugPrintAt(img, text, 5, 3)
-		entry = &textCacheEntry{img: img}
-		textCache[key] = entry
-	}
-	entry.lastUsed = textCacheFrame
-	return entry.img
-}
-
-// printColoredAt draws colored text at the given position.
-// Uses a text image cache to avoid per-frame GPU image allocations.
-func printColoredAt(screen *ebiten.Image, text string, x, y int, col color.RGBA) {
-	if text == "" {
-		return
-	}
-
-	// Build cache key: text + color bytes
-	key := text + string([]byte{col.R, col.G, col.B, col.A})
-
-	entry, ok := textCache[key]
-	if !ok {
-		tw := len(text)*charW + 2
-		if tw < 1 {
-			tw = 1
-		}
-		th := lineH
-		img := ebiten.NewImage(tw, th)
-		ebitenutil.DebugPrintAt(img, text, 0, 0)
-		entry = &textCacheEntry{img: img}
-		textCache[key] = entry
-	}
-	entry.lastUsed = textCacheFrame
-
-	op := &ebiten.DrawImageOptions{}
-	op.GeoM.Translate(float64(x), float64(y))
-
-	// DebugPrintAt draws white text; tint to desired color
-	r := float64(col.R) / 255.0
-	g := float64(col.G) / 255.0
-	b := float64(col.B) / 255.0
-	a := float64(col.A) / 255.0
-	op.ColorScale.Scale(float32(r), float32(g), float32(b), float32(a))
-
-	screen.DrawImage(entry.img, op)
 }
 
 // drawSwarmTooltips shows tooltip text when hovering over toggle buttons.
@@ -751,12 +692,12 @@ func drawSwarmTooltips(screen *ebiten.Image) {
 		text        string
 	}
 	zones := []tooltipZone{
-		{5, editorToggle1Y, toggleBtnW, toggleBtnH, "Zufaellige Hindernisse im Feld"},
-		{175, editorToggle1Y, toggleBtnW, toggleBtnH, "Labyrinth mit Gaengen und Waenden"},
-		{5, editorToggle2Y, toggleBtnW, toggleBtnH, "Lichtquelle fuer light_value Sensor"},
-		{175, editorToggle2Y, toggleBtnW, toggleBtnH, "BOUNCE=Abprallen WRAP=Durchlaufen"},
-		{5, editorToggle3Y, toggleBtnW, toggleBtnH, "Paket-Liefersystem mit Stationen"},
-		{175, editorToggle3Y, toggleBtnW, toggleBtnH, "LKW-Entladung mit Rampe"},
+		{5, editorToggle1Y, toggleBtnW, toggleBtnH, locale.T("editor.tip_obstacles")},
+		{175, editorToggle1Y, toggleBtnW, toggleBtnH, locale.T("editor.tip_maze")},
+		{5, editorToggle2Y, toggleBtnW, toggleBtnH, locale.T("editor.tip_light")},
+		{175, editorToggle2Y, toggleBtnW, toggleBtnH, locale.T("editor.tip_wrap")},
+		{5, editorToggle3Y, toggleBtnW, toggleBtnH, locale.T("editor.tip_delivery")},
+		{175, editorToggle3Y, toggleBtnW, toggleBtnH, locale.T("editor.tip_truck")},
 	}
 
 	for _, z := range zones {
@@ -931,4 +872,42 @@ func SwarmDropdownHitTest(mx, my int, presetCount int) int {
 		}
 	}
 	return -1
+}
+
+// drawSwarmQuickStats renders a thin persistent stats bar at the very top of
+// the arena area (right of the editor panel). It shows key metrics at a glance.
+func drawSwarmQuickStats(screen *ebiten.Image, ss *swarm.SwarmState, s *simulation.Simulation, fps float64, sw int) {
+	barH := 14
+	barX := 355 // right of editor panel
+	barW := sw - barX
+
+	// Semi-transparent dark background
+	vector.DrawFilledRect(screen, float32(barX), 0, float32(barW), float32(barH), color.RGBA{15, 18, 25, 200}, false)
+
+	// Build stats line
+	speedStr := fmt.Sprintf("%.0fx", s.Speed)
+	if s.Speed < 1.0 {
+		speedStr = fmt.Sprintf("%.3gx", s.Speed)
+	}
+
+	stats := fmt.Sprintf("Bots:%s | Tick:%s (%s) | Speed:%s | FPS:%.0f",
+		fmtNum(ss.BotCount), fmtNum(ss.Tick), fmtTime(ss.Tick), speedStr, fps)
+
+	// Add delivery stats if active
+	if ss.DeliveryOn && ss.DeliveryStats.TotalDelivered > 0 {
+		pct := 0
+		if ss.DeliveryStats.TotalDelivered > 0 {
+			pct = ss.DeliveryStats.CorrectDelivered * 100 / ss.DeliveryStats.TotalDelivered
+		}
+		stats += fmt.Sprintf(" | Del:%s/%s (%d%%)",
+			fmtNum(ss.DeliveryStats.CorrectDelivered), fmtNum(ss.DeliveryStats.TotalDelivered), pct)
+	}
+
+	// Add evolution generation and fitness if active
+	if ss.EvolutionOn {
+		stats += fmt.Sprintf(" | Gen:%d | Fit:%.0f", ss.Generation, ss.BestFitness)
+	}
+
+	dimCol := color.RGBA{130, 140, 160, 200}
+	printColoredAt(screen, stats, barX+6, 2, dimCol)
 }

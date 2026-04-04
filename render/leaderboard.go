@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"image/color"
 	"swarmsim/domain/swarm"
+	"swarmsim/locale"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/vector"
@@ -29,20 +30,20 @@ func DrawLeaderboardOverlay(screen *ebiten.Image, lb *swarm.LeaderboardState) {
 		float32(panelW), float32(panelH), 2, color.RGBA{255, 200, 50, 200}, false)
 
 	// Title
-	title := "BESTENLISTE — HIGHSCORES"
-	titleW := len(title) * charW
+	title := locale.T("leaderboard.title")
+	titleW := runeLen(title) * charW
 	printColoredAt(screen, title, sw/2-titleW/2, py+10, color.RGBA{255, 200, 50, 255})
 
 	// Column headers
 	y := py + 32
-	headerCol := color.RGBA{100, 180, 255, 255}
+	headerCol := ColorBrightBlue
 	printColoredAt(screen, "#", px+10, y, headerCol)
-	printColoredAt(screen, "Name", px+30, y, headerCol)
-	printColoredAt(screen, "Score", px+220, y, headerCol)
-	printColoredAt(screen, "Korrekt", px+290, y, headerCol)
-	printColoredAt(screen, "Falsch", px+370, y, headerCol)
-	printColoredAt(screen, "Eff.%", px+440, y, headerCol)
-	printColoredAt(screen, "Modus", px+510, y, headerCol)
+	printColoredAt(screen, locale.T("leaderboard.col_name"), px+30, y, headerCol)
+	printColoredAt(screen, locale.T("leaderboard.col_score"), px+220, y, headerCol)
+	printColoredAt(screen, locale.T("leaderboard.col_correct"), px+290, y, headerCol)
+	printColoredAt(screen, locale.T("leaderboard.col_wrong"), px+370, y, headerCol)
+	printColoredAt(screen, locale.T("leaderboard.col_efficiency"), px+440, y, headerCol)
+	printColoredAt(screen, locale.T("leaderboard.col_mode"), px+510, y, headerCol)
 	printColoredAt(screen, "Gen", px+590, y, headerCol)
 	printColoredAt(screen, "Bots", px+640, y, headerCol)
 
@@ -54,9 +55,9 @@ func DrawLeaderboardOverlay(screen *ebiten.Image, lb *swarm.LeaderboardState) {
 
 	entries := swarm.LeaderboardTop(lb, 15)
 	for i, e := range entries {
-		rankCol := color.RGBA{180, 180, 180, 255}
-		nameCol := color.RGBA{200, 210, 230, 255}
-		scoreCol := color.RGBA{180, 180, 180, 255}
+		rankCol := ColorMediumGray
+		nameCol := ColorTextLight
+		scoreCol := ColorMediumGray
 
 		// Gold/Silver/Bronze for top 3
 		switch i {
@@ -82,8 +83,8 @@ func DrawLeaderboardOverlay(screen *ebiten.Image, lb *swarm.LeaderboardState) {
 		printColoredAt(screen, name, px+30, y, nameCol)
 		printColoredAt(screen, fmt.Sprintf("%d", e.Score), px+220, y, scoreCol)
 		printColoredAt(screen, fmt.Sprintf("%d", e.Correct), px+290, y, color.RGBA{100, 255, 100, 255})
-		printColoredAt(screen, fmt.Sprintf("%d", e.Wrong), px+370, y, color.RGBA{255, 100, 100, 255})
-		printColoredAt(screen, fmt.Sprintf("%.0f%%", e.Efficiency), px+440, y, color.RGBA{180, 180, 180, 255})
+		printColoredAt(screen, fmt.Sprintf("%d", e.Wrong), px+370, y, ColorLightRed)
+		printColoredAt(screen, fmt.Sprintf("%.0f%%", e.Efficiency), px+440, y, ColorMediumGray)
 		printColoredAt(screen, e.Mode, px+510, y, color.RGBA{150, 150, 170, 255})
 		printColoredAt(screen, fmt.Sprintf("%d", e.Generation), px+590, y, color.RGBA{150, 150, 170, 255})
 		printColoredAt(screen, fmt.Sprintf("%d", e.BotCount), px+640, y, color.RGBA{150, 150, 170, 255})
@@ -92,12 +93,12 @@ func DrawLeaderboardOverlay(screen *ebiten.Image, lb *swarm.LeaderboardState) {
 	}
 
 	if len(entries) == 0 {
-		printColoredAt(screen, "Noch keine Eintraege — spiele und liefere Pakete!",
+		printColoredAt(screen, locale.T("leaderboard.empty"),
 			px+40, y+20, color.RGBA{140, 150, 170, 255})
 	}
 
 	// Footer
 	footerY := py + panelH - 22
-	footer := "ESC = Schliessen  |  Scores werden bei Programm-Wechsel/Reset gespeichert"
+	footer := locale.T("leaderboard.footer")
 	printColoredAt(screen, footer, px+40, footerY, color.RGBA{100, 100, 120, 255})
 }

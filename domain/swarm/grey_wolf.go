@@ -34,7 +34,7 @@ const (
 	gwoGridSize        = 12    // grid sampling resolution per axis (12×12 = 144 samples)
 	gwoGridRescanRate    = 150   // periodic grid rescan every N ticks
 	gwoGridRescanSize    = 18    // grid resolution for periodic rescan (18×18 = 324 samples)
-	gwoGridInjectTop     = 10    // number of top grid points to inject into wolf positions
+	gwoGridInjectTop     = AlgoGridInjectTop // number of top grid points to inject into wolf positions
 	gwoLocalWalkRadius   = 40.0  // alpha local random walk radius
 	gwoDirectToBestStart = 0.3   // progress threshold to start Direct-to-Best
 	gwoDirectToBestMax   = 0.70  // max probability of Direct-to-Best in late phase
@@ -260,9 +260,6 @@ func TickGWO(ss *SwarmState) {
 		ah := float64(ss.ArenaH)
 
 		// Collect top grid points
-		type gridPt struct {
-			x, y, f float64
-		}
 		topPts := make([]gridPt, 0, gwoGridInjectTop)
 		for gx := 0; gx < gwoGridRescanSize; gx++ {
 			for gy := 0; gy < gwoGridRescanSize; gy++ {
@@ -299,10 +296,6 @@ func TickGWO(ss *SwarmState) {
 		// Inject top grid points into worst omega wolves
 		if len(topPts) > 0 {
 			// Find worst fitness omega wolves
-			type idxFit struct {
-				idx int
-				f   float64
-			}
 			omegas := make([]idxFit, 0, len(ss.Bots))
 			for i := 0; i < len(ss.Bots); i++ {
 				if i != st.AlphaIdx && i != st.BetaIdx && i != st.DeltaIdx {

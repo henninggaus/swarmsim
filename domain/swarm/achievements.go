@@ -1,6 +1,9 @@
 package swarm
 
-import "time"
+import (
+	"swarmsim/locale"
+	"time"
+)
 
 // AchievementID uniquely identifies an achievement.
 type AchievementID int
@@ -46,6 +49,15 @@ const (
 	AchAllOverlays                            // Toggle every overlay at least once
 	AchDSLExpert                              // Use 10+ different actions in one program
 
+	// --- Algo-Labor Achievements ---
+	AchAlgoActivated                          // First optimization algorithm activated in Algo-Labor
+	AchAlgoLaborist                           // 5+ different algorithms tried in Algo-Labor
+	AchAlgoTournament                         // Auto-Tournament completed in Algo-Labor
+
+	// --- Neuro / GP Achievements ---
+	AchNeuroDrives                            // First delivery with Neuro enabled
+	AchGPMaster                              // GP fitness exceeds 500
+
 	AchCount // sentinel
 )
 
@@ -61,12 +73,18 @@ const (
 
 // AchievementDef describes a single achievement.
 type AchievementDef struct {
-	ID          AchievementID
-	Name        string // German display name
-	Description string // German description
-	Icon        string // emoji-like short code
-	Difficulty  AchievementDifficulty
+	ID         AchievementID
+	NameKey    string // locale key for display name
+	DescKey    string // locale key for description
+	Icon       string // emoji-like short code
+	Difficulty AchievementDifficulty
 }
+
+// DisplayName returns the localized achievement name.
+func (d AchievementDef) DisplayName() string { return locale.T(d.NameKey) }
+
+// DisplayDesc returns the localized achievement description.
+func (d AchievementDef) DisplayDesc() string { return locale.T(d.DescKey) }
 
 // Achievement is a runtime instance of an earned achievement.
 type Achievement struct {
@@ -84,9 +102,10 @@ type AchievementState struct {
 	TotalUnlocked int
 
 	// Tracking helpers
-	OverlaysUsed    map[string]bool // which overlays have been toggled
-	DayNightCycles  int             // completed day/night cycles
-	PrevDayNight    float64         // previous phase for cycle detection
+	OverlaysUsed    map[string]bool            // which overlays have been toggled
+	TriedAlgos      map[SwarmAlgorithmType]bool // which algo-labor algorithms have been tried
+	DayNightCycles  int                        // completed day/night cycles
+	PrevDayNight    float64                    // previous phase for cycle detection
 }
 
 // AchievementPopup holds display state for the unlock notification.
@@ -97,52 +116,59 @@ type AchievementPopup struct {
 
 // AllAchievements defines every achievement in the game.
 var AllAchievements = [AchCount]AchievementDef{
-	AchFirstDelivery:    {AchFirstDelivery, "Erste Lieferung", "Erstes Paket erfolgreich zugestellt", "📦", DiffBronze},
-	AchDelivery10:       {AchDelivery10, "Fleissige Boten", "10 Pakete zugestellt", "📬", DiffBronze},
-	AchDelivery50:       {AchDelivery50, "Logistik-Profi", "50 Pakete zugestellt", "🚚", DiffSilver},
-	AchDelivery100:      {AchDelivery100, "Paket-Imperium", "100 Pakete zugestellt", "🏭", DiffGold},
-	AchSpeedDemon:       {AchSpeedDemon, "Blitzlieferung", "10 Lieferungen in unter 500 Ticks", "⚡", DiffGold},
-	AchPerfectRound:     {AchPerfectRound, "Makellos", "Truck-Runde ohne Kollision", "✨", DiffSilver},
+	AchFirstDelivery:    {AchFirstDelivery, "ach.name.first_delivery", "ach.desc.first_delivery", "📦", DiffBronze},
+	AchDelivery10:       {AchDelivery10, "ach.name.delivery10", "ach.desc.delivery10", "📬", DiffBronze},
+	AchDelivery50:       {AchDelivery50, "ach.name.delivery50", "ach.desc.delivery50", "🚚", DiffSilver},
+	AchDelivery100:      {AchDelivery100, "ach.name.delivery100", "ach.desc.delivery100", "🏭", DiffGold},
+	AchSpeedDemon:       {AchSpeedDemon, "ach.name.speed_demon", "ach.desc.speed_demon", "⚡", DiffGold},
+	AchPerfectRound:     {AchPerfectRound, "ach.name.perfect_round", "ach.desc.perfect_round", "✨", DiffSilver},
 
-	AchFirstGen:         {AchFirstGen, "Evolution!", "Erste Generation abgeschlossen", "🧬", DiffBronze},
-	AchGen10:            {AchGen10, "Selektion", "Generation 10 erreicht", "🔬", DiffBronze},
-	AchGen50:            {AchGen50, "Darwin waere stolz", "Generation 50 erreicht", "🏆", DiffSilver},
-	AchFitnessJump:      {AchFitnessJump, "Quantensprung", "Fitness verdoppelt in einer Generation", "🚀", DiffGold},
-	AchSpeciesExplosion: {AchSpeciesExplosion, "Artenvielfalt", "5+ Spezies gleichzeitig", "🌈", DiffSilver},
-	AchConvergence:      {AchConvergence, "Konvergenz", "Alle Bots innerhalb 10% Fitness", "🎯", DiffGold},
+	AchFirstGen:         {AchFirstGen, "ach.name.first_gen", "ach.desc.first_gen", "🧬", DiffBronze},
+	AchGen10:            {AchGen10, "ach.name.gen10", "ach.desc.gen10", "🔬", DiffBronze},
+	AchGen50:            {AchGen50, "ach.name.gen50", "ach.desc.gen50", "🏆", DiffSilver},
+	AchFitnessJump:      {AchFitnessJump, "ach.name.fitness_jump", "ach.desc.fitness_jump", "🚀", DiffGold},
+	AchSpeciesExplosion: {AchSpeciesExplosion, "ach.name.species_explosion", "ach.desc.species_explosion", "🌈", DiffSilver},
+	AchConvergence:      {AchConvergence, "ach.name.convergence", "ach.desc.convergence", "🎯", DiffGold},
 
-	AchPerfectAlignment: {AchPerfectAlignment, "Gleichschritt", "Alignment > 0.95", "➡️", DiffSilver},
-	AchTightCluster:     {AchTightCluster, "Zusammenhalt", "Kohaesion > 0.95", "🫂", DiffSilver},
-	AchVortex:           {AchVortex, "Wirbelwind", "Wirbel-Muster erkannt", "🌀", DiffGold},
-	AchCircle:           {AchCircle, "Kreismeister", "Kreis-Formation erkannt", "⭕", DiffGold},
-	AchStream:           {AchStream, "Schwarmstrom", "Strom-Muster mit 50+ Bots", "🌊", DiffSilver},
-	AchChaos:            {AchChaos, "Totales Chaos", "Entropie > 0.95", "💥", DiffBronze},
+	AchPerfectAlignment: {AchPerfectAlignment, "ach.name.perfect_alignment", "ach.desc.perfect_alignment", "➡️", DiffSilver},
+	AchTightCluster:     {AchTightCluster, "ach.name.tight_cluster", "ach.desc.tight_cluster", "🫂", DiffSilver},
+	AchVortex:           {AchVortex, "ach.name.vortex", "ach.desc.vortex", "🌀", DiffGold},
+	AchCircle:           {AchCircle, "ach.name.circle", "ach.desc.circle", "⭕", DiffGold},
+	AchStream:           {AchStream, "ach.name.stream", "ach.desc.stream", "🌊", DiffSilver},
+	AchChaos:            {AchChaos, "ach.name.chaos", "ach.desc.chaos", "💥", DiffBronze},
 
-	AchExplorer25:       {AchExplorer25, "Entdecker", "25% der Arena erkundet", "🗺️", DiffBronze},
-	AchExplorer50:       {AchExplorer50, "Kartograph", "50% der Arena erkundet", "🧭", DiffSilver},
-	AchExplorer90:       {AchExplorer90, "Welteroberer", "90% der Arena erkundet", "🌍", DiffDiamond},
+	AchExplorer25:       {AchExplorer25, "ach.name.explorer25", "ach.desc.explorer25", "🗺️", DiffBronze},
+	AchExplorer50:       {AchExplorer50, "ach.name.explorer50", "ach.desc.explorer50", "🧭", DiffSilver},
+	AchExplorer90:       {AchExplorer90, "ach.name.explorer90", "ach.desc.explorer90", "🌍", DiffDiamond},
 
-	AchBots100:          {AchBots100, "Schwarm", "100+ Bots gleichzeitig", "🐝", DiffBronze},
-	AchBots300:          {AchBots300, "Armee", "300+ Bots gleichzeitig", "🐜", DiffSilver},
-	AchBots500:          {AchBots500, "Legion", "500 Bots (Maximum!)", "👑", DiffGold},
-	AchMarathon:         {AchMarathon, "Marathon", "100.000 Ticks Simulation", "⏱️", DiffSilver},
-	AchNightOwl:         {AchNightOwl, "Nachteule", "5 Tag/Nacht-Zyklen ueberlebt", "🦉", DiffSilver},
+	AchBots100:          {AchBots100, "ach.name.bots100", "ach.desc.bots100", "🐝", DiffBronze},
+	AchBots300:          {AchBots300, "ach.name.bots300", "ach.desc.bots300", "🐜", DiffSilver},
+	AchBots500:          {AchBots500, "ach.name.bots500", "ach.desc.bots500", "👑", DiffGold},
+	AchMarathon:         {AchMarathon, "ach.name.marathon", "ach.desc.marathon", "⏱️", DiffSilver},
+	AchNightOwl:         {AchNightOwl, "ach.name.night_owl", "ach.desc.night_owl", "🦉", DiffSilver},
 
-	AchAllOverlays:      {AchAllOverlays, "Kontrollfreak", "Jedes Overlay mindestens einmal benutzt", "🎛️", DiffDiamond},
-	AchDSLExpert:        {AchDSLExpert, "Codemaster", "10+ verschiedene Aktionen im Programm", "💻", DiffGold},
+	AchAllOverlays:      {AchAllOverlays, "ach.name.all_overlays", "ach.desc.all_overlays", "🎛️", DiffDiamond},
+	AchDSLExpert:        {AchDSLExpert, "ach.name.dsl_expert", "ach.desc.dsl_expert", "💻", DiffGold},
+
+	AchAlgoActivated:    {AchAlgoActivated, "ach.name.algo_activated", "ach.desc.algo_activated", "⚗️", DiffBronze},
+	AchAlgoLaborist:     {AchAlgoLaborist, "ach.name.algo_laborist", "ach.desc.algo_laborist", "🔭", DiffSilver},
+	AchAlgoTournament:   {AchAlgoTournament, "ach.name.algo_tournament", "ach.desc.algo_tournament", "🏅", DiffGold},
+
+	AchNeuroDrives:      {AchNeuroDrives, "ach.name.neuro_drives", "ach.desc.neuro_drives", "🧠", DiffSilver},
+	AchGPMaster:         {AchGPMaster, "ach.name.gp_master", "ach.desc.gp_master", "🌱", DiffGold},
 }
 
-// DifficultyName returns the German display name for a difficulty.
+// DifficultyName returns the localized display name for a difficulty.
 func DifficultyName(d AchievementDifficulty) string {
 	switch d {
 	case DiffBronze:
-		return "Bronze"
+		return locale.T("diff.bronze")
 	case DiffSilver:
-		return "Silber"
+		return locale.T("diff.silver")
 	case DiffGold:
-		return "Gold"
+		return locale.T("diff.gold")
 	case DiffDiamond:
-		return "Diamant"
+		return locale.T("diff.diamond")
 	}
 	return "?"
 }
@@ -166,6 +192,7 @@ func DifficultyColor(d AchievementDifficulty) [3]uint8 {
 func NewAchievementState() *AchievementState {
 	return &AchievementState{
 		OverlaysUsed: make(map[string]bool),
+		TriedAlgos:   make(map[SwarmAlgorithmType]bool),
 	}
 }
 
@@ -369,6 +396,31 @@ func CheckAchievements(ss *SwarmState) {
 		if len(actionSet) >= 10 {
 			as.Unlock(AchDSLExpert, tick)
 		}
+	}
+
+	// --- Algo-Labor ---
+	if ss.SwarmAlgo != nil && ss.SwarmAlgo.ActiveAlgo != AlgoNone {
+		as.Unlock(AchAlgoActivated, tick)
+		if as.TriedAlgos == nil {
+			as.TriedAlgos = make(map[SwarmAlgorithmType]bool)
+		}
+		as.TriedAlgos[ss.SwarmAlgo.ActiveAlgo] = true
+		if len(as.TriedAlgos) >= 5 {
+			as.Unlock(AchAlgoLaborist, tick)
+		}
+	}
+	if ss.AlgoTournamentTotal > 0 && ss.AlgoTournamentDone >= ss.AlgoTournamentTotal {
+		as.Unlock(AchAlgoTournament, tick)
+	}
+
+	// --- Neuro Delivery ---
+	if ss.NeuroEnabled && ss.DeliveryStats.TotalDelivered >= 1 {
+		as.Unlock(AchNeuroDrives, tick)
+	}
+
+	// --- GP Master ---
+	if ss.GPEnabled && ss.BestFitness >= 500 {
+		as.Unlock(AchGPMaster, tick)
 	}
 }
 

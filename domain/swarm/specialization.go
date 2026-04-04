@@ -193,12 +193,7 @@ func applyRoleBehavior(ss *SwarmState, bot *SwarmBot, prof *SpecProfile) {
 		if dist > 10 {
 			angle := math.Atan2(dy, dx)
 			diff := angle - bot.Angle
-			for diff > math.Pi {
-				diff -= 2 * math.Pi
-			}
-			for diff < -math.Pi {
-				diff += 2 * math.Pi
-			}
+			diff = WrapAngle(diff)
 			bot.Angle += diff * strength * 0.1
 		}
 	}

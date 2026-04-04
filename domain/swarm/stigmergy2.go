@@ -289,12 +289,7 @@ func readPheromones(ss *SwarmState, sg *Stigmergy2State, botIdx int, bot *SwarmB
 
 func turnToward(bot *SwarmBot, targetAngle, strength float64) {
 	diff := targetAngle - bot.Angle
-	for diff > math.Pi {
-		diff -= 2 * math.Pi
-	}
-	for diff < -math.Pi {
-		diff += 2 * math.Pi
-	}
+	diff = WrapAngle(diff)
 	bot.Angle += diff * strength
 }
 

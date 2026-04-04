@@ -4,6 +4,7 @@ import (
 	"math/rand"
 	"swarmsim/domain/bot"
 	"swarmsim/domain/comm"
+	"swarmsim/domain/factory"
 	"swarmsim/domain/physics"
 	"swarmsim/domain/resource"
 	"swarmsim/domain/swarm"
@@ -97,4 +98,8 @@ type Simulation struct {
 	// Programmable swarm mode
 	SwarmMode  bool
 	SwarmState *swarm.SwarmState
+
+	// Factory mode (F5)
+	FactoryMode  bool
+	FactoryState *factory.FactoryState
 }

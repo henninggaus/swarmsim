@@ -259,12 +259,7 @@ func replayMemory(ss *SwarmState, em *EpisodicMemoryState, bot *SwarmBot, mems [
 	}
 
 	diff := targetAngle - bot.Angle
-	for diff > math.Pi {
-		diff -= 2 * math.Pi
-	}
-	for diff < -math.Pi {
-		diff += 2 * math.Pi
-	}
+	diff = WrapAngle(diff)
 	bot.Angle += diff * chosen.Strength * 0.1
 }
 

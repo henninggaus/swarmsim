@@ -1,6 +1,9 @@
 package swarm
 
-import "math"
+import (
+	"math"
+	"sort"
+)
 
 // Harris Hawks Optimization (HHO): Meta-heuristic inspired by the cooperative
 // hunting strategy of Harris's hawks. The algorithm models three phases:
@@ -28,7 +31,7 @@ const (
 	hhoSpeedMult       = 5.0  // movement speed multiplier (5x = 7.5 px/tick)
 	hhoGridRescanRate  = 150  // periodic grid rescan every N ticks
 	hhoGridRescanSize  = 16   // grid resolution (16×16 = 256 samples)
-	hhoGridInjectTop   = 10   // inject top N grid positions into worst hawks
+	hhoGridInjectTop   = AlgoGridInjectTop // inject top N grid positions into worst hawks
 	hhoDirectMaxProb   = 0.80 // max probability of direct-to-best at end
 	hhoDirectStartProg = 0.10 // progress threshold to start direct-to-best
 	hhoGBWeightMin     = 0.05 // global-best attraction weight at start
@@ -309,9 +312,6 @@ func hhoGridRescan(ss *SwarmState, st *HHOState) {
 	usableH := ss.ArenaH - 2*margin
 	n := len(ss.Bots)
 
-	type gridPt struct {
-		x, y, f float64
-	}
 	gridPts := make([]gridPt, 0, hhoGridRescanSize*hhoGridRescanSize)
 	for gx := 0; gx < hhoGridRescanSize; gx++ {
 		for gy := 0; gy < hhoGridRescanSize; gy++ {
@@ -325,13 +325,7 @@ func hhoGridRescan(ss *SwarmState, st *HHOState) {
 	}
 
 	// Sort grid points by fitness descending
-	for i := 0; i < len(gridPts)-1; i++ {
-		for j := i + 1; j < len(gridPts); j++ {
-			if gridPts[j].f > gridPts[i].f {
-				gridPts[i], gridPts[j] = gridPts[j], gridPts[i]
-			}
-		}
-	}
+	sort.Slice(gridPts, func(i, j int) bool { return gridPts[i].f > gridPts[j].f })
 
 	// Update global best from grid findings
 	if len(gridPts) > 0 && gridPts[0].f > st.GlobalBestF {
@@ -341,21 +335,11 @@ func hhoGridRescan(ss *SwarmState, st *HHOState) {
 	}
 
 	// Find worst hawks by fitness
-	type idxFit struct {
-		idx int
-		f   float64
-	}
 	agents := make([]idxFit, n)
 	for i := range ss.Bots {
 		agents[i] = idxFit{i, st.Fitness[i]}
 	}
-	for i := 0; i < len(agents)-1; i++ {
-		for j := i + 1; j < len(agents); j++ {
-			if agents[j].f < agents[i].f {
-				agents[i], agents[j] = agents[j], agents[i]
-			}
-		}
-	}
+	sort.Slice(agents, func(i, j int) bool { return agents[i].f < agents[j].f })
 
 	// Teleport worst hawks to best grid points
 	inject := hhoGridInjectTop

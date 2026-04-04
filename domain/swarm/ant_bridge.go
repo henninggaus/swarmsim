@@ -205,12 +205,7 @@ func ApplyCrossBridge(bot *SwarmBot, ss *SwarmState, idx int) {
 
 	if bestDist < bridgeDetectRadius {
 		diff := bestAngle - bot.Angle
-		for diff > math.Pi {
-			diff -= 2 * math.Pi
-		}
-		for diff < -math.Pi {
-			diff += 2 * math.Pi
-		}
+		diff = WrapAngle(diff)
 		if diff > bridgeSteerRate {
 			diff = bridgeSteerRate
 		} else if diff < -bridgeSteerRate {

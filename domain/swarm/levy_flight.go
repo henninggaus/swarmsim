@@ -107,12 +107,7 @@ func ApplyLevyWalk(bot *SwarmBot, ss *SwarmState, idx int) {
 
 	// Steer toward target angle
 	diff := st.TargetAng[idx] - bot.Angle
-	for diff > math.Pi {
-		diff -= 2 * math.Pi
-	}
-	for diff < -math.Pi {
-		diff += 2 * math.Pi
-	}
+	diff = WrapAngle(diff)
 	if diff > levySteerRate {
 		diff = levySteerRate
 	} else if diff < -levySteerRate {

@@ -114,12 +114,7 @@ func TickAmoeba(ss *SwarmState) {
 		// Pseudopod: bots in front cone
 		angleToBot := math.Atan2(dy, dx)
 		angleDiff := angleToBot - st.Direction
-		for angleDiff > math.Pi {
-			angleDiff -= 2 * math.Pi
-		}
-		for angleDiff < -math.Pi {
-			angleDiff += 2 * math.Pi
-		}
+		angleDiff = WrapAngle(angleDiff)
 		st.IsPseudo[i] = math.Abs(angleDiff) < amoebaPseudoAngle && distToCenter > skinThreshold*0.5
 
 		// Sensor cache
@@ -152,12 +147,7 @@ func ApplyAmoeba(bot *SwarmBot, ss *SwarmState, idx int) {
 	if st.IsPseudo[idx] {
 		// Pseudopod: extend outward in movement direction
 		diff := st.Direction - bot.Angle
-		for diff > math.Pi {
-			diff -= 2 * math.Pi
-		}
-		for diff < -math.Pi {
-			diff += 2 * math.Pi
-		}
+		diff = WrapAngle(diff)
 		if diff > amoebaPseudoStr {
 			diff = amoebaPseudoStr
 		} else if diff < -amoebaPseudoStr {
@@ -178,12 +168,7 @@ func ApplyAmoeba(bot *SwarmBot, ss *SwarmState, idx int) {
 		)
 
 		diff := blendAngle - bot.Angle
-		for diff > math.Pi {
-			diff -= 2 * math.Pi
-		}
-		for diff < -math.Pi {
-			diff += 2 * math.Pi
-		}
+		diff = WrapAngle(diff)
 		if diff > 0.15 {
 			diff = 0.15
 		} else if diff < -0.15 {
@@ -195,12 +180,7 @@ func ApplyAmoeba(bot *SwarmBot, ss *SwarmState, idx int) {
 	} else {
 		// Interior: stream toward movement direction
 		diff := st.Direction - bot.Angle
-		for diff > math.Pi {
-			diff -= 2 * math.Pi
-		}
-		for diff < -math.Pi {
-			diff += 2 * math.Pi
-		}
+		diff = WrapAngle(diff)
 		if diff > amoebaStreamStr {
 			diff = amoebaStreamStr
 		} else if diff < -amoebaStreamStr {
@@ -212,12 +192,7 @@ func ApplyAmoeba(bot *SwarmBot, ss *SwarmState, idx int) {
 		if distToCenter > amoebaSkinDist*2 {
 			centerAngle := math.Atan2(-dy, -dx)
 			cdiff := centerAngle - bot.Angle
-			for cdiff > math.Pi {
-				cdiff -= 2 * math.Pi
-			}
-			for cdiff < -math.Pi {
-				cdiff += 2 * math.Pi
-			}
+			cdiff = WrapAngle(cdiff)
 			bot.Angle += cdiff * amoebaCoherence
 		}
 

@@ -29,7 +29,7 @@ const (
 	// Grid rescan parameters
 	mfoGridRescanRate = 250 // periodic grid rescan every N ticks
 	mfoGridRescanSize = 14  // grid resolution (14×14 = 196 samples)
-	mfoGridInjectTop  = 10  // top grid points injected into worst moths
+	mfoGridInjectTop  = AlgoGridInjectTop // top grid points injected into worst moths
 
 	// Direct-to-Best parameters
 	mfoDirectStartProgress = 0.25 // start Direct-to-Best at 25% progress
@@ -397,9 +397,6 @@ func mfoGridRescan(ss *SwarmState, st *MFOState) {
 	if usableW <= 0 || usableH <= 0 {
 		return
 	}
-	type gridPt struct {
-		x, y, f float64
-	}
 	gridPts := make([]gridPt, 0, mfoGridRescanSize*mfoGridRescanSize)
 	for gx := 0; gx < mfoGridRescanSize; gx++ {
 		for gy := 0; gy < mfoGridRescanSize; gy++ {
@@ -428,10 +425,6 @@ func mfoGridRescan(ss *SwarmState, st *MFOState) {
 		return
 	}
 	// Find worst moths by fitness
-	type idxFit struct {
-		idx int
-		f   float64
-	}
 	worst := make([]idxFit, n)
 	for i := range ss.Bots {
 		worst[i] = idxFit{i, st.BotFitness[i]}

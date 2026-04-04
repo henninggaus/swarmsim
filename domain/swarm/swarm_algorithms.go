@@ -413,9 +413,18 @@ func TickSwarmAlgorithm(ss *SwarmState) {
 	if h.tick != nil {
 		h.tick(ss)
 	}
+	// Prepare math trace for selected bot if overlay is active.
+	if ss.ShowMathTrace && ss.SelectedBot >= 0 && ss.SelectedBot < len(ss.Bots) {
+		ss.MathTrace = &MathTrace{}
+	} else {
+		ss.MathTrace = nil
+	}
 	if h.apply != nil {
 		for i := range ss.Bots {
 			h.apply(&ss.Bots[i], ss, i)
+			if ss.MathTrace != nil && i == ss.SelectedBot && h.mathTrace != nil {
+				h.mathTrace(&ss.Bots[i], ss, i)
+			}
 		}
 	}
 	// Sample convergence data for the real-time graph.

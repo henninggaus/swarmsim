@@ -78,12 +78,7 @@ func computeFlockSensors(ss *SwarmState, idx int) {
 	avgAngle := math.Atan2(alignSin/float64(nFlock), alignCos/float64(nFlock))
 	alignDiff := avgAngle - bot.Angle
 	// Normalize to [-π, π]
-	for alignDiff > math.Pi {
-		alignDiff -= 2 * math.Pi
-	}
-	for alignDiff < -math.Pi {
-		alignDiff += 2 * math.Pi
-	}
+	alignDiff = WrapAngle(alignDiff)
 	bot.FlockAlign = int(alignDiff * 180 / math.Pi) // -180..180
 
 	// Cohesion: distance to center of mass of neighbors
@@ -174,12 +169,7 @@ func ApplyFlock(bot *SwarmBot, ss *SwarmState, idx int) {
 	// Apply clamped steering
 	desired := math.Atan2(steerY, steerX)
 	diff := desired - bot.Angle
-	for diff > math.Pi {
-		diff -= 2 * math.Pi
-	}
-	for diff < -math.Pi {
-		diff += 2 * math.Pi
-	}
+	diff = WrapAngle(diff)
 	if diff > flockMaxSteer {
 		diff = flockMaxSteer
 	} else if diff < -flockMaxSteer {
@@ -214,12 +204,7 @@ func ApplyAlign(bot *SwarmBot, ss *SwarmState, idx int) {
 	}
 	target := math.Atan2(sinSum/float64(n), cosSum/float64(n))
 	diff := target - bot.Angle
-	for diff > math.Pi {
-		diff -= 2 * math.Pi
-	}
-	for diff < -math.Pi {
-		diff += 2 * math.Pi
-	}
+	diff = WrapAngle(diff)
 	if diff > flockMaxSteer {
 		diff = flockMaxSteer
 	} else if diff < -flockMaxSteer {
@@ -256,12 +241,7 @@ func ApplyCohere(bot *SwarmBot, ss *SwarmState, idx int) {
 	cy /= float64(n)
 	target := math.Atan2(cy, cx)
 	diff := target - bot.Angle
-	for diff > math.Pi {
-		diff -= 2 * math.Pi
-	}
-	for diff < -math.Pi {
-		diff += 2 * math.Pi
-	}
+	diff = WrapAngle(diff)
 	if diff > flockMaxSteer {
 		diff = flockMaxSteer
 	} else if diff < -flockMaxSteer {

@@ -1,12 +1,12 @@
 package render
 
 import (
-	"fmt"
 	"image/color"
 	"math"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/vector"
+	"swarmsim/locale"
 )
 
 // TutorialStep defines one step of the interactive tutorial.
@@ -28,91 +28,105 @@ type TutorialState struct {
 	Dismissed   bool // user skipped or finished
 }
 
-// TutorialSteps defines all 15 tutorial steps.
-var TutorialSteps = []TutorialStep{
-	// Step 0: Welcome
-	{
-		Lines:     [3]string{"Willkommen bei SwarmSim! Ein Schwarm-Robotik-Simulator.", "Du programmierst autonome Bots mit einfachen Regeln —", "ohne zentrale Steuerung entstehen komplexe Muster."},
-		WaitInput: "",
-	},
-	// Step 1: Modes
-	{
-		Lines:     [3]string{"F1 = Classic Mode (5 Bot-Typen, Pheromone, Genom-Evolution)", "F2 = Swarm Lab (SwarmScript Editor — hier wird's spannend!)", "Druecke F2 um das Swarm Lab zu oeffnen."},
-		WaitInput: "key:F2",
-	},
-	// Step 2: Editor
-	{
-		Lines:     [3]string{"Links siehst du den SwarmScript Editor.", "Jede Zeile ist eine Regel: IF <Sensor> <Op> <Wert> THEN <Aktion>.", "Die erste passende Regel bestimmt was der Bot tut."},
-		ArrowX:    175, ArrowY: 300,
-		WaitInput: "",
-	},
-	// Step 3: First program
-	{
-		Lines:     [3]string{"Waehle 'Aggregation' im Dropdown und druecke DEPLOY.", "Aggregation: Bots drehen sich zum naechsten Nachbarn", "und finden sich zu Clustern zusammen (soziale Anziehung)."},
-		ArrowX:    100, ArrowY: 36,
-		WaitInput: "click:deploy_any",
-	},
-	// Step 4: Observe
-	{
-		Lines:     [3]string{"Beobachte: Jeder Bot sieht nur 120px weit — keine globale Karte!", "Trotzdem bilden sich Gruppen. Das ist emergentes Verhalten:", "komplexe Muster aus einfachen lokalen Regeln."},
-		WaitInput: "timer:300",
-	},
-	// Step 5: Switch program
-	{
-		Lines:     [3]string{"Jetzt waehle 'Dispersion' und druecke DEPLOY.", "Das Gegenteil: Bots stossen sich ab und verteilen sich", "gleichmaessig — wie Gas-Molekuele in einem Raum."},
-		ArrowX:    100, ArrowY: 36,
-		WaitInput: "click:deploy_any",
-	},
-	// Step 6: Delivery on
-	{
-		Lines:     [3]string{"Im Tab 'Arena' klicke auf 'Lieferung: AN'.", "Farbige Stationen erscheinen: Gefuellte Kreise = Pickup,", "Ringe = Dropoff (Paket zur gleichen Farbe bringen)."},
-		ArrowX:    88, ArrowY: 680,
-		WaitInput: "click:delivery",
-	},
-	// Step 7: Delivery program
-	{
-		Lines:     [3]string{"Waehle 'Simple Delivery' und druecke DEPLOY.", "Bots sammeln Pakete ein (!) und liefern zur passenden", "Dropoff. Beobachte wie der LED-Gradient als Wegweiser wirkt!"},
-		ArrowX:    100, ArrowY: 36,
-		WaitInput: "click:deploy_any",
-	},
-	// Step 8: Stats
-	{
-		Lines:     [3]string{"Oben: Deliveries (geliefert), Correct (richtige Farbe), Wrong.", "AvgTime = durchschnittliche Lieferzeit in Ticks.", "Im Tab 'Anzeige' kannst du das Dashboard aktivieren."},
-		ArrowX:    600, ArrowY: 15,
-		WaitInput: "",
-	},
-	// Step 9: Bot select
-	{
-		Lines:     [3]string{"Klicke auf einen Bot in der Arena!", "Du siehst sein Info-Panel: aktuelle Sensoren, Zustand,", "ob er ein Paket traegt und seine Lieferstatistiken."},
-		WaitInput: "click:bot",
-	},
-	// Step 10: Follow-cam info (no key required, just explain)
-	{
-		Lines:     [3]string{"Tipp: Im Tab 'Anzeige' gibt es einen Follow-Cam Toggle.", "Die Kamera zentriert sich auf den selektierten Bot.", "So siehst du die Welt aus Bot-Perspektive!"},
-		WaitInput: "",
-	},
-	// Step 11: Block editor
-	{
-		Lines:     [3]string{"Klicke auf BLOCKS oben fuer den visuellen Editor.", "Statt Text zu tippen, waehlst du Sensoren, Operatoren", "und Aktionen aus Dropdown-Menues — ideal zum Experimentieren!"},
-		ArrowX:    288, ArrowY: 10,
-		WaitInput: "click:blocks",
-	},
-	// Step 12: Tabs
-	{
-		Lines:     [3]string{"Unten links: 4 Tabs fuer alle Features.", "Arena = Umgebung, Evo = Evolution, Anzeige = Visualisierung,", "Werkzeuge = Speed/Export. Algorithmen: F4 Algo-Labor."},
-		ArrowX:    175, ArrowY: 650,
-		WaitInput: "",
-	},
-	// Step 13: Help
-	{
-		Lines:     [3]string{"Druecke H fuer die Hilfe mit allen Sensoren,", "Aktionen und Feature-Erklaerungen.", "Hover ueber Buttons zeigt Tooltips mit Details."},
-		WaitInput: "key:H",
-	},
-	// Step 14: Finish
-	{
-		Lines:     [3]string{"Fertig! Tipps: 'Evolving Delivery' + Tab Evo: Evolution ON.", "GP: Random Start + GP ON = Programme evolvieren sich!", "F4 Algo-Labor: 20 Algorithmen per Klick testen. Viel Spass!"},
-		WaitInput: "",
-	},
+var (
+	cachedTutorialSteps    []TutorialStep
+	cachedTutorialStepLang locale.Lang
+)
+
+// GetTutorialSteps returns all 15 tutorial steps with localized strings.
+// Results are cached and only rebuilt when the active language changes.
+func GetTutorialSteps() []TutorialStep {
+	if cachedTutorialSteps != nil && cachedTutorialStepLang == locale.GetLang() {
+		return cachedTutorialSteps
+	}
+	steps := []TutorialStep{
+		// Step 0: Welcome
+		{
+			Lines:     [3]string{locale.T("tutorial.0.0"), locale.T("tutorial.0.1"), locale.T("tutorial.0.2")},
+			WaitInput: "",
+		},
+		// Step 1: Modes
+		{
+			Lines:     [3]string{locale.T("tutorial.1.0"), locale.T("tutorial.1.1"), locale.T("tutorial.1.2")},
+			WaitInput: "key:F2",
+		},
+		// Step 2: Editor
+		{
+			Lines:     [3]string{locale.T("tutorial.2.0"), locale.T("tutorial.2.1"), locale.T("tutorial.2.2")},
+			ArrowX:    175, ArrowY: 300,
+			WaitInput: "",
+		},
+		// Step 3: First program
+		{
+			Lines:     [3]string{locale.T("tutorial.3.0"), locale.T("tutorial.3.1"), locale.T("tutorial.3.2")},
+			ArrowX:    100, ArrowY: 36,
+			WaitInput: "click:deploy_any",
+		},
+		// Step 4: Observe
+		{
+			Lines:     [3]string{locale.T("tutorial.4.0"), locale.T("tutorial.4.1"), locale.T("tutorial.4.2")},
+			WaitInput: "timer:300",
+		},
+		// Step 5: Switch program
+		{
+			Lines:     [3]string{locale.T("tutorial.5.0"), locale.T("tutorial.5.1"), locale.T("tutorial.5.2")},
+			ArrowX:    100, ArrowY: 36,
+			WaitInput: "click:deploy_any",
+		},
+		// Step 6: Delivery on
+		{
+			Lines:     [3]string{locale.T("tutorial.6.0"), locale.T("tutorial.6.1"), locale.T("tutorial.6.2")},
+			ArrowX:    88, ArrowY: 680,
+			WaitInput: "click:delivery",
+		},
+		// Step 7: Delivery program
+		{
+			Lines:     [3]string{locale.T("tutorial.7.0"), locale.T("tutorial.7.1"), locale.T("tutorial.7.2")},
+			ArrowX:    100, ArrowY: 36,
+			WaitInput: "click:deploy_any",
+		},
+		// Step 8: Stats
+		{
+			Lines:     [3]string{locale.T("tutorial.8.0"), locale.T("tutorial.8.1"), locale.T("tutorial.8.2")},
+			ArrowX:    600, ArrowY: 15,
+			WaitInput: "",
+		},
+		// Step 9: Bot select
+		{
+			Lines:     [3]string{locale.T("tutorial.9.0"), locale.T("tutorial.9.1"), locale.T("tutorial.9.2")},
+			WaitInput: "click:bot",
+		},
+		// Step 10: Follow-cam info (no key required, just explain)
+		{
+			Lines:     [3]string{locale.T("tutorial.10.0"), locale.T("tutorial.10.1"), locale.T("tutorial.10.2")},
+			WaitInput: "",
+		},
+		// Step 11: Block editor
+		{
+			Lines:     [3]string{locale.T("tutorial.11.0"), locale.T("tutorial.11.1"), locale.T("tutorial.11.2")},
+			ArrowX:    288, ArrowY: 10,
+			WaitInput: "click:blocks",
+		},
+		// Step 12: Tabs
+		{
+			Lines:     [3]string{locale.T("tutorial.12.0"), locale.T("tutorial.12.1"), locale.T("tutorial.12.2")},
+			ArrowX:    175, ArrowY: 650,
+			WaitInput: "",
+		},
+		// Step 13: Help
+		{
+			Lines:     [3]string{locale.T("tutorial.13.0"), locale.T("tutorial.13.1"), locale.T("tutorial.13.2")},
+			WaitInput: "key:H",
+		},
+		// Step 14: Finish
+		{
+			Lines:     [3]string{locale.T("tutorial.14.0"), locale.T("tutorial.14.1"), locale.T("tutorial.14.2")},
+			WaitInput: "",
+		},
+	}
+	cachedTutorialSteps = steps
+	cachedTutorialStepLang = locale.GetLang()
+	return steps
 }
 
 var (
@@ -129,13 +143,14 @@ var (
 
 // DrawTutorial renders the tutorial overlay.
 func DrawTutorial(screen *ebiten.Image, tut *TutorialState, tick int) {
-	if !tut.Active || tut.Step < 0 || tut.Step >= len(TutorialSteps) {
+	steps := GetTutorialSteps()
+	if !tut.Active || tut.Step < 0 || tut.Step >= len(steps) {
 		return
 	}
 
 	sw := screen.Bounds().Dx()
 	sh := screen.Bounds().Dy()
-	step := TutorialSteps[tut.Step]
+	step := steps[tut.Step]
 
 	// Semi-transparent overlay
 	vector.DrawFilledRect(screen, 0, 0, float32(sw), float32(sh), colorTutBg, false)
@@ -151,7 +166,7 @@ func DrawTutorial(screen *ebiten.Image, tut *TutorialState, tick int) {
 	vector.StrokeRect(screen, float32(boxX), float32(boxY), float32(boxW), float32(boxH), 2, colorTutBorder, false)
 
 	// Step indicator
-	stepText := fmt.Sprintf("Schritt %d / %d", tut.Step+1, len(TutorialSteps))
+	stepText := locale.Tf("tutorial.step_fmt", tut.Step+1, len(steps))
 	printColoredAt(screen, stepText, boxX+10, boxY+6, colorTutStep)
 
 	// Text lines
@@ -184,12 +199,12 @@ func DrawTutorial(screen *ebiten.Image, tut *TutorialState, tick int) {
 			btnColor = colorTutBtnH
 		}
 		vector.DrawFilledRect(screen, float32(btnX), float32(btnY), float32(btnW), 22, btnColor, false)
-		printColoredAt(screen, "Weiter >", btnX+10, btnY+4, colorTutText)
+		printColoredAt(screen, locale.T("tutorial.next"), btnX+10, btnY+4, colorTutText)
 	} else {
 		// Show hint about what input is expected
 		hint := tutorialInputHint(step.WaitInput)
 		if hint != "" {
-			printColoredAt(screen, hint, boxX+boxW-len(hint)*charW-15, btnY+4, colorTutDim)
+			printColoredAt(screen, hint, boxX+boxW-runeLen(hint)*charW-15, btnY+4, colorTutDim)
 		}
 	}
 
@@ -197,7 +212,7 @@ func DrawTutorial(screen *ebiten.Image, tut *TutorialState, tick int) {
 	skipW := 100
 	skipX := boxX + 10
 	vector.DrawFilledRect(screen, float32(skipX), float32(btnY), float32(skipW), 22, color.RGBA{60, 30, 30, 200}, false)
-	printColoredAt(screen, "Ueberspringen", skipX+5, btnY+4, colorTutDim)
+	printColoredAt(screen, locale.T("tutorial.skip"), skipX+5, btnY+4, colorTutDim)
 }
 
 func drawTutorialArrow(screen *ebiten.Image, tx, ty, bx, by, pulse int) {
@@ -243,22 +258,22 @@ func drawTutorialArrow(screen *ebiten.Image, tx, ty, bx, by, pulse int) {
 func tutorialInputHint(waitInput string) string {
 	switch waitInput {
 	case "key:F2":
-		return "[Druecke F2]"
+		return locale.T("tutorial.hint.f2")
 	case "key:F":
-		return "[Druecke F]"
+		return locale.T("tutorial.hint.f")
 	case "key:H":
-		return "[Druecke H]"
+		return locale.T("tutorial.hint.h")
 	case "click:deploy_any":
-		return "[Waehle Preset + DEPLOY]"
+		return locale.T("tutorial.hint.deploy")
 	case "click:delivery":
-		return "[Klicke Delivery]"
+		return locale.T("tutorial.hint.delivery")
 	case "click:bot":
-		return "[Klicke einen Bot]"
+		return locale.T("tutorial.hint.bot")
 	case "click:blocks":
-		return "[Klicke BLOCKS]"
+		return locale.T("tutorial.hint.blocks")
 	}
 	if len(waitInput) > 6 && waitInput[:6] == "timer:" {
-		return "[Warte...]"
+		return locale.T("tutorial.hint.wait")
 	}
 	return ""
 }
@@ -266,10 +281,11 @@ func tutorialInputHint(waitInput string) string {
 // TutorialWeiterHitTest checks if "Weiter" or "Ueberspringen" was clicked.
 // Returns "weiter", "skip", or "".
 func TutorialWeiterHitTest(mx, my, sw, sh int, tut *TutorialState) string {
-	if !tut.Active || tut.Step < 0 || tut.Step >= len(TutorialSteps) {
+	steps := GetTutorialSteps()
+	if !tut.Active || tut.Step < 0 || tut.Step >= len(steps) {
 		return ""
 	}
-	step := TutorialSteps[tut.Step]
+	step := steps[tut.Step]
 
 	boxW := 700
 	boxH := 110

@@ -3,9 +3,9 @@ package render
 import (
 	"bytes"
 	"encoding/binary"
-	"fmt"
 	"math"
 	"math/rand"
+	"swarmsim/logger"
 
 	"github.com/hajimehoshi/ebiten/v2/audio"
 )
@@ -136,7 +136,7 @@ func (ss *SoundSystem) StartAmbient() {
 	ss.ambientStream.pos = 0
 	player, err := ss.ctx.NewPlayer(ss.ambientStream)
 	if err != nil {
-		fmt.Println("[SOUND] Error creating ambient player:", err)
+		logger.Error("SOUND", "Error creating ambient player: %v", err)
 		return
 	}
 	ss.ambientPlayer = player

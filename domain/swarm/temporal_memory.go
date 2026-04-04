@@ -113,12 +113,7 @@ func TickTemporalMemory(ss *SwarmState) {
 			if dist > 5 {
 				targetAngle := math.Atan2(dy, dx)
 				diff := targetAngle - bot.Angle
-				for diff > math.Pi {
-					diff -= 2 * math.Pi
-				}
-				for diff < -math.Pi {
-					diff += 2 * math.Pi
-				}
+				diff = WrapAngle(diff)
 				bot.Angle += diff * 0.1
 				bot.Speed *= 1.1
 			}

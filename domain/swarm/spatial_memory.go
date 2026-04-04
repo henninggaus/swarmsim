@@ -210,12 +210,7 @@ func smReadAndNavigate(ss *SwarmState, sm *SpatialMemoryState, bot *SwarmBot) {
 	if bestScore > -999 && (bestDX != 0 || bestDY != 0) {
 		targetAngle := math.Atan2(bestDY, bestDX)
 		diff := targetAngle - bot.Angle
-		for diff > math.Pi {
-			diff -= 2 * math.Pi
-		}
-		for diff < -math.Pi {
-			diff += 2 * math.Pi
-		}
+		diff = WrapAngle(diff)
 		bot.Angle += diff * 0.05 // gentle nudge
 	}
 }

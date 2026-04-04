@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"image/color"
 	"swarmsim/domain/swarm"
+	"swarmsim/locale"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/vector"
@@ -28,15 +29,15 @@ func DrawSpeciationOverlay(screen *ebiten.Image, ss *swarm.SwarmState) {
 		1, color.RGBA{80, 80, 120, 255}, false)
 
 	// Title
-	printColoredAt(screen, "ARTBILDUNG (Speciation)", x+5, y+5, color.RGBA{255, 220, 100, 255})
-	printColoredAt(screen, fmt.Sprintf("Arten: %d  Schwelle: %.2f", len(spec.Species), spec.Threshold),
+	printColoredAt(screen, locale.T("speciation.title"), x+5, y+5, color.RGBA{255, 220, 100, 255})
+	printColoredAt(screen, locale.Tf("speciation.species_threshold", len(spec.Species), spec.Threshold),
 		x+5, y+18, color.RGBA{180, 180, 200, 255})
 
 	// Species list (top section)
 	ly := y + 34
 	for i, sp := range spec.Species {
 		if i >= 8 {
-			printColoredAt(screen, fmt.Sprintf("... +%d weitere", len(spec.Species)-8), x+5, ly, color.RGBA{120, 120, 140, 200})
+			printColoredAt(screen, locale.Tf("speciation.more", len(spec.Species)-8), x+5, ly, color.RGBA{120, 120, 140, 200})
 			break
 		}
 		col := color.RGBA{sp.Color[0], sp.Color[1], sp.Color[2], 255}
@@ -56,7 +57,7 @@ func DrawSpeciationOverlay(screen *ebiten.Image, ss *swarm.SwarmState) {
 
 	histLen := len(spec.History)
 	if histLen < 2 {
-		printColoredAt(screen, "Warte auf Generationsdaten...", x+10, chartY+20, color.RGBA{100, 100, 120, 200})
+		printColoredAt(screen, locale.T("speciation.waiting"), x+10, chartY+20, color.RGBA{100, 100, 120, 200})
 		return
 	}
 
@@ -96,5 +97,5 @@ func DrawSpeciationOverlay(screen *ebiten.Image, ss *swarm.SwarmState) {
 	}
 
 	// Chart label
-	printColoredAt(screen, "Artenzusammensetzung", x+5, chartY-10, color.RGBA{150, 150, 170, 200})
+	printColoredAt(screen, locale.T("speciation.composition"), x+5, chartY-10, color.RGBA{150, 150, 170, 200})
 }

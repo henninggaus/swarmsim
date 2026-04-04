@@ -93,7 +93,7 @@ func (r *Renderer) drawMinimap(screen *ebiten.Image, s *simulation.Simulation, s
 	vy := my + float32(tly*scaleY)
 	vw := float32((brx - tlx) * scaleX)
 	vh := float32((bry - tly) * scaleY)
-	vector.StrokeRect(screen, vx, vy, vw, vh, 1, color.RGBA{255, 255, 255, 200}, false)
+	vector.StrokeRect(screen, vx, vy, vw, vh, 1, ColorWhiteFaded, false)
 }
 
 // drawSwarmMinimap renders the swarm-mode minimap in the bottom-right of the arena viewport.

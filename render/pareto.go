@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"image/color"
 	"swarmsim/domain/swarm"
+	"swarmsim/locale"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/vector"
@@ -28,23 +29,23 @@ func DrawParetoOverlay(screen *ebiten.Image, ss *swarm.SwarmState) {
 		float32(panelW), float32(panelH), 1, color.RGBA{200, 100, 255, 180}, false)
 
 	// Title
-	printColoredAt(screen, "PARETO-FRONT", px+6, py+4, color.RGBA{200, 130, 255, 255})
+	printColoredAt(screen, locale.T("pareto.title"), px+6, py+4, color.RGBA{200, 130, 255, 255})
 
 	y := py + 22
 	objNames := swarm.ObjectiveNames()
 
 	// Front stats
-	printColoredAt(screen, fmt.Sprintf("Front-Groesse: %d", swarm.ParetoFrontSize(pf)),
-		px+8, y, color.RGBA{180, 180, 180, 255})
+	printColoredAt(screen, locale.Tf("pareto.front_size", swarm.ParetoFrontSize(pf)),
+		px+8, y, ColorMediumGray)
 	y += lineH + 2
 
-	printColoredAt(screen, fmt.Sprintf("Fronts: %d", len(pf.Fronts)),
-		px+8, y, color.RGBA{180, 180, 180, 255})
+	printColoredAt(screen, locale.Tf("pareto.fronts_count", len(pf.Fronts)),
+		px+8, y, ColorMediumGray)
 	y += lineH + 4
 
 	// Objective ranges for Pareto front (rank 0)
 	if len(pf.Fronts) > 0 && len(pf.Fronts[0]) > 0 && len(pf.Objectives) > 0 {
-		printColoredAt(screen, "Ziele (Front 0):", px+8, y, color.RGBA{140, 150, 170, 255})
+		printColoredAt(screen, locale.T("pareto.objectives"), px+8, y, color.RGBA{140, 150, 170, 255})
 		y += lineH + 2
 
 		numObj := len(pf.Objectives[0])
@@ -62,7 +63,7 @@ func DrawParetoOverlay(screen *ebiten.Image, ss *swarm.SwarmState) {
 			}
 
 			label := fmt.Sprintf("%s: %.0f-%.0f", objNames[obj], minV, maxV)
-			col := color.RGBA{180, 180, 180, 255}
+			col := ColorMediumGray
 			switch obj {
 			case 0:
 				col = color.RGBA{100, 255, 150, 255} // green for deliveries

@@ -190,12 +190,7 @@ func ApplyShepherd(bot *SwarmBot, ss *SwarmState, idx int) {
 	dy := goalY - bot.Y
 	targetAngle := math.Atan2(dy, dx)
 	diff := targetAngle - bot.Angle
-	for diff > math.Pi {
-		diff -= 2 * math.Pi
-	}
-	for diff < -math.Pi {
-		diff += 2 * math.Pi
-	}
+	diff = WrapAngle(diff)
 	if diff > shepherdSteerRate {
 		diff = shepherdSteerRate
 	} else if diff < -shepherdSteerRate {
@@ -236,12 +231,7 @@ func applyFlockFlee(bot *SwarmBot, ss *SwarmState, idx int) {
 	if shepherdCount > 0 {
 		fleeAngle := math.Atan2(fleeY, fleeX)
 		diff := fleeAngle - bot.Angle
-		for diff > math.Pi {
-			diff -= 2 * math.Pi
-		}
-		for diff < -math.Pi {
-			diff += 2 * math.Pi
-		}
+		diff = WrapAngle(diff)
 		steer := shepherdDrivePower
 		if diff > steer {
 			diff = steer

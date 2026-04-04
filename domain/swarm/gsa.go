@@ -1,6 +1,9 @@
 package swarm
 
-import "math"
+import (
+	"math"
+	"sort"
+)
 
 // Gravitational Search Algorithm (GSA): Physics-inspired metaheuristic where
 // agents are masses that interact via Newtonian gravity. Fitter agents have
@@ -28,7 +31,7 @@ const (
 	gsaSpeedMult   = 5.0    // movement speed multiplier (5.0 * 1.5 = 7.5 px/tick)
 	gsaGridRescanRate = 300  // periodic grid rescan every N ticks
 	gsaGridRescanSize = 14   // grid resolution (14×14 = 196 samples)
-	gsaGridInjectTop  = 10   // best grid positions to inject per rescan
+	gsaGridInjectTop  = AlgoGridInjectTop // best grid positions to inject per rescan
 	gsaDirectProb     = 0.55 // max direct-to-best probability in late phase
 )
 
@@ -357,9 +360,6 @@ func gsaGridRescan(ss *SwarmState, st *GSAState) {
 	usableH := ss.ArenaH - 2*margin
 	n := len(ss.Bots)
 
-	type gridPt struct {
-		x, y, f float64
-	}
 	gridPts := make([]gridPt, 0, gsaGridRescanSize*gsaGridRescanSize)
 	for gx := 0; gx < gsaGridRescanSize; gx++ {
 		for gy := 0; gy < gsaGridRescanSize; gy++ {
@@ -374,13 +374,7 @@ func gsaGridRescan(ss *SwarmState, st *GSAState) {
 	}
 
 	// Sort grid points by fitness descending
-	for i := 0; i < len(gridPts)-1; i++ {
-		for j := i + 1; j < len(gridPts); j++ {
-			if gridPts[j].f > gridPts[i].f {
-				gridPts[i], gridPts[j] = gridPts[j], gridPts[i]
-			}
-		}
-	}
+	sort.Slice(gridPts, func(i, j int) bool { return gridPts[i].f > gridPts[j].f })
 
 	// Update GlobalBest from grid findings
 	if len(gridPts) > 0 && gridPts[0].f > st.GlobalBestF {
@@ -390,22 +384,12 @@ func gsaGridRescan(ss *SwarmState, st *GSAState) {
 	}
 
 	// Find worst agents by fitness
-	type idxFit struct {
-		idx int
-		f   float64
-	}
 	agents := make([]idxFit, n)
 	for i := range ss.Bots {
 		agents[i] = idxFit{i, st.Fitness[i]}
 	}
 	// Sort ascending by fitness (worst first)
-	for i := 0; i < len(agents)-1; i++ {
-		for j := i + 1; j < len(agents); j++ {
-			if agents[j].f < agents[i].f {
-				agents[i], agents[j] = agents[j], agents[i]
-			}
-		}
-	}
+	sort.Slice(agents, func(i, j int) bool { return agents[i].f < agents[j].f })
 
 	// Teleport worst agents to best grid points
 	inject := gsaGridInjectTop

@@ -27,9 +27,9 @@ const (
 	deSpeedMult = 5.0   // movement speed multiplier (7.5 px/tick)
 
 	// Grid scan parameters
-	deInitGridSide       = 20  // initial grid scan side (20x20=400)
+	deInitGridSide       = AlgoGridRescanSize // initial grid scan side (20x20=400)
 	deGridRescanInterval = 150 // ticks between grid re-scans
-	deGridRescanSide     = 20  // grid side for re-scan (20x20=400)
+	deGridRescanSide     = AlgoGridRescanSize // grid side for re-scan (20x20=400)
 	deGridInjectCount    = 15  // best grid positions to inject per rescan
 
 	// Direct-to-Best parameters
@@ -105,9 +105,6 @@ func deInitialGridScan(ss *SwarmState) {
 	usableW := ss.ArenaW - 2*margin
 	usableH := ss.ArenaH - 2*margin
 
-	type gridPt struct {
-		x, y, f float64
-	}
 	pts := make([]gridPt, 0, deInitGridSide*deInitGridSide)
 	for gx := 0; gx < deInitGridSide; gx++ {
 		for gy := 0; gy < deInitGridSide; gy++ {
@@ -139,10 +136,6 @@ func deInitialGridScan(ss *SwarmState) {
 	}
 
 	// Find worst bots by fitness.
-	type idxFit struct {
-		idx int
-		f   float64
-	}
 	ranked := make([]idxFit, n)
 	for i := 0; i < n; i++ {
 		ranked[i] = idxFit{i, st.Fitness[i]}
@@ -351,9 +344,6 @@ func dePeriodicGridRescan(ss *SwarmState) {
 	usableW := ss.ArenaW - 2*margin
 	usableH := ss.ArenaH - 2*margin
 
-	type gridPt struct {
-		x, y, f float64
-	}
 	pts := make([]gridPt, 0, deGridRescanSide*deGridRescanSide)
 	for gx := 0; gx < deGridRescanSide; gx++ {
 		for gy := 0; gy < deGridRescanSide; gy++ {
@@ -382,10 +372,6 @@ func dePeriodicGridRescan(ss *SwarmState) {
 		inject = len(pts)
 	}
 
-	type idxFit struct {
-		idx int
-		f   float64
-	}
 	ranked := make([]idxFit, n)
 	for i := 0; i < n; i++ {
 		ranked[i] = idxFit{i, st.Fitness[i]}

@@ -1,6 +1,9 @@
 package swarm
 
-import "math"
+import (
+	"math"
+	"sort"
+)
 
 // Cuckoo Search Algorithm (CS): Meta-heuristic inspired by the brood
 // parasitism of cuckoo birds combined with Lévy flight exploration.
@@ -35,7 +38,7 @@ const (
 	// Grid rescan parameters
 	csGridRescanRate = 150 // periodic grid rescan every N ticks
 	csGridRescanSize = 18  // grid resolution (18×18 = 324 samples)
-	csGridInjectTop  = 10  // top grid points injected into worst nests
+	csGridInjectTop  = AlgoGridInjectTop // top grid points injected into worst nests
 
 	// Direct-to-best parameters
 	csDirectToBestStart = 0.20 // progress threshold to start direct-to-best
@@ -318,9 +321,6 @@ func csGridRescan(ss *SwarmState, st *CuckooState) {
 	usableH := ss.ArenaH - 2*margin
 	n := len(ss.Bots)
 
-	type gridPt struct {
-		x, y, f float64
-	}
 	gridPts := make([]gridPt, 0, csGridRescanSize*csGridRescanSize)
 	for gx := 0; gx < csGridRescanSize; gx++ {
 		for gy := 0; gy < csGridRescanSize; gy++ {
@@ -334,13 +334,7 @@ func csGridRescan(ss *SwarmState, st *CuckooState) {
 	}
 
 	// Sort grid points by fitness descending
-	for i := 0; i < len(gridPts)-1; i++ {
-		for j := i + 1; j < len(gridPts); j++ {
-			if gridPts[j].f > gridPts[i].f {
-				gridPts[i], gridPts[j] = gridPts[j], gridPts[i]
-			}
-		}
-	}
+	sort.Slice(gridPts, func(i, j int) bool { return gridPts[i].f > gridPts[j].f })
 
 	// Update GlobalBest from grid findings
 	if len(gridPts) > 0 && gridPts[0].f > st.GlobalBestF {
@@ -350,21 +344,11 @@ func csGridRescan(ss *SwarmState, st *CuckooState) {
 	}
 
 	// Find worst nests by fitness
-	type idxFit struct {
-		idx int
-		f   float64
-	}
 	nests := make([]idxFit, n)
 	for i := range ss.Bots {
 		nests[i] = idxFit{i, st.Fitness[i]}
 	}
-	for i := 0; i < len(nests)-1; i++ {
-		for j := i + 1; j < len(nests); j++ {
-			if nests[j].f < nests[i].f {
-				nests[i], nests[j] = nests[j], nests[i]
-			}
-		}
-	}
+	sort.Slice(nests, func(i, j int) bool { return nests[i].f < nests[j].f })
 
 	// Teleport worst nests to best grid points
 	inject := csGridInjectTop

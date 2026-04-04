@@ -112,12 +112,7 @@ func TickWave(ss *SwarmState) {
 
 		// Check if wave front is passing this bot
 		phaseDiff := st.Phase - botPhase
-		for phaseDiff > math.Pi {
-			phaseDiff -= 2 * math.Pi
-		}
-		for phaseDiff < -math.Pi {
-			phaseDiff += 2 * math.Pi
-		}
+		phaseDiff = WrapAngle(phaseDiff)
 
 		// Flash when phase difference is small (wave front nearby)
 		if math.Abs(phaseDiff) < 0.3 {

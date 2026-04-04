@@ -31,12 +31,12 @@ const (
 	bfoGBestWEnd       = 0.80  // global-best attraction weight at end (stronger convergence)
 	bfoSpeedMult       = 5.0   // movement speed multiplier (5x = 7.5 px/tick)
 	bfoGridRescanRate  = 120   // periodic grid rescan every N ticks (more frequent)
-	bfoGridRescanSide  = 20    // grid resolution (20x20 = 400 samples)
+	bfoGridRescanSide  = AlgoGridRescanSize // grid resolution (20x20 = 400 samples)
 	bfoGridInjectTop   = 15    // best grid positions to inject (more replacement)
 	bfoDtbStartProg    = 0.10  // direct-to-best starts earlier
 	bfoDtbMaxProb      = 0.85  // max probability of direct-to-best (stronger)
 	bfoLocalWalkR      = 40.0  // best-bot local random walk radius
-	bfoInitGridSide    = 20    // initial grid scan resolution (20x20 = 400 samples)
+	bfoInitGridSide    = AlgoGridRescanSize // initial grid scan resolution (20x20 = 400 samples)
 )
 
 // BFOState holds Bacterial Foraging Optimization state.
@@ -479,9 +479,6 @@ func bfoGridRescan(ss *SwarmState) {
 	aw := ss.ArenaW
 	ah := ss.ArenaH
 
-	type gridPt struct {
-		x, y, f float64
-	}
 	topPts := make([]gridPt, 0, bfoGridInjectTop)
 
 	for gx := 0; gx < bfoGridRescanSide; gx++ {
@@ -522,10 +519,6 @@ func bfoGridRescan(ss *SwarmState) {
 	}
 
 	// Find worst-fitness bots to replace
-	type idxFit struct {
-		idx int
-		f   float64
-	}
 	worst := make([]idxFit, 0, n)
 	for i := range ss.Bots {
 		if i < len(st.Fitness) {

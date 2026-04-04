@@ -9,6 +9,7 @@ import (
 	"image/gif"
 	"image/png"
 	"os"
+	"swarmsim/locale"
 	"swarmsim/logger"
 	"sync"
 	"time"
@@ -210,7 +211,7 @@ func DrawCaptureOverlay(screen *ebiten.Image, r *Renderer) {
 		}
 		text := r.OverlayText
 		charW := 6
-		textW := len(text) * charW
+		textW := runeLen(text) * charW
 		barW := textW + 30
 		barH := 28
 		x := sw - barW - 20
@@ -243,8 +244,8 @@ func DrawCaptureOverlay(screen *ebiten.Image, r *Renderer) {
 		spinChars := []string{"|", "/", "-", "\\"}
 		spin := spinChars[(r.RecBlinkTick/8)%4]
 		r.RecBlinkTick++
-		text := fmt.Sprintf("GIF wird erstellt... %s  (Bitte warten)", spin)
-		textW := len(text) * 6
+		text := locale.Tf("capture.gif_encoding", spin)
+		textW := runeLen(text) * 6
 		x := sw/2 - textW/2
 		y := 5
 		ebitenutil.DrawRect(screen, float64(x-5), float64(y-2), float64(textW+10), 22,
@@ -254,7 +255,7 @@ func DrawCaptureOverlay(screen *ebiten.Image, r *Renderer) {
 
 	// Check if background encoding finished (using mutex-protected snapshot above)
 	if !encoding && encodedFile != "" {
-		r.OverlayText = "GIF gespeichert: " + encodedFile
+		r.OverlayText = locale.Tf("capture.gif_saved", encodedFile)
 		r.OverlayTimer = 90
 	}
 
@@ -263,10 +264,10 @@ func DrawCaptureOverlay(screen *ebiten.Image, r *Renderer) {
 		r.RecBlinkTick++
 		// Always show frame count, blink the red dot
 		frameInfo := fmt.Sprintf("REC %d/%d", r.RecFrameCount, gifMaxFrames)
-		recX := sw - len(frameInfo)*6 - 20
+		recX := sw - runeLen(frameInfo)*6 - 20
 		recY := 5
 		// Red background
-		ebitenutil.DrawRect(screen, float64(recX-4), float64(recY-2), float64(len(frameInfo)*6+12), 18,
+		ebitenutil.DrawRect(screen, float64(recX-4), float64(recY-2), float64(runeLen(frameInfo)*6+12), 18,
 			color.RGBA{150, 0, 0, 200})
 		// Blinking dot
 		if (r.RecBlinkTick/15)%2 == 0 {
@@ -274,7 +275,7 @@ func DrawCaptureOverlay(screen *ebiten.Image, r *Renderer) {
 		}
 		printColoredAt(screen, frameInfo, recX+8, recY, color.RGBA{255, 120, 120, 255})
 		// Progress bar under REC indicator
-		barW := float32(len(frameInfo)*6 + 8)
+		barW := float32(runeLen(frameInfo)*6 + 8)
 		progress := float32(r.RecFrameCount) / float32(gifMaxFrames)
 		ebitenutil.DrawRect(screen, float64(recX-2), float64(recY+16), float64(barW), 3,
 			color.RGBA{60, 0, 0, 200})

@@ -2,7 +2,102 @@
 
 All notable changes to SwarmSim are documented in this file.
 
+## [Unreleased] - 2026-04-02
+
+### Added
+
+- **Factory Mode (F5)**: Complete warehouse logistics simulation with 1000+ autonomous robots
+  - 3 robot types: Transporter, Forklift, Express (different speed/energy profiles)
+  - Predefined factory layout with halls, loading docks, machines, storage zones
+  - Task queue with Kanban-style assignment and priority scheduling
+  - Multi-step production recipes with machine processing
+  - Truck lifecycle: inbound (raw materials) and outbound (finished goods)
+  - Energy economics with day/night pricing and charging stations
+  - Budget management (buy/sell bots, energy costs, revenue from deliveries)
+  - Shift system with handover and off-duty parking
+  - Maintenance planner (P key) with scheduled repairs and malfunction detection
+  - Customer order system with deadlines and scoring
+  - Random events system (6 event types affecting production)
+  - Weather system (rain affects bot speed)
+  - Bot experience and efficiency levels
+  - Heatmap for traffic density visualization (M key)
+  - Follow-cam for individual bot tracking (F key)
+  - Minimap with click-to-jump navigation
+  - Stats clipboard export (X key)
+  - Spark effects for malfunctions, machine completion FX
+  - Emergency mode (E key) halts truck/task operations
+- **Live Math Overlay (K key)**: Real-time formula visualization for all 20+ optimization algorithms
+  - 4 color-coded step types: Input (blue), Intermediate (yellow), Output (green), Branch (orange)
+  - MathTrace/MathStep types in domain/swarm/math_trace.go
+  - 20 trace functions in math_trace_algos.go (PSO, GWO, WOA, SCA, DE, Cuckoo, ABC, BFO, MFO, Bat, HHO, SSA, GSA, FPA, SA, AO, DA, TLBO, EO, Jaya)
+  - Rendering overlay in render/swarm_render_math.go
+- **i18n System**: Full internationalization with 7 languages
+  - Languages: DE, EN, FR, ES, PT, IT, UK (Ukrainian)
+  - 1325+ translation keys organized by prefix
+  - Core functions: T() for lookup, Tf() for formatted, Tn() for pluralization
+  - Persistent language preference (SaveLang/LoadLang)
+  - Thread-safe with sync.RWMutex
+  - CLI consistency checker: cmd/locale-check/
+- **Unicode Font Rendering**: JetBrains Mono TTF via text/v2
+  - Full Unicode support including Cyrillic (Ukrainian)
+  - GPU text image cache with printColoredAt
+  - 512-entry LRU text cache with 120-frame eviction
+- **Algorithm Registry**: Central dispatch table for algorithm lifecycle
+  - Eliminates large switch statements for algorithm management
+  - Single-location registration for new algorithms
+  - Optional query functions: bestFitness, avgFitnessVals, bestPos, explorationRatio
+  - Math trace hook integration
+- **Algo-Labor Mode (F4)**: Dedicated optimization algorithm comparison
+  - Radar chart comparing convergence, diversity, speed, stability
+  - Tournament mode with round-robin algorithm competition
+  - 7 fitness landscapes: Gaussian Peaks, Rastrigin, Ackley, Rosenbrock, Schwefel, Griewank, Levy
+  - Side-by-side algorithm comparison view
+  - Algorithm-specific overlays
+- **Additional Algorithms**: TLBO, EO, Jaya added to the optimization suite
+- **Shared Algorithm Utilities**: algo_common.go with gridPt, idxFit types and shared constants
+- **Swarm Steering Utilities**: WrapAngle, steerToward, Levy flight helpers in swarm_steering.go
+- **Self-Programming Swarm (Collective AI)**: Bots detect problems autonomously, AI generates SwarmScript solutions, proven code spreads through the swarm
+- **Claude API Backend**: Optional real LLM integration for code generation (set ANTHROPIC_API_KEY)
+- **Learning System**: 12 interactive lessons (Beginner/Intermediate/Advanced) with star-rated challenges
+- **Emergence Detection**: Real-time recognition of 6 swarm behavior patterns with explanatory popups
+- **Keyboard Shortcut Card**: Press ? for quick reference of all shortcuts
+- **Parameter Tweaker**: Real-time parameter adjustment without redeploying (Shift+P)
+- **Performance Monitor**: FPS, tick time, spatial hash stats (F12)
+- **Bot Comparison**: Shift+Click to compare two bots side-by-side
+- **Auto-Save**: Ctrl+S saves session, auto-restores on next launch
+- **Zoom-to-Fit**: Press 0 to auto-zoom to fit all bots
+- **Button hover/press feedback, deploy success toast, confirmation dialogs**
+
+### Changed
+
+- **Replaced DebugPrintAt with text/v2**: Full Unicode rendering replaces ASCII-only debug text
+- **Replaced 24 bubble sorts with sort.Slice**: Performance improvement across algorithm files
+- **Extracted 45 angle normalizations to WrapAngle()**: Centralized in swarm_steering.go
+- **Split main.go** (2733 lines to 6 files): main.go, game_update.go, game_draw.go, input.go, swarm_input.go, block_editor.go
+- **Split swarm_render.go** (4738 lines to 5+ files): swarm_render.go, swarm_render_algo.go, swarm_render_algo_compare.go, swarm_render_algo_overlays.go, swarm_render_delivery.go, swarm_render_info.go, swarm_render_overlay.go
+- **Split swarm_ai.go** (3371 lines to 3 files): swarm_ai.go, swarm_ai_program.go, swarm_ai_physics.go
+- **Centralized color constants**: render/colors.go replaces scattered color definitions
+- **Refactored algorithm registration**: From switch statements to registry map pattern
+- **Tutorial system**: Refactored with persistent completion tracking and localized steps
+- **Welcome screen**: Animated bot background with localized text
+- **Help overlay**: Three-file split (help.go, help_features.go, help_reference.go) with algorithm documentation
+- **Achievement system**: Expanded and localized
+
+### Fixed
+
+- **SCA**: 6 bugs fixed (stale GlobalBestIdx, redundant steerToward, incorrect phase branching, missing cycle reset, grid injection targeting, r3 bias calculation)
+- **Race condition in locale.go**: Added sync.RWMutex for thread-safe translations
+- **Text cache memory leak**: Added 512-entry LRU cap with 120-frame eviction
+- **Factory storage indexing**: Explicit named indices replace magic numbers
+- **Algorithm angle wrapping**: 45 inconsistent normalizations replaced with WrapAngle()
+- **Bubble sort performance**: 24 O(n^2) sorts replaced with sort.Slice
+- **Factory bot slice sync**: All parallel per-bot slices (Roles, Malfunctioning, OpHours, etc.) kept in sync during add/remove
+- **Parking slot computation**: O(n) pre-computation replaces O(n^2) per-bot search
+- **Stale task pruning**: Factory tasks pruned every 100 ticks to prevent queue growth
+
 ## Einzelverbesserungen
+
+- **SCA Tuning v4: Mass-Convergence + Spaetphasen-Lokalwalk + Sqrt-DTB-Ramp + Grid-Jitter** — Sine Cosine Algorithm (SCA) war der absolut schwaechste Algorithmus im Gesamtdurchschnitt (AvgAvg 100.64 ueber 7 Landschaften) mit den zwei schlechtesten Einzelkombinationen: Rastrigin Avg 85.96 und Ackley Avg 88.03. Trotz dreimaligem Tuning (v1: Eigenbewegung, v2: Grid-Scan/Scout-Bots, v3: Dual-Grid/DTB/GB-Boost/r3-Bias) blieb SCA weit zurueck. Kernproblem: Die SCA-Oszillationsformel (r1*sin(r2)*|r3*dest-X|) erzeugt Offsets proportional zur Distanz in zufaelliger Richtung — auf multimodalen Landschaften (Rastrigin, Ackley) werden Bots dadurch zu entfernten lokalen Optima geschleudert, selbst wenn DTB 90%+ erreicht. Vier Verbesserungen: (1) **Periodische Mass-Convergence (alle 40 Ticks ab Tick 120)**: Die schlechtesten 50% der Bots werden direkt zum GlobalBest teleportiert (±8px Jitter). Effektiver als Grid-Injection, weil gezielt zum bekannten Optimum statt zur Landschaftsabtastung. (2) **Spaetphasen-Lokalwalk statt SCA-Dynamik (ab progress>0.40)**: Bots die nicht DTB machen, fuehren einen schrumpfenden Random Walk (80→15px) um GlobalBest durch statt die streuende SCA-Formel zu nutzen. Eliminiert die Hauptquelle der Streuung komplett. (3) **Sqrt-DTB-Ramp**: DTB-Wahrscheinlichkeit steigt mit Wurzelfunktion statt linear — erreicht 50% bei progress~0.30 statt ~0.50. DTB-Max auf 97% erhoeht, Start auf progress=0.07 vorgezogen. DTB-Jitter von ±7.5px auf ±5px reduziert. (4) **Grid-Rescan Jitter (15%)**: Periodische Grid-Rescans verschieben Rasterpunkte zufaellig um bis zu 15% der Zellbreite — evaluiert bei jedem Rescan andere Positionen. GB-Attraktion auf 90% erhoeht. Benchmark vorher/nachher: Rastrigin Avg 85.96→88.24 (+2.7%); Schwefel Avg 89.63→89.89 (+0.3%); Ackley Avg 88.03→88.26 (+0.3%); Griewank Avg 98.82→98.90 (+0.1%); Rosenbrock Avg 99.97→99.97 (~0%); Levy Avg 99.27→99.25 (~0%); Gaussian Peaks Avg 142.83→142.71 (~0%). Best-Fitness auf 7/7 Landschaften unveraendert bei 100.00. Gesamtdurchschnitt 100.64→101.03 (+0.4%). go build, go vet fehlerfrei, alle Tests gruen.
 
 - **HSO Tuning v4: Groesserer Grid-Jitter + Lokale Verfeinerung nach Grid-Scan + Interpolation zwischen HM-Eintraegen** — Harmony Search (HSO) hatte den absolut niedrigsten Avg-Wert aller Algo/Landschafts-Kombinationen: Avg 67.42 auf Gaussian Peaks, und war insgesamt der zweitschwaechste Algorithmus (Gesamtdurchschnitt 92.55). Trotz dreimaligem Tuning (v1: DTB/Grid-Rescan, v2: haeufigerer Rescan/Local Walk, v3: groesseres Init-Grid/mehr Injection) blieb HSO auf Gaussian Peaks und Schwefel deutlich zurueck. Drei Kernprobleme: (1) Grid-Rescan Jitter war nur 2% der Zellbreite — wiederholte Rescans evaluierten nahezu identische Positionen, sodass schmale Peak-Ueberlappungszonen auf Gaussian Peaks nie gefunden wurden. (2) Kein lokaler Verfeinerungsschritt nach dem Grid-Scan — der beste Grid-Punkt wurde direkt injiziert, ohne die unmittelbare Umgebung fein abzutasten. (3) Improvisation basierte nur auf einzelnen HM-Eintraegen (HMCR + Pitch Adjustment) — keine Kombination zweier guter Positionen, was das Entdecken von Peak-Superpositionszonen verhinderte. Drei Verbesserungen: (1) **Groesserer Grid-Jitter (2%→15%)**: Jeder Grid-Rescan verschiebt Rasterpunkte um bis zu 15% der Zellbreite zufaellig — bei 20 Rescans in 3000 Ticks werden so deutlich mehr verschiedene Positionen evaluiert. Auch der initiale Grid-Scan nutzt 15% Jitter. (2) **Lokale Verfeinerung (10x10 um besten Grid-Punkt)**: Nach jedem Grid-Scan (initial und Rescan) wird ein feines 10x10-Raster (100 Punkte) im Radius 60px um den besten gefundenen Punkt evaluiert — findet praezise Peaks in Ueberlappungszonen. (3) **Interpolation zwischen HM-Eintraegen (20%)**: Mit 20% Wahrscheinlichkeit wird statt der normalen HMCR-Improvisation eine gewichtete Interpolation zwischen zwei tournament-selektierten HM-Eintraegen durchgefuehrt (w*HM[a]+(1-w)*HM[b] mit zufaelligem w). Dies erzeugt Kandidaten zwischen bekannten guten Positionen und kann Peak-Superpositionszonen auf Gaussian Peaks entdecken. Benchmark vorher/nachher: Gaussian Peaks Avg 67.42→71.43 (+6%); Schwefel Avg 91.02→96.56 (+6%); Rastrigin Avg 94.25→95.12 (+0.9%); Rosenbrock Avg 99.90→99.96 (+0.06%); Griewank Avg 99.35→99.46 (+0.1%); Levy Avg 99.89→99.85 (~0%); Ackley Avg 96.02→95.60 (-0.4%). Best-Fitness auf 7/7 Landschaften unveraendert bei 100.00. Gesamtdurchschnitt 92.55→94.00 (+1.6%). go build, go vet fehlerfrei, alle Tests gruen.
 

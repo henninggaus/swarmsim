@@ -120,12 +120,7 @@ func TickSlime(ss *SwarmState) {
 
 		// Encode as angle relative to heading
 		diff := bestAngle - bot.Angle
-		for diff > math.Pi {
-			diff -= 2 * math.Pi
-		}
-		for diff < -math.Pi {
-			diff += 2 * math.Pi
-		}
+		diff = WrapAngle(diff)
 		bot.SlimeGrad = int(diff * 180 / math.Pi)
 	}
 }

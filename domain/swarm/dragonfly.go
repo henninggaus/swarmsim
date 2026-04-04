@@ -35,7 +35,7 @@ const (
 	daSpeedMult        = 5.0  // algoMovBot speed multiplier (7.5 px/tick)
 	daGridRescanRate   = 200  // periodic grid rescan every N ticks
 	daGridRescanSize   = 16   // grid resolution (16×16 = 256 samples)
-	daGridInjectTop    = 10   // inject top N grid positions into worst bots
+	daGridInjectTop    = AlgoGridInjectTop // inject top N grid positions into worst bots
 	daDirectMaxProb    = 0.70 // max probability of direct-to-best at end
 	daDirectStartProg  = 0.20 // progress threshold to start direct-to-best
 	daGBWeightMin      = 0.05 // global-best attraction weight at start
@@ -356,9 +356,6 @@ func daGridRescan(ss *SwarmState, st *DAState) {
 	usableH := ss.ArenaH - 2*margin
 	n := len(ss.Bots)
 
-	type gridPt struct {
-		x, y, f float64
-	}
 	gridPts := make([]gridPt, 0, daGridRescanSize*daGridRescanSize)
 	for gx := 0; gx < daGridRescanSize; gx++ {
 		for gy := 0; gy < daGridRescanSize; gy++ {
@@ -388,10 +385,6 @@ func daGridRescan(ss *SwarmState, st *DAState) {
 	}
 
 	// Find worst bots by fitness
-	type idxFit struct {
-		idx int
-		f   float64
-	}
 	agents := make([]idxFit, n)
 	for i := range ss.Bots {
 		agents[i] = idxFit{i, st.Fitness[i]}

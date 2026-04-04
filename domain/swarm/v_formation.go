@@ -154,12 +154,7 @@ func ApplyVFormation(bot *SwarmBot, ss *SwarmState, idx int) {
 	if idx == st.LeaderIdx {
 		// Leader: fly in migration direction
 		diff := st.MigAngle - bot.Angle
-		for diff > math.Pi {
-			diff -= 2 * math.Pi
-		}
-		for diff < -math.Pi {
-			diff += 2 * math.Pi
-		}
+		diff = WrapAngle(diff)
 		if diff > vfSteerRate {
 			diff = vfSteerRate
 		} else if diff < -vfSteerRate {
@@ -199,12 +194,7 @@ func ApplyVFormation(bot *SwarmBot, ss *SwarmState, idx int) {
 	if dist > 5 {
 		targetAngle := math.Atan2(dy, dx)
 		diff := targetAngle - bot.Angle
-		for diff > math.Pi {
-			diff -= 2 * math.Pi
-		}
-		for diff < -math.Pi {
-			diff += 2 * math.Pi
-		}
+		diff = WrapAngle(diff)
 		if diff > vfSteerRate {
 			diff = vfSteerRate
 		} else if diff < -vfSteerRate {
@@ -215,12 +205,7 @@ func ApplyVFormation(bot *SwarmBot, ss *SwarmState, idx int) {
 	} else {
 		// In position: match leader heading
 		diff := st.MigAngle - bot.Angle
-		for diff > math.Pi {
-			diff -= 2 * math.Pi
-		}
-		for diff < -math.Pi {
-			diff += 2 * math.Pi
-		}
+		diff = WrapAngle(diff)
 		bot.Angle += diff * 0.1
 		bot.Speed = SwarmBotSpeed * 0.95
 	}

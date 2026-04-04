@@ -5,6 +5,7 @@ import (
 	"image/color"
 	"math"
 	"swarmsim/domain/swarm"
+	"swarmsim/locale"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/vector"
@@ -54,16 +55,16 @@ func DrawAchievementPopup(screen *ebiten.Image, ss *swarm.SwarmState) {
 	// Icon + title
 	textAlpha := alpha
 	titleCol := color.RGBA{diffCol[0], diffCol[1], diffCol[2], textAlpha}
-	line1 := fmt.Sprintf("%s  %s", def.Icon, def.Name)
+	line1 := fmt.Sprintf("%s  %s", def.Icon, def.DisplayName())
 	printColoredAt(screen, line1, x+10, y+5, titleCol)
 
 	// Achievement unlocked label
 	unlockCol := color.RGBA{255, 255, 255, textAlpha}
-	printColoredAt(screen, "ERFOLG FREIGESCHALTET!", x+10, y+18, unlockCol)
+	printColoredAt(screen, locale.T("ach.unlocked"), x+10, y+18, unlockCol)
 
 	// Description
 	descCol := color.RGBA{180, 180, 200, textAlpha}
-	printColoredAt(screen, def.Description, x+10, y+33, descCol)
+	printColoredAt(screen, def.DisplayDesc(), x+10, y+33, descCol)
 }
 
 // DrawAchievementOverlay draws the full achievement list panel (Shift+B).
@@ -93,7 +94,7 @@ func DrawAchievementOverlay(screen *ebiten.Image, ss *swarm.SwarmState) {
 		1, color.RGBA{80, 80, 120, 255}, false)
 
 	// Title
-	titleStr := fmt.Sprintf("ERFOLGE  [%d/%d]", as.TotalUnlocked, int(swarm.AchCount))
+	titleStr := fmt.Sprintf("%s  [%d/%d]", locale.T("ach.title"), as.TotalUnlocked, int(swarm.AchCount))
 	printColoredAt(screen, titleStr, x+10, y+5, color.RGBA{255, 220, 100, 255})
 
 	// Progress bar
@@ -123,17 +124,17 @@ func DrawAchievementOverlay(screen *ebiten.Image, ss *swarm.SwarmState) {
 			vector.DrawFilledCircle(screen, float32(x+16), float32(ly+5), 4,
 				color.RGBA{diffCol[0], diffCol[1], diffCol[2], 255}, false)
 			// Name
-			nameCol := color.RGBA{255, 255, 255, 255}
-			printColoredAt(screen, def.Icon+" "+def.Name, x+24, ly, nameCol)
+			nameCol := ColorWhite
+			printColoredAt(screen, def.Icon+" "+def.DisplayName(), x+24, ly, nameCol)
 			// Description (shorter, right-aligned)
 			descCol := color.RGBA{140, 140, 160, 200}
-			printColoredAt(screen, def.Description, x+180, ly, descCol)
+			printColoredAt(screen, def.DisplayDesc(), x+180, ly, descCol)
 		} else {
 			// Locked: gray
 			vector.DrawFilledCircle(screen, float32(x+16), float32(ly+5), 4,
 				color.RGBA{50, 50, 60, 200}, false)
 			lockCol := color.RGBA{80, 80, 100, 150}
-			printColoredAt(screen, "??? "+def.Name, x+24, ly, lockCol)
+			printColoredAt(screen, "??? "+def.DisplayName(), x+24, ly, lockCol)
 		}
 		ly += lineH
 	}

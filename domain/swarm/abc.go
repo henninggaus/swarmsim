@@ -1,6 +1,9 @@
 package swarm
 
-import "math"
+import (
+	"math"
+	"sort"
+)
 
 // Artificial Bee Colony (ABC): A swarm intelligence algorithm inspired by
 // the foraging behaviour of honey bee colonies. The colony consists of three
@@ -415,9 +418,6 @@ func abcGridRescan(ss *SwarmState, st *ABCState) {
 	usableH := ss.ArenaH - 2*margin
 	n := len(ss.Bots)
 
-	type gridPt struct {
-		x, y, f float64
-	}
 	gridPts := make([]gridPt, 0, abcGridSize*abcGridSize)
 	for gx := 0; gx < abcGridSize; gx++ {
 		for gy := 0; gy < abcGridSize; gy++ {
@@ -431,13 +431,7 @@ func abcGridRescan(ss *SwarmState, st *ABCState) {
 	}
 
 	// Sort grid points by fitness descending.
-	for i := 0; i < len(gridPts)-1; i++ {
-		for j := i + 1; j < len(gridPts); j++ {
-			if gridPts[j].f > gridPts[i].f {
-				gridPts[i], gridPts[j] = gridPts[j], gridPts[i]
-			}
-		}
-	}
+	sort.Slice(gridPts, func(i, j int) bool { return gridPts[i].f > gridPts[j].f })
 
 	// Update GlobalBest from grid findings.
 	if len(gridPts) > 0 && gridPts[0].f > st.GlobalBestF {
@@ -447,22 +441,12 @@ func abcGridRescan(ss *SwarmState, st *ABCState) {
 	}
 
 	// Find worst bees by fitness.
-	type idxFit struct {
-		idx int
-		f   float64
-	}
 	bees := make([]idxFit, n)
 	for i := range ss.Bots {
 		bees[i] = idxFit{i, st.Fitness[i]}
 	}
 	// Sort ascending (worst first).
-	for i := 0; i < len(bees)-1; i++ {
-		for j := i + 1; j < len(bees); j++ {
-			if bees[j].f < bees[i].f {
-				bees[i], bees[j] = bees[j], bees[i]
-			}
-		}
-	}
+	sort.Slice(bees, func(i, j int) bool { return bees[i].f < bees[j].f })
 
 	// Teleport worst bees to best grid points (only bees significantly below GlobalBest).
 	inject := abcGridInjectTop

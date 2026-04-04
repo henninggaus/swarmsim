@@ -197,9 +197,6 @@ func jayaGridRescan(ss *SwarmState, st *JayaState) {
 		return
 	}
 
-	type gridPt struct {
-		x, y, f float64
-	}
 	gridPts := make([]gridPt, 0, jayaGridSide*jayaGridSide)
 	for gx := 0; gx < jayaGridSide; gx++ {
 		for gy := 0; gy < jayaGridSide; gy++ {

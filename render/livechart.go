@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"image/color"
 	"swarmsim/domain/swarm"
+	"swarmsim/locale"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/vector"
@@ -34,7 +35,7 @@ func DrawLiveChart(screen *ebiten.Image, ss *swarm.SwarmState) {
 		float32(chartW), float32(chartH), 1, color.RGBA{60, 100, 180, 180}, false)
 
 	// Title
-	printColoredAt(screen, "LIVE-STATISTIK", px+6, py+4, color.RGBA{100, 180, 255, 255})
+	printColoredAt(screen, "LIVE-STATISTIK", px+6, py+4, ColorBrightBlue)
 
 	// Chart area
 	cx := px + 35
@@ -116,11 +117,11 @@ func DrawLiveChart(screen *ebiten.Image, ss *swarm.SwarmState) {
 	// Legend
 	ly := py + chartH - 12
 	vector.DrawFilledRect(screen, float32(cx), float32(ly), 8, 8, color.RGBA{80, 220, 120, 255}, false)
-	printColoredAt(screen, "Richtig", cx+12, ly, color.RGBA{160, 200, 160, 255})
+	printColoredAt(screen, locale.T("stat.correct"), cx+12, ly, color.RGBA{160, 200, 160, 255})
 	vector.DrawFilledRect(screen, float32(cx+70), float32(ly), 8, 8, color.RGBA{255, 80, 80, 200}, false)
-	printColoredAt(screen, "Falsch", cx+82, ly, color.RGBA{200, 160, 160, 255})
+	printColoredAt(screen, locale.T("stat.wrong"), cx+82, ly, color.RGBA{200, 160, 160, 255})
 	vector.DrawFilledRect(screen, float32(cx+135), float32(ly), 8, 8, color.RGBA{80, 140, 220, 180}, false)
-	printColoredAt(screen, "Gesamt", cx+147, ly, color.RGBA{160, 170, 200, 255})
+	printColoredAt(screen, locale.T("stat.total"), cx+147, ly, color.RGBA{160, 170, 200, 255})
 
 	// Current values
 	if nCorrect > 0 {
@@ -129,7 +130,7 @@ func DrawLiveChart(screen *ebiten.Image, ss *swarm.SwarmState) {
 		if nWrong > 0 {
 			lastW = st.WrongBuckets[nWrong-1]
 		}
-		info := fmt.Sprintf("Aktuell: %d/%d  (je 500 Ticks)", lastC, lastC+lastW)
+		info := locale.Tf("stat.current_per_bucket", lastC, lastC+lastW)
 		printColoredAt(screen, info, cx+10, py+12, color.RGBA{180, 190, 210, 200})
 	}
 }

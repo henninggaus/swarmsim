@@ -8,7 +8,7 @@
 > genetic programming, multiplayer arenas, and real-time analytics.
 > Built in Go with [Ebiten](https://ebitengine.org/).
 >
-> **~60.000 lines of Go** | **820+ tests** | **156 source files**
+> **~113,000 lines of Go** | **12 test suites** | **373 source files**
 
 ## Highlights
 
@@ -25,6 +25,13 @@
 - **Logistics Simulation** — Truck unloading, package delivery, color-coded stations
 - **Visual Block Editor** — Click-based programming without typing
 - **Interactive Tutorial** — 15-step guided tour on first launch (F3)
+- **Factory Mode (F5)** — Full warehouse logistics simulation with 1000+ autonomous robots, production chains, LKW loading/unloading, 3 robot types, energy economics, customer orders
+- **20 Optimization Algorithms** — GWO, WOA, PSO, DE, Cuckoo Search, ABC, Bat, HHO, and 12 more — with live math formula display (K key)
+- **7 Languages** — German, English, French, Spanish, Portuguese, Italian, Ukrainian — switchable at runtime
+- **Unicode Font Rendering** — JetBrains Mono with full Cyrillic support
+- **Live Math Overlay** — See exactly how each algorithm calculates bot positions, with color-coded formulas
+- **Self-Programming Swarm** — Bots detect problems and request AI-generated code. Proven solutions spread through the swarm. Optional Claude API for real LLM code generation
+- **Interactive Learning** — 12 guided lessons from beginner to expert, with challenges and star ratings
 - **WebAssembly** — Runs in the browser, no install needed
 
 ## Quick Start
@@ -40,7 +47,7 @@ Press **H** for the full keyboard reference.
 
 ### Requirements
 
-- Go 1.21+ (tested with Go 1.25)
+- Go 1.23+ (tested with Go 1.25)
 - No CGO dependencies
 
 ## SwarmScript Language
@@ -230,6 +237,22 @@ The main mode. Full SwarmScript editor with visual block editor.
 Features: Delivery system, Trucks, Maze, Obstacles, Light source,
 Parameter Evolution, Genetic Programming, Teams, and Dashboard.
 
+### F3: Tutorial
+
+15-step interactive guided tour covering SwarmScript basics,
+delivery mode, bot selection, follow-cam, block editor, and feature toggles.
+
+### F4: Algo-Labor
+
+Side-by-side comparison of 20 bio-inspired optimization algorithms
+on configurable fitness landscapes. Live math overlay, radar chart,
+and auto-tournament benchmarking.
+
+### F5: Factory Mode
+
+Full autonomous warehouse logistics simulation with 1000+ robots,
+production chains, LKW operations, energy economics, and real-time KPIs.
+
 ## Features In Detail
 
 ### Genetic Programming (GP)
@@ -268,6 +291,38 @@ Real-time dashboard with five panels:
 15-step guided tour covering SwarmScript basics, delivery mode,
 bot selection, follow-cam, block editor, and feature toggles.
 Starts automatically on first launch, skippable with ESC.
+
+## Factory Mode (F5)
+
+A complete autonomous warehouse simulation:
+
+- **1000-2000 robots** navigate a multi-zone factory (Receiving -> Storage -> Production -> Shipping)
+- **3 robot types**: Transporter (60%), Forklift with pallets (25%), Express courier (15%)
+- **Production chain**: Inbound LKW -> QC inspection -> Kanban-pull machines -> Multi-step recipes -> Outbound LKW
+- **Smart task assignment**: Bots pick nearest tasks, avoid congestion, communicate charger availability
+- **Energy economics**: Day/night pricing, budget management, bot purchase/sale
+- **Shift system**: 70/30 rotation with handover, maintenance scheduling
+- **Random events**: Supply shortage, rush orders, power outages, efficiency bonuses
+- **Real-time KPIs**: OEE, throughput, quality rate, bottleneck detection
+
+## Algo-Labor (F4)
+
+Compare 20 bio-inspired optimization algorithms side-by-side:
+
+GWO (Grey Wolf) | WOA (Whale) | PSO (Particle Swarm) | DE (Differential Evolution) | Cuckoo Search | ABC (Bee Colony) | BFO (Bacterial) | MFO (Moth-Flame) | Bat | HHO (Harris Hawks) | SSA (Salp Swarm) | GSA (Gravitational) | FPA (Flower) | SA (Simulated Annealing) | AO (Aquila) | SCA (Sine Cosine) | DA (Dragonfly) | TLBO (Teaching) | EO (Equilibrium) | Jaya
+
+- **Live Math Overlay (K)**: See the exact formula with live values for the selected bot
+- **Radar Chart**: Compare algorithm performance across 4 metrics
+- **Auto-Tournament**: Benchmark all algorithms automatically
+- **4 Fitness Landscapes**: Gaussian Peaks, Rastrigin, Ackley, Rosenbrock
+
+## Languages
+
+SwarmSim supports 7 languages, switchable at runtime via the language button in the tab bar:
+
+Deutsch | English | Francais | Espanol | Portugues | Italiano | Ukrainska
+
+1325+ translated strings covering all UI, help text, tooltips, and achievements.
 
 ## Advanced Subsystems (80+)
 
@@ -405,7 +460,8 @@ SwarmSim contains a rich library of scientific subsystems, each following the `I
 swarmsim/
 ├── domain/              Core logic (no rendering dependencies)
 │   ├── bot/             Bot types and behavior interfaces
-│   ├── swarm/           SwarmBot + 80 subsystems (156 files, see above)
+│   ├── swarm/           SwarmBot + 80+ subsystems (see above)
+│   ├── factory/         Factory mode logic (robots, machines, trucks, orders)
 │   ├── physics/         Collision detection, spatial hash, arena
 │   ├── comm/            Decentralized message passing (TTL, range)
 │   ├── genetics/        Genome, crossover, mutation, fitness
@@ -457,15 +513,17 @@ go build -o swarmsim .
 
 | Key | Action |
 |-----|--------|
-| **Space** | Pause / Resume |
-| **+/-** | Simulation speed (0.5x - 5.0x) |
 | **F1** | Classic Mode |
 | **F2** | Swarm Lab |
-| **F3** | Start Tutorial |
+| **F3** | Tutorial |
+| **F4** | Algo-Labor |
+| **F5** | Factory Mode |
 | **F10** | Screenshot (PNG) |
 | **F11** | GIF Recording |
 | **H** | Help overlay |
-| **ESC** | Quit |
+| **Space** | Pause / Resume |
+| **+/-** | Simulation speed (0.5x - 5.0x) |
+| **ESC** | Back / Quit |
 
 ### Swarm Lab (F2)
 
@@ -481,13 +539,41 @@ go build -o swarmsim .
 | **F** | Follow selected bot |
 | **Tab** | Filter log to selected bot |
 
+### Swarm Lab / Algo-Labor
+
+| Key | Action |
+|-----|--------|
+| **K** | Live Math Overlay (formula display) |
+| **1-5** | Speed presets |
+| **Click** | Select bot |
+| **Mouse wheel** | Zoom |
+
+### Factory Mode (F5)
+
+| Key | Action |
+|-----|--------|
+| **WASD** | Pan camera |
+| **1-5** | Speed (1x-20x) |
+| **Click** | Select bot / Toggle machine |
+| **F** | Follow selected bot |
+| **M** | Heatmap overlay |
+| **H** | Help overlay |
+| **P** | Maintenance planner |
+| **E** | Emergency evacuation |
+| **T** | Spawn inbound truck |
+| **Shift+T** | Spawn outbound truck |
+| **B** | Buy 10 bots ($5000) |
+| **V** | Sell 10 bots (+$2000) |
+| **X** | Export stats to clipboard |
+
 ## Tech Stack
 
-- **Go 1.25** (no CGO)
-- **Ebiten v2** (2D game library)
+- **Go 1.23+** (tested with Go 1.25, no CGO)
+- **Ebiten v2.9** (2D game library)
+- **JetBrains Mono** font (SIL OFL) with full Cyrillic support
+- **text/v2** for Unicode rendering
 - Cross-compile: Windows, Linux, WebAssembly
-- No external dependencies beyond Ebiten
-- **~60.000 lines of Go**, **820+ unit tests**, **186 commits**
+- **~113,000 lines of Go** | **12 test suites** | **373 source files**
 
 ## Contributing
 

@@ -1,6 +1,9 @@
 package swarm
 
-import "math"
+import (
+	"math"
+	"swarmsim/locale"
+)
 
 // PatternType identifies a detected swarm formation pattern.
 type PatternType int
@@ -28,23 +31,23 @@ type PatternResult struct {
 	Circularity   float64     // how circular the arrangement is (0-1)
 }
 
-// PatternName returns the German display name for a pattern type.
+// PatternName returns the localized display name for a pattern type.
 func PatternName(p PatternType) string {
 	switch p {
 	case PatternCluster:
-		return "Cluster"
+		return locale.T("pattern.cluster")
 	case PatternLine:
-		return "Linie"
+		return locale.T("pattern.line")
 	case PatternCircle:
-		return "Kreis"
+		return locale.T("pattern.circle")
 	case PatternScattered:
-		return "Verstreut"
+		return locale.T("pattern.scattered")
 	case PatternStream:
-		return "Strom"
+		return locale.T("pattern.stream")
 	case PatternVortex:
-		return "Wirbel"
+		return locale.T("pattern.vortex")
 	}
-	return "Keins"
+	return locale.T("pattern.none")
 }
 
 // DetectPatterns analyzes the swarm and detects emergent formations.

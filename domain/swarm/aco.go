@@ -123,12 +123,7 @@ func TickACO(ss *SwarmState) {
 		// Convert to relative angle
 		if bestVal > trailHere+0.5 {
 			relAngle := bestAngle - bot.Angle
-			for relAngle > math.Pi {
-				relAngle -= 2 * math.Pi
-			}
-			for relAngle < -math.Pi {
-				relAngle += 2 * math.Pi
-			}
+			relAngle = WrapAngle(relAngle)
 			ss.Bots[i].ACOGrad = int(relAngle * 180 / math.Pi)
 		} else {
 			ss.Bots[i].ACOGrad = 0

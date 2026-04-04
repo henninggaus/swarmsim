@@ -24,6 +24,9 @@ type algoHandler struct {
 	tick  func(*SwarmState)                 // global per-tick update
 	apply func(*SwarmBot, *SwarmState, int) // per-bot steering (nil if tick handles it)
 
+	// Optional: live math trace for selected bot
+	mathTrace func(*SwarmBot, *SwarmState, int)
+
 	// Queries — nil means the algorithm does not support the query.
 	bestFitness      func(*SwarmState) float64                   // global best fitness
 	avgFitnessVals   func(*SwarmState) []float64                 // per-bot fitness slice for averaging
@@ -84,10 +87,11 @@ var algoRegistry = map[SwarmAlgorithmType]algoHandler{
 		tick: func(ss *SwarmState) { tickBoids(ss, ss.SwarmAlgo) },
 	},
 	AlgoPSO: {
-		init:  InitPSO,
-		clear: ClearPSO,
-		tick:  TickPSO,
-		apply: ApplyPSOMove,
+		init:      InitPSO,
+		clear:     ClearPSO,
+		tick:      TickPSO,
+		apply:     ApplyPSOMove,
+		mathTrace: tracePSO,
 		bestFitness: func(ss *SwarmState) float64 {
 			if ss.PSO != nil { return ss.PSO.GlobalFit }
 			return 0
@@ -137,10 +141,11 @@ var algoRegistry = map[SwarmAlgorithmType]algoHandler{
 		},
 	},
 	AlgoGWO: {
-		init:  InitGWO,
-		clear: ClearGWO,
-		tick:  TickGWO,
-		apply: ApplyGWO,
+		init:      InitGWO,
+		clear:     ClearGWO,
+		tick:      TickGWO,
+		apply:     ApplyGWO,
+		mathTrace: traceGWO,
 		bestFitness: func(ss *SwarmState) float64 {
 			if ss.GWO == nil {
 				return 0
@@ -172,10 +177,11 @@ var algoRegistry = map[SwarmAlgorithmType]algoHandler{
 		},
 	},
 	AlgoWOA: {
-		init:  InitWOA,
-		clear: ClearWOA,
-		tick:  TickWOA,
-		apply: ApplyWOA,
+		init:      InitWOA,
+		clear:     ClearWOA,
+		tick:      TickWOA,
+		apply:     ApplyWOA,
+		mathTrace: traceWOA,
 		bestFitness: func(ss *SwarmState) float64 {
 			if ss.WOA != nil {
 				if ss.WOA.GlobalBestF > ss.WOA.BestF { return ss.WOA.GlobalBestF }
@@ -201,10 +207,11 @@ var algoRegistry = map[SwarmAlgorithmType]algoHandler{
 		},
 	},
 	AlgoBFO: {
-		init:  InitBFO,
-		clear: ClearBFO,
-		tick:  TickBFO,
-		apply: ApplyBFO,
+		init:      InitBFO,
+		clear:     ClearBFO,
+		tick:      TickBFO,
+		apply:     ApplyBFO,
+		mathTrace: traceBFO,
 		bestFitness: func(ss *SwarmState) float64 {
 			if ss.BFO != nil { return ss.BFO.BestF }
 			return 0
@@ -221,10 +228,11 @@ var algoRegistry = map[SwarmAlgorithmType]algoHandler{
 		},
 	},
 	AlgoMFO: {
-		init:  InitMFO,
-		clear: ClearMFO,
-		tick:  TickMFO,
-		apply: ApplyMFO,
+		init:      InitMFO,
+		clear:     ClearMFO,
+		tick:      TickMFO,
+		apply:     ApplyMFO,
+		mathTrace: traceMFO,
 		bestFitness: func(ss *SwarmState) float64 {
 			if ss.MFO != nil {
 				cur := sliceMax(ss.MFO.BotFitness)
@@ -245,10 +253,11 @@ var algoRegistry = map[SwarmAlgorithmType]algoHandler{
 		},
 	},
 	AlgoCuckoo: {
-		init:  InitCuckoo,
-		clear: ClearCuckoo,
-		tick:  TickCuckoo,
-		apply: ApplyCuckoo,
+		init:      InitCuckoo,
+		clear:     ClearCuckoo,
+		tick:      TickCuckoo,
+		apply:     ApplyCuckoo,
+		mathTrace: traceCuckoo,
 		bestFitness: func(ss *SwarmState) float64 {
 			if ss.Cuckoo != nil {
 				if ss.Cuckoo.GlobalBestF > ss.Cuckoo.BestF { return ss.Cuckoo.GlobalBestF }
@@ -269,10 +278,11 @@ var algoRegistry = map[SwarmAlgorithmType]algoHandler{
 		},
 	},
 	AlgoDE: {
-		init:  InitDE,
-		clear: ClearDE,
-		tick:  TickDE,
-		apply: ApplyDE,
+		init:      InitDE,
+		clear:     ClearDE,
+		tick:      TickDE,
+		apply:     ApplyDE,
+		mathTrace: traceDE,
 		bestFitness: func(ss *SwarmState) float64 {
 			if ss.DE != nil { return ss.DE.BestF }
 			return 0
@@ -293,10 +303,11 @@ var algoRegistry = map[SwarmAlgorithmType]algoHandler{
 		},
 	},
 	AlgoABC: {
-		init:  InitABC,
-		clear: ClearABC,
-		tick:  TickABC,
-		apply: ApplyABC,
+		init:      InitABC,
+		clear:     ClearABC,
+		tick:      TickABC,
+		apply:     ApplyABC,
+		mathTrace: traceABC,
 		bestFitness: func(ss *SwarmState) float64 {
 			if ss.ABC != nil {
 				if ss.ABC.GlobalBestF > ss.ABC.BestF {
@@ -338,10 +349,11 @@ var algoRegistry = map[SwarmAlgorithmType]algoHandler{
 		},
 	},
 	AlgoBat: {
-		init:  InitBat,
-		clear: ClearBat,
-		tick:  TickBat,
-		apply: ApplyBat,
+		init:      InitBat,
+		clear:     ClearBat,
+		tick:      TickBat,
+		apply:     ApplyBat,
+		mathTrace: traceBat,
 		bestFitness: func(ss *SwarmState) float64 {
 			if ss.Bat != nil {
 				if ss.Bat.GlobalBestF > ss.Bat.BestF { return ss.Bat.GlobalBestF }
@@ -365,10 +377,11 @@ var algoRegistry = map[SwarmAlgorithmType]algoHandler{
 		},
 	},
 	AlgoSSA: {
-		init:  InitSSA,
-		clear: ClearSSA,
-		tick:  TickSSA,
-		apply: ApplySSA,
+		init:      InitSSA,
+		clear:     ClearSSA,
+		tick:      TickSSA,
+		apply:     ApplySSA,
+		mathTrace: traceSSA,
 		bestFitness: func(ss *SwarmState) float64 {
 			if ss.SSA != nil { return ss.SSA.FoodFit }
 			return 0
@@ -390,10 +403,11 @@ var algoRegistry = map[SwarmAlgorithmType]algoHandler{
 		},
 	},
 	AlgoGSA: {
-		init:  InitGSA,
-		clear: ClearGSA,
-		tick:  TickGSA,
-		apply: ApplyGSA,
+		init:      InitGSA,
+		clear:     ClearGSA,
+		tick:      TickGSA,
+		apply:     ApplyGSA,
+		mathTrace: traceGSA,
 		bestFitness: func(ss *SwarmState) float64 {
 			if ss.GSA != nil {
 				cur := sliceMax(ss.GSA.Fitness)
@@ -418,10 +432,11 @@ var algoRegistry = map[SwarmAlgorithmType]algoHandler{
 		},
 	},
 	AlgoFPA: {
-		init:  InitFPA,
-		clear: ClearFPA,
-		tick:  TickFPA,
-		apply: ApplyFPA,
+		init:      InitFPA,
+		clear:     ClearFPA,
+		tick:      TickFPA,
+		apply:     ApplyFPA,
+		mathTrace: traceFPA,
 		bestFitness: func(ss *SwarmState) float64 {
 			if ss.FPA != nil { return ss.FPA.GlobalBestF }
 			return 0
@@ -440,10 +455,11 @@ var algoRegistry = map[SwarmAlgorithmType]algoHandler{
 		},
 	},
 	AlgoHHO: {
-		init:  InitHHO,
-		clear: ClearHHO,
-		tick:  TickHHO,
-		apply: ApplyHHO,
+		init:      InitHHO,
+		clear:     ClearHHO,
+		tick:      TickHHO,
+		apply:     ApplyHHO,
+		mathTrace: traceHHO,
 		bestFitness: func(ss *SwarmState) float64 {
 			if ss.HHO != nil {
 				if ss.HHO.GlobalBestF > ss.HHO.BestF { return ss.HHO.GlobalBestF }
@@ -468,10 +484,11 @@ var algoRegistry = map[SwarmAlgorithmType]algoHandler{
 		},
 	},
 	AlgoSA: {
-		init:  InitSA,
-		clear: ClearSA,
-		tick:  TickSA,
-		apply: ApplySA,
+		init:      InitSA,
+		clear:     ClearSA,
+		tick:      TickSA,
+		apply:     ApplySA,
+		mathTrace: traceSA,
 		bestFitness: func(ss *SwarmState) float64 {
 			if ss.SA != nil { return ss.SA.GlobalBestF }
 			return 0
@@ -499,10 +516,11 @@ var algoRegistry = map[SwarmAlgorithmType]algoHandler{
 		},
 	},
 	AlgoAO: {
-		init:  InitAO,
-		clear: ClearAO,
-		tick:  TickAO,
-		apply: ApplyAO,
+		init:      InitAO,
+		clear:     ClearAO,
+		tick:      TickAO,
+		apply:     ApplyAO,
+		mathTrace: traceAO,
 		bestFitness: func(ss *SwarmState) float64 {
 			if ss.AO != nil {
 				if ss.AO.GlobalBestF > ss.AO.BestF { return ss.AO.GlobalBestF }
@@ -524,10 +542,11 @@ var algoRegistry = map[SwarmAlgorithmType]algoHandler{
 		},
 	},
 	AlgoSCA: {
-		init:  InitSCA,
-		clear: ClearSCA,
-		tick:  TickSCA,
-		apply: ApplySCA,
+		init:      InitSCA,
+		clear:     ClearSCA,
+		tick:      TickSCA,
+		apply:     ApplySCA,
+		mathTrace: traceSCA,
 		bestFitness: func(ss *SwarmState) float64 {
 			if ss.SCA != nil {
 				if ss.SCA.GlobalBestF > ss.SCA.BestF {
@@ -553,10 +572,11 @@ var algoRegistry = map[SwarmAlgorithmType]algoHandler{
 		},
 	},
 	AlgoDA: {
-		init:  InitDA,
-		clear: ClearDA,
-		tick:  TickDA,
-		apply: ApplyDA,
+		init:      InitDA,
+		clear:     ClearDA,
+		tick:      TickDA,
+		apply:     ApplyDA,
+		mathTrace: traceDA,
 		bestFitness: func(ss *SwarmState) float64 {
 			if ss.DA != nil { return ss.DA.BestF }
 			return 0
@@ -575,10 +595,11 @@ var algoRegistry = map[SwarmAlgorithmType]algoHandler{
 		},
 	},
 	AlgoTLBO: {
-		init:  InitTLBO,
-		clear: ClearTLBO,
-		tick:  TickTLBO,
-		apply: ApplyTLBO,
+		init:      InitTLBO,
+		clear:     ClearTLBO,
+		tick:      TickTLBO,
+		apply:     ApplyTLBO,
+		mathTrace: traceTLBO,
 		bestFitness: func(ss *SwarmState) float64 {
 			if ss.TLBO != nil {
 				if ss.TLBO.GlobalBestF > ss.TLBO.BestF { return ss.TLBO.GlobalBestF }
@@ -600,10 +621,11 @@ var algoRegistry = map[SwarmAlgorithmType]algoHandler{
 		},
 	},
 	AlgoEO: {
-		init:  InitEO,
-		clear: ClearEO,
-		tick:  TickEO,
-		apply: ApplyEO,
+		init:      InitEO,
+		clear:     ClearEO,
+		tick:      TickEO,
+		apply:     ApplyEO,
+		mathTrace: traceEO,
 		bestFitness: func(ss *SwarmState) float64 {
 			if ss.EO != nil { return ss.EO.BestFit }
 			return 0
@@ -624,10 +646,11 @@ var algoRegistry = map[SwarmAlgorithmType]algoHandler{
 		},
 	},
 	AlgoJaya: {
-		init:  InitJaya,
-		clear: ClearJaya,
-		tick:  TickJaya,
-		apply: ApplyJaya,
+		init:      InitJaya,
+		clear:     ClearJaya,
+		tick:      TickJaya,
+		apply:     ApplyJaya,
+		mathTrace: traceJaya,
 		bestFitness: func(ss *SwarmState) float64 {
 			if ss.Jaya == nil { return 0 }
 			f := ss.Jaya.BestF

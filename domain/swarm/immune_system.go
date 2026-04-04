@@ -224,12 +224,7 @@ func ApplyImmuneSwarm(bot *SwarmBot, ss *SwarmState, idx int) {
 			if dist > 5 {
 				targetAngle := math.Atan2(dy, dx)
 				diff := targetAngle - bot.Angle
-				for diff > math.Pi {
-					diff -= 2 * math.Pi
-				}
-				for diff < -math.Pi {
-					diff += 2 * math.Pi
-				}
+				diff = WrapAngle(diff)
 				if diff > 0.2 {
 					diff = 0.2
 				} else if diff < -0.2 {
@@ -267,12 +262,7 @@ func ApplyImmuneSwarm(bot *SwarmBot, ss *SwarmState, idx int) {
 			if abCount > 0 {
 				fleeAngle := math.Atan2(fleeY, fleeX)
 				diff := fleeAngle - bot.Angle
-				for diff > math.Pi {
-					diff -= 2 * math.Pi
-				}
-				for diff < -math.Pi {
-					diff += 2 * math.Pi
-				}
+				diff = WrapAngle(diff)
 				if diff > 0.25 {
 					diff = 0.25
 				} else if diff < -0.25 {

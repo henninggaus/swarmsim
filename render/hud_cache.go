@@ -1,6 +1,9 @@
 package render
 
-import "fmt"
+import (
+	"fmt"
+	"swarmsim/locale"
+)
 
 // hudStringCache caches formatted strings for HUD rendering.
 // Strings are only re-formatted every N frames to reduce GC pressure.
@@ -78,17 +81,17 @@ func cachedGPInfo(shouldUpdate bool, gen int, best, avg float64, timer, interval
 
 func cachedChainInfo(shouldUpdate bool, name string, elapsed, total, score int) string {
 	if shouldUpdate || hudCache.chainInfo == "" {
-		hudCache.chainInfo = fmt.Sprintf("SZENARIO-KETTE: %s | %d/%d Ticks | Score:%d | F5=Stop",
-			name, elapsed, total, score)
+		hudCache.chainInfo = fmt.Sprintf("SZENARIO-KETTE: %s | %s/%s Ticks | Score:%s | F5=Stop",
+			name, fmtNum(elapsed), fmtNum(total), fmtNum(score))
 	}
 	return hudCache.chainInfo
 }
 
 func cachedChainDone(shouldUpdate bool, totalScore int, stepScores []int) string {
 	if shouldUpdate || hudCache.chainDone == "" {
-		result := fmt.Sprintf("KETTE FERTIG! Gesamt-Score: %d", totalScore)
+		result := fmt.Sprintf("KETTE FERTIG! Gesamt-Score: %s", fmtNum(totalScore))
 		for i, s := range stepScores {
-			result += fmt.Sprintf(" | S%d:%d", i+1, s)
+			result += fmt.Sprintf(" | S%d:%s", i+1, fmtNum(s))
 		}
 		hudCache.chainDone = result
 	}
@@ -105,7 +108,7 @@ func cachedOptInfo(shouldUpdate bool, trial, maxTrials int, current, best float6
 
 func cachedFollowCam(shouldUpdate bool, botIdx int) string {
 	if shouldUpdate || hudCache.followCam == "" || hudCache.lastFollowBot != botIdx {
-		hudCache.followCam = fmt.Sprintf("Folge Bot #%d [F zum Stoppen]", botIdx)
+		hudCache.followCam = fmt.Sprintf(locale.T("hud.follow_cam"), botIdx)
 		hudCache.lastFollowBot = botIdx
 	}
 	return hudCache.followCam
@@ -113,7 +116,7 @@ func cachedFollowCam(shouldUpdate bool, botIdx int) string {
 
 func cachedClassicInfo(shouldUpdate bool, fps float64, tick int, speed float64, paused bool) string {
 	if shouldUpdate || hudCache.classicInfo == "" {
-		info := fmt.Sprintf("FPS: %.0f  Tick: %d  Speed: %.1fx", fps, tick, speed)
+		info := fmt.Sprintf("FPS: %.0f  Tick: %s  Speed: %.1fx", fps, fmtNum(tick), speed)
 		if paused {
 			info += "  [PAUSED]"
 		}
@@ -132,7 +135,7 @@ func cachedClassicGen(shouldUpdate bool, gen, tick, genLen int, best, avg float6
 
 func cachedClassicRes(shouldUpdate bool, avail, delivered, score, msgs, totalMsgs int) string {
 	if shouldUpdate || hudCache.classicRes == "" {
-		hudCache.classicRes = fmt.Sprintf("Ressourcen: %d  Geliefert: %d  Score: %d  Msgs: %d (gesamt: %d)",
+		hudCache.classicRes = locale.Tf("ui.classic_resources",
 			avail, delivered, score, msgs, totalMsgs)
 	}
 	return hudCache.classicRes

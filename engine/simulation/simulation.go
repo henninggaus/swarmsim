@@ -4,11 +4,13 @@ import (
 	"math/rand"
 	"swarmsim/domain/bot"
 	"swarmsim/domain/comm"
+	"swarmsim/domain/factory"
 	"swarmsim/domain/genetics"
 	"swarmsim/domain/physics"
 	"swarmsim/domain/resource"
 	"swarmsim/domain/swarm"
 	"swarmsim/engine/pheromone"
+	"swarmsim/logger"
 )
 
 // NewSimulation creates and initializes a new simulation.
@@ -207,6 +209,12 @@ func (s *Simulation) Update() {
 		return
 	}
 
+	// Factory mode uses its own update loop
+	if s.FactoryMode && s.FactoryState != nil {
+		s.updateFactoryMode()
+		return
+	}
+
 	// Rebuild spatial hash
 	s.Hash.Clear()
 	for _, b := range s.Bots {
@@ -371,6 +379,8 @@ func (s *Simulation) LoadScenario(sc Scenario) {
 	s.DeliveryEvents = nil
 	s.SwarmMode = false
 	s.SwarmState = nil
+	s.FactoryMode = false
+	s.FactoryState = nil
 	s.SelectedBotID = -1
 	s.CurrentScenario = sc.ID
 	s.ScenarioTitle = sc.Name
@@ -467,7 +477,15 @@ func (s *Simulation) FindBotAt(x, y, maxDist float64) bot.Bot {
 }
 
 // LoadSwarmScenario sets up the programmable swarm scenario.
+// If SwarmState already exists, it preserves the existing state (mode switch preservation).
 func (s *Simulation) LoadSwarmScenario() {
+	s.FactoryMode = false
+	s.SwarmMode = true
+	if s.SwarmState != nil {
+		// PRESERVE existing state -- just re-enter the mode
+		return
+	}
+
 	cfg := DefaultConfig()
 	cfg.ArenaWidth = swarm.SwarmArenaSize
 	cfg.ArenaHeight = swarm.SwarmArenaSize
@@ -493,6 +511,28 @@ func (s *Simulation) LoadSwarmScenario() {
 
 	s.SwarmMode = true
 	s.SwarmState = swarm.NewSwarmState(s.Rng, swarm.SwarmDefaultBots)
+}
+
+// ResetSwarmScenario forces a fresh SwarmState (used by "New Round" button).
+func (s *Simulation) ResetSwarmScenario() {
+	s.SwarmState = nil
+	s.LoadSwarmScenario()
+}
+
+// LoadFactoryScenario sets up the factory logistics mode.
+// If FactoryState already exists, it preserves the existing state (mode switch preservation).
+func (s *Simulation) LoadFactoryScenario() {
+	s.SwarmMode = false
+	s.FactoryMode = true
+	if s.FactoryState != nil {
+		// PRESERVE existing state -- just re-enter the mode
+		s.Paused = false
+		return
+	}
+	s.FactoryState = factory.NewFactoryState(factory.DefaultBotCount)
+	s.FactoryState.ShowFactoryTut = true // trigger tutorial on first load
+	s.Paused = false
+	logger.Info("FACTORY", "Factory mode loaded: %d bots", s.FactoryState.BotCount)
 }
 
 // pherAdapter wraps *pheromone.PheromoneGrid to satisfy bot.PheromoneGrid interface.

@@ -1,6 +1,9 @@
 package swarm
 
-import "math"
+import (
+	"math"
+	"sort"
+)
 
 // Sine Cosine Algorithm (SCA): Population-based metaheuristic that uses
 // sine and cosine oscillations to balance exploration and exploitation.
@@ -25,28 +28,63 @@ import "math"
 
 const (
 	scaMaxTicks  = 3000  // full optimization cycle (matches benchmark length)
-	scaSteerRate = 0.25  // max steering change per tick (radians)
 	scaAMax      = 2.0   // initial r1 upper bound (exploration range)
 	scaAMin      = 0.05  // minimum r1 floor — reduced to allow tighter convergence in late phases
 	scaSpeedMult = 5.0   // movement speed multiplier (7.5 px/tick)
 	scaLocalWalk = 40.0  // best bot local random walk radius around GlobalBest
 
 	// Grid scan parameters
-	scaInitGridSize       = 20  // 20×20 = 400 initial coarse samples
+	scaInitGridSize       = AlgoGridRescanSize // 20×20 = 400 initial coarse samples
 	scaGridRescanRate     = 120 // periodic grid rescan every N ticks
-	scaGridRescanSize     = 20  // 20×20 = 400 samples per rescan
+	scaGridRescanSize     = AlgoGridRescanSize // 20×20 = 400 samples per rescan
 	scaGridInjectTop      = 15  // inject top N grid points into worst bots
+	scaGridJitter         = 0.15 // jitter fraction of cell width for grid rescan (v4)
 	scaLocalRefineSize    = 10  // 10×10 = 100 fine samples around best point
 	scaLocalRefineRadius  = 60.0 // radius for local refinement (px)
 
 	// Direct-to-Best parameters
-	scaDtbStartProg = 0.10 // progress threshold to start Direct-to-Best (early)
-	scaDtbMaxProb   = 0.90 // max probability in late phase (aggressive — SCA oscillation scatters bots)
+	scaDtbStartProg = 0.07 // progress threshold to start Direct-to-Best (v4: earlier)
+	scaDtbMaxProb   = 0.97 // max probability in late phase (v4: near-total convergence)
 
 	// Global-best attraction
 	scaGBStartW = 0.05  // initial GB weight
-	scaGBEndW   = 0.80  // final GB weight (strong — counteracts r3-based scattering)
+	scaGBEndW   = 0.90  // final GB weight (v4: very strong — counteracts r3-based scattering)
+
+	// Mass convergence parameters (v4): periodically teleport worst bots to GlobalBest
+	scaMassConvRate    = 40   // mass convergence every N ticks
+	scaMassConvStart   = 120  // start mass convergence after N ticks
+	scaMassConvFrac    = 0.50 // fraction of bots to teleport (worst 50%)
+	scaMassConvJitter  = 8.0  // jitter radius around GlobalBest (px)
 )
+
+// scaIdxFit pairs a bot index with its fitness for ranking.
+type scaIdxFit struct {
+	idx int
+	f   float64
+}
+
+// scaRankWorst returns bot indices sorted ascending by fitness (worst first).
+func scaRankWorst(fitness []float64, n int) []scaIdxFit {
+	ranked := make([]scaIdxFit, n)
+	for i := 0; i < n; i++ {
+		ranked[i] = scaIdxFit{i, fitness[i]}
+	}
+	sort.Slice(ranked, func(i, j int) bool {
+		return ranked[i].f < ranked[j].f
+	})
+	return ranked
+}
+
+// scaUpdateGridBest updates GlobalBest from a grid-evaluated point.
+// Sets GlobalBestIdx to -1 since the point doesn't correspond to a bot.
+func scaUpdateGridBest(st *SCAState, f, px, py float64) {
+	if f > st.GlobalBestF {
+		st.GlobalBestF = f
+		st.GlobalBestX = px
+		st.GlobalBestY = py
+		st.GlobalBestIdx = -1
+	}
+}
 
 // SCAState holds Sine Cosine Algorithm state for the swarm.
 type SCAState struct {
@@ -105,11 +143,7 @@ func InitSCA(ss *SwarmState) {
 				px := margin + usableW*(float64(gx)+0.5)/float64(scaInitGridSize)
 				py := margin + usableH*(float64(gy)+0.5)/float64(scaInitGridSize)
 				f := distanceFitnessPt(ss, px, py)
-				if f > ss.SCA.GlobalBestF {
-					ss.SCA.GlobalBestF = f
-					ss.SCA.GlobalBestX = px
-					ss.SCA.GlobalBestY = py
-				}
+				scaUpdateGridBest(ss.SCA, f, px, py)
 			}
 		}
 		// Pass 2: offset grid (shifted by half-cell for complementary sampling)
@@ -123,11 +157,7 @@ func InitSCA(ss *SwarmState) {
 					continue
 				}
 				f := distanceFitnessPt(ss, px, py)
-				if f > ss.SCA.GlobalBestF {
-					ss.SCA.GlobalBestF = f
-					ss.SCA.GlobalBestX = px
-					ss.SCA.GlobalBestY = py
-				}
+				scaUpdateGridBest(ss.SCA, f, px, py)
 			}
 		}
 		// Local refinement around best found point
@@ -189,29 +219,74 @@ func TickSCA(ss *SwarmState) {
 		st.GlobalBestY = ss.Bots[st.CurBestIdx].Y
 		st.GlobalBestIdx = st.CurBestIdx
 	}
+	// If GlobalBestIdx is stale (e.g. set by grid scan, not a bot), assign
+	// the current tick's best bot so it gets gold LED + local walk behavior.
+	if st.GlobalBestIdx < 0 && st.CurBestIdx >= 0 {
+		st.GlobalBestIdx = st.CurBestIdx
+	}
 
-	// Periodic grid rescan: margin-based grid for consistent coverage
+	// Mass convergence: teleport worst bots to GlobalBest periodically.
+	// On multimodal landscapes (Rastrigin, Ackley), bots get trapped at local
+	// optima far from the known global best. DTB alone is too slow — bots must
+	// walk to GlobalBest. Mass convergence teleports them directly.
+	if st.Tick >= scaMassConvStart && st.Tick%scaMassConvRate == 0 && st.GlobalBestF > -1e18 {
+		aw := float64(ss.ArenaW)
+		ah := float64(ss.ArenaH)
+		n := len(ss.Bots)
+		nConv := int(float64(n) * scaMassConvFrac)
+		if nConv < 1 {
+			nConv = 1
+		}
+		ranked := scaRankWorst(st.Fitness, n)
+		for k := 0; k < nConv && k < n; k++ {
+			idx := ranked[k].idx
+			if idx == st.GlobalBestIdx {
+				continue
+			}
+			ss.Bots[idx].X = st.GlobalBestX + (ss.Rng.Float64()-0.5)*2*scaMassConvJitter
+			ss.Bots[idx].Y = st.GlobalBestY + (ss.Rng.Float64()-0.5)*2*scaMassConvJitter
+			clampToArena(&ss.Bots[idx], aw, ah)
+			st.Fitness[idx] = distanceFitness(&ss.Bots[idx], ss)
+			if st.Fitness[idx] > st.GlobalBestF {
+				st.GlobalBestF = st.Fitness[idx]
+				st.GlobalBestX = ss.Bots[idx].X
+				st.GlobalBestY = ss.Bots[idx].Y
+				st.GlobalBestIdx = idx
+			}
+		}
+	}
+
+	// Periodic grid rescan: margin-based grid with jitter for varied coverage
 	if st.Tick > 0 && st.Tick%scaGridRescanRate == 0 {
 		aw := float64(ss.ArenaW)
 		ah := float64(ss.ArenaH)
 		margin := SwarmEdgeMargin
 		usableW := aw - 2*margin
 		usableH := ah - 2*margin
+		cellW := usableW / float64(scaGridRescanSize)
+		cellH := usableH / float64(scaGridRescanSize)
 
-		type gridPt struct {
-			x, y, f float64
-		}
 		topPts := make([]gridPt, 0, scaGridInjectTop)
 		for gx := 0; gx < scaGridRescanSize; gx++ {
 			for gy := 0; gy < scaGridRescanSize; gy++ {
-				px := margin + usableW*(float64(gx)+0.5)/float64(scaGridRescanSize)
-				py := margin + usableH*(float64(gy)+0.5)/float64(scaGridRescanSize)
-				f := distanceFitnessPt(ss, px, py)
-				if f > st.GlobalBestF {
-					st.GlobalBestF = f
-					st.GlobalBestX = px
-					st.GlobalBestY = py
+				jx := (ss.Rng.Float64() - 0.5) * 2 * scaGridJitter * cellW
+				jy := (ss.Rng.Float64() - 0.5) * 2 * scaGridJitter * cellH
+				px := margin + usableW*(float64(gx)+0.5)/float64(scaGridRescanSize) + jx
+				py := margin + usableH*(float64(gy)+0.5)/float64(scaGridRescanSize) + jy
+				if px < margin {
+					px = margin
 				}
+				if px > aw-margin {
+					px = aw - margin
+				}
+				if py < margin {
+					py = margin
+				}
+				if py > ah-margin {
+					py = ah - margin
+				}
+				f := distanceFitnessPt(ss, px, py)
+				scaUpdateGridBest(st, f, px, py)
 				inserted := false
 				for ti := range topPts {
 					if f > topPts[ti].f {
@@ -233,21 +308,7 @@ func TickSCA(ss *SwarmState) {
 
 		// Inject top grid points into worst bots
 		if len(topPts) > 0 {
-			type idxFit struct {
-				idx int
-				f   float64
-			}
-			bots := make([]idxFit, 0, len(ss.Bots))
-			for i := range ss.Bots {
-				bots = append(bots, idxFit{i, st.Fitness[i]})
-			}
-			for i := 0; i < len(bots)-1; i++ {
-				for j := i + 1; j < len(bots); j++ {
-					if bots[j].f < bots[i].f {
-						bots[i], bots[j] = bots[j], bots[i]
-					}
-				}
-			}
+			bots := scaRankWorst(st.Fitness, len(ss.Bots))
 			inject := scaGridInjectTop
 			if inject > len(bots) {
 				inject = len(bots)
@@ -330,10 +391,12 @@ func ApplySCA(bot *SwarmBot, ss *SwarmState, idx int) {
 	}
 
 	// Direct-to-Best: skip SCA dynamics, go directly to GlobalBest with jitter
+	// v4: sqrt ramp for faster early convergence (reaches 50% at progress~0.35 instead of ~0.55)
 	if progress > scaDtbStartProg {
-		dtbProb := scaDtbMaxProb * (progress - scaDtbStartProg) / (1.0 - scaDtbStartProg)
+		frac := (progress - scaDtbStartProg) / (1.0 - scaDtbStartProg)
+		dtbProb := scaDtbMaxProb * math.Sqrt(frac)
 		if ss.Rng.Float64() < dtbProb {
-			jitter := 7.5
+			jitter := 5.0
 			tX := st.GlobalBestX + (ss.Rng.Float64()-0.5)*jitter*2
 			tY := st.GlobalBestY + (ss.Rng.Float64()-0.5)*jitter*2
 			algoMovBot(bot, tX, tY, ss.ArenaW, ss.ArenaH, scaSpeedMult)
@@ -349,7 +412,31 @@ func ApplySCA(bot *SwarmBot, ss *SwarmState, idx int) {
 		}
 	}
 
-	// Standard SCA dynamics
+	// v4: In late phases, replace SCA oscillation with directed local walk
+	// around GlobalBest. The SCA formula scatters bots via sin/cos oscillation
+	// proportional to distance — on multimodal landscapes this pushes bots to
+	// distant local optima. A shrinking local walk keeps exploration near the
+	// known optimum.
+	if progress > 0.40 {
+		// Walk radius shrinks from 80px at progress=0.40 to 15px at progress=1.0
+		walkR := 80.0 - 65.0*(progress-0.40)/0.60
+		if walkR < 15.0 {
+			walkR = 15.0
+		}
+		tX := st.GlobalBestX + (ss.Rng.Float64()-0.5)*2*walkR
+		tY := st.GlobalBestY + (ss.Rng.Float64()-0.5)*2*walkR
+		algoMovBot(bot, tX, tY, ss.ArenaW, ss.ArenaH, scaSpeedMult)
+		f := distanceFitnessPt(ss, tX, tY)
+		if f > st.GlobalBestF {
+			st.GlobalBestF = f
+			st.GlobalBestX = tX
+			st.GlobalBestY = tY
+		}
+		bot.LEDColor = [3]uint8{0, 200, 200} // cyan for local walk
+		return
+	}
+
+	// Standard SCA dynamics (early exploration phase only)
 	// r1: linearly decreasing from scaAMax to scaAMin
 	r1 := scaAMax - (scaAMax-scaAMin)*progress
 	if r1 < scaAMin {
@@ -359,7 +446,6 @@ func ApplySCA(bot *SwarmBot, ss *SwarmState, idx int) {
 	r2 := ss.Rng.Float64() * 2 * math.Pi
 	// r3: random weight for destination. In late phases, bias toward 1.0 so
 	// the difference vector points from bot toward GlobalBest (not toward origin).
-	// Early: uniform [0,2]. Late: biased toward 1.0 via linear interpolation.
 	r3raw := ss.Rng.Float64() * 2.0
 	r3 := r3raw*(1-progress) + 1.0*progress
 	r4 := ss.Rng.Float64()
@@ -391,9 +477,6 @@ func ApplySCA(bot *SwarmBot, ss *SwarmState, idx int) {
 
 	algoMovBot(bot, targetX, targetY, ss.ArenaW, ss.ArenaH, scaSpeedMult)
 
-	desired := math.Atan2(targetY-bot.Y, targetX-bot.X)
-	steerToward(bot, desired, scaSteerRate)
-
 	// LED color
 	intensity := uint8(100 + r1/scaAMax*155)
 	if st.Phase[idx] == 0 {
@@ -422,11 +505,7 @@ func scaLocalRefine(ss *SwarmState) {
 				continue
 			}
 			f := distanceFitnessPt(ss, px, py)
-			if f > st.GlobalBestF {
-				st.GlobalBestF = f
-				st.GlobalBestX = px
-				st.GlobalBestY = py
-			}
+			scaUpdateGridBest(st, f, px, py)
 		}
 	}
 }

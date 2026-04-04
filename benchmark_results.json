@@ -208,12 +208,12 @@
     "algo_type": 20,
     "fitness_func": "Gaussian Peaks",
     "fit_func_type": 0,
-    "best_fitness": 158.54157564388976,
-    "avg_fitness": 142.83060967972352,
+    "best_fitness": 158.54157489590372,
+    "avg_fitness": 142.71214222939375,
     "convergence_speed": 300,
-    "final_diversity": 0.04961514794500384,
+    "final_diversity": 0.04865081391254265,
     "iterations": 300,
-    "perturbations": 3
+    "perturbations": 4
   },
   {
     "algorithm": "Dragonfly (DA)",
@@ -473,9 +473,9 @@
     "fitness_func": "Rastrigin",
     "fit_func_type": 1,
     "best_fitness": 100,
-    "avg_fitness": 85.9551638349479,
+    "avg_fitness": 88.23566665024182,
     "convergence_speed": 300,
-    "final_diversity": 0.07101925691367725,
+    "final_diversity": 0.08693091950923298,
     "iterations": 300,
     "perturbations": 5
   },
@@ -737,9 +737,9 @@
     "fitness_func": "Ackley",
     "fit_func_type": 2,
     "best_fitness": 99.99999999999999,
-    "avg_fitness": 88.02644818361256,
+    "avg_fitness": 88.26389251495232,
     "convergence_speed": 300,
-    "final_diversity": 0.03949575173435702,
+    "final_diversity": 0.0425135610360158,
     "iterations": 300,
     "perturbations": 5
   },
@@ -1000,12 +1000,12 @@
     "algo_type": 20,
     "fitness_func": "Rosenbrock",
     "fit_func_type": 3,
-    "best_fitness": 99.99999999751903,
-    "avg_fitness": 99.97365031947103,
+    "best_fitness": 99.99999999717448,
+    "avg_fitness": 99.97134757483853,
     "convergence_speed": 300,
-    "final_diversity": 0.11983969654947473,
+    "final_diversity": 0.12446054884861749,
     "iterations": 300,
-    "perturbations": 4
+    "perturbations": 5
   },
   {
     "algorithm": "Dragonfly (DA)",
@@ -1264,10 +1264,10 @@
     "algo_type": 20,
     "fitness_func": "Schwefel",
     "fit_func_type": 4,
-    "best_fitness": 99.99999791904787,
-    "avg_fitness": 89.63278991345614,
+    "best_fitness": 99.9999917256782,
+    "avg_fitness": 89.88957947714377,
     "convergence_speed": 300,
-    "final_diversity": 0.29145895282100387,
+    "final_diversity": 0.27668447194540574,
     "iterations": 300,
     "perturbations": 3
   },
@@ -1529,9 +1529,9 @@
     "fitness_func": "Griewank",
     "fit_func_type": 5,
     "best_fitness": 100,
-    "avg_fitness": 98.82465715450229,
+    "avg_fitness": 98.90170308433883,
     "convergence_speed": 300,
-    "final_diversity": 0.03922699114048747,
+    "final_diversity": 0.03884859915503111,
     "iterations": 300,
     "perturbations": 5
   },
@@ -1792,12 +1792,12 @@
     "algo_type": 20,
     "fitness_func": "Lévy",
     "fit_func_type": 6,
-    "best_fitness": 99.99999997710806,
-    "avg_fitness": 99.26787968357816,
+    "best_fitness": 99.99999977779348,
+    "avg_fitness": 99.25040145603512,
     "convergence_speed": 300,
-    "final_diversity": 0.04610976362475015,
+    "final_diversity": 0.0462982754461563,
     "iterations": 300,
-    "perturbations": 3
+    "perturbations": 2
   },
   {
     "algorithm": "Dragonfly (DA)",

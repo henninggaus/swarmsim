@@ -176,12 +176,7 @@ func ApplyAssistTransport(bot *SwarmBot, ss *SwarmState, idx int) {
 	if dist > 1.0 {
 		target := math.Atan2(dy, dx)
 		diff := target - bot.Angle
-		for diff > math.Pi {
-			diff -= 2 * math.Pi
-		}
-		for diff < -math.Pi {
-			diff += 2 * math.Pi
-		}
+		diff = WrapAngle(diff)
 		if diff > transportAlignStr {
 			diff = transportAlignStr
 		} else if diff < -transportAlignStr {

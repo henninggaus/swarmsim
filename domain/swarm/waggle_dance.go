@@ -109,12 +109,7 @@ func TickWaggle(ss *SwarmState) {
 			dy := st.TargetY[bestJ] - bot.Y
 			targetAngle := math.Atan2(dy, dx)
 			diff := targetAngle - bot.Angle
-			for diff > math.Pi {
-				diff -= 2 * math.Pi
-			}
-			for diff < -math.Pi {
-				diff += 2 * math.Pi
-			}
+			diff = WrapAngle(diff)
 			bot.WaggleTarget = int(diff * 180 / math.Pi)
 		}
 	}

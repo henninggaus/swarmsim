@@ -182,12 +182,7 @@ func TickReactionDiffusion(ss *SwarmState) {
 				gradAngle := math.Atan2(gradY, gradX)
 				diff := gradAngle - ss.Bots[i].Angle
 				// Normalize to [-pi, pi]
-				for diff > math.Pi {
-					diff -= 2 * math.Pi
-				}
-				for diff < -math.Pi {
-					diff += 2 * math.Pi
-				}
+				diff = WrapAngle(diff)
 				ss.Bots[i].Angle += diff * rd.ChemotaxisGain * 0.1
 			}
 

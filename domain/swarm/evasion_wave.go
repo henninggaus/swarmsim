@@ -165,12 +165,7 @@ func ApplyEvade(bot *SwarmBot, ss *SwarmState, idx int) {
 	// If alarmed, steer toward flee direction
 	if st.Alarmed[idx] {
 		diff := st.FleeAngle[idx] - bot.Angle
-		for diff > math.Pi {
-			diff -= 2 * math.Pi
-		}
-		for diff < -math.Pi {
-			diff += 2 * math.Pi
-		}
+		diff = WrapAngle(diff)
 		if diff > evasionSteerRate {
 			diff = evasionSteerRate
 		} else if diff < -evasionSteerRate {

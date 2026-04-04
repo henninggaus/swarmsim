@@ -6,10 +6,10 @@ import (
 	"math"
 	"swarmsim/domain/bot"
 	"swarmsim/engine/simulation"
+	"swarmsim/locale"
 
 	"github.com/hajimehoshi/ebiten/v2"
-	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
-	"github.com/hajimehoshi/ebiten/v2/vector"
+"github.com/hajimehoshi/ebiten/v2/vector"
 )
 
 // DrawHUD renders the heads-up display overlay.
@@ -32,13 +32,13 @@ func DrawHUD(screen *ebiten.Image, s *simulation.Simulation, fps float64, r *Ren
 
 	// Top-left: FPS, Tick, Speed
 	info := cachedClassicInfo(upd, fps, s.Tick, s.Speed, s.Paused)
-	ebitenutil.DebugPrintAt(screen, info, 10, 10)
+	printColoredAt(screen, info, 10, 10, ColorWhite)
 
 	// Mode-specific top HUD
 	drawWaveHUD(screen, s, sw)
 
 	// Classic Mode scenario indicator (top-left, line 2)
-	scenLabel := fmt.Sprintf("Classic: %s [N:Naechstes]", s.ScenarioTitle)
+	scenLabel := locale.Tf("ui.classic_scenario", s.ScenarioTitle)
 	printColoredAt(screen, scenLabel, 10, 26, color.RGBA{180, 200, 220, 200})
 
 	// Top-center: Generation info (shift down if wave HUD active)
@@ -47,21 +47,21 @@ func DrawHUD(screen *ebiten.Image, s *simulation.Simulation, fps float64, r *Ren
 		genY = 95
 	}
 	genInfo := cachedClassicGen(upd, s.Generation, s.GenerationTick, s.Cfg.GenerationLength, s.BestFitness, s.AvgFitness)
-	genW := len(genInfo) * 6
-	ebitenutil.DebugPrintAt(screen, genInfo, sw/2-genW/2, genY)
+	genW := runeLen(genInfo) * 6
+	printColoredAt(screen, genInfo, sw/2-genW/2, genY, ColorWhite)
 
 	// Top-right: Bot counts
 	counts := s.BotCount()
 	y := 10
-	drawBotCount(screen, sw-160, y, "Kundschafter", counts[bot.TypeScout], ColorScout)
+	drawBotCount(screen, sw-160, y, locale.T("bot.scout"), counts[bot.TypeScout], ColorScout)
 	y += 16
-	drawBotCount(screen, sw-160, y, "Arbeiter", counts[bot.TypeWorker], ColorWorker)
+	drawBotCount(screen, sw-160, y, locale.T("bot.worker"), counts[bot.TypeWorker], ColorWorker)
 	y += 16
-	drawBotCount(screen, sw-160, y, "Anfuehrer", counts[bot.TypeLeader], ColorLeader)
+	drawBotCount(screen, sw-160, y, locale.T("bot.leader"), counts[bot.TypeLeader], ColorLeader)
 	y += 16
-	drawBotCount(screen, sw-160, y, "Panzer", counts[bot.TypeTank], ColorTank)
+	drawBotCount(screen, sw-160, y, locale.T("bot.tank"), counts[bot.TypeTank], ColorTank)
 	y += 16
-	drawBotCount(screen, sw-160, y, "Heiler", counts[bot.TypeHealer], ColorHealer)
+	drawBotCount(screen, sw-160, y, locale.T("bot.healer"), counts[bot.TypeHealer], ColorHealer)
 
 	// Bottom-left: Resources & messages
 	available := 0
@@ -71,14 +71,14 @@ func DrawHUD(screen *ebiten.Image, s *simulation.Simulation, fps float64, r *Ren
 		}
 	}
 	resInfo := cachedClassicRes(upd, available, s.Delivered, s.Score, s.ActiveMsgs, s.TotalMsgsSent)
-	ebitenutil.DebugPrintAt(screen, resInfo, 10, sh-45)
+	printColoredAt(screen, resInfo, 10, sh-45, ColorWhite)
 
 	pherModes := []string{"Pher:OFF", "Pher:FOUND", "Pher:ALL"}
-	ebitenutil.DebugPrintAt(screen, pherModes[s.PheromoneVizMode], 10, sh-30)
+	printColoredAt(screen, pherModes[s.PheromoneVizMode], 10, sh-30, ColorWhite)
 
 	// Bottom help: two lines for readability
-	printColoredAt(screen, "SPACE:Pause  1-5:Bot spawnen  R:Ressource  O:Hindernis  N:Szenario  D:Debug", 10, sh-28, color.RGBA{140, 150, 170, 200})
-	printColoredAt(screen, "P:Pheromone  E:Evolution  V:Genom  S:Sound  +/-:Speed  H:Hilfe", 10, sh-14, color.RGBA{140, 150, 170, 200})
+	printColoredAt(screen, locale.T("ui.classic_help1"), 10, sh-28, color.RGBA{140, 150, 170, 200})
+	printColoredAt(screen, locale.T("ui.classic_help2"), 10, sh-14, color.RGBA{140, 150, 170, 200})
 
 	// Selected bot info panel
 	if s.SelectedBotID >= 0 {
@@ -120,7 +120,7 @@ func drawFPSWarning(screen *ebiten.Image, r *Renderer, fps float64, sw int) {
 	}
 	if r.LowFPSCounter > 60 {
 		warn := fmt.Sprintf("FPS niedrig: %.0f", fps)
-		warnW := len(warn) * charW
+		warnW := runeLen(warn) * charW
 		warnX := sw - warnW - 15
 		vector.DrawFilledRect(screen, float32(warnX-4), 2, float32(warnW+8), float32(lineH+4),
 			color.RGBA{100, 80, 0, 200}, false)
@@ -165,7 +165,7 @@ func drawFadeOverlay(screen *ebiten.Image, r *Renderer) {
 
 func drawBotCount(screen *ebiten.Image, x, y int, name string, count int, col color.RGBA) {
 	vector.DrawFilledRect(screen, float32(x), float32(y+2), 10, 10, col, false)
-	ebitenutil.DebugPrintAt(screen, fmt.Sprintf("%s: %d", name, count), x+15, y)
+	printColoredAt(screen, fmt.Sprintf("%s: %d", name, count), x+15, y, ColorWhite)
 }
 
 func drawBotInfoPanel(screen *ebiten.Image, b bot.Bot, screenW int) {
@@ -177,19 +177,19 @@ func drawBotInfoPanel(screen *ebiten.Image, b bot.Bot, screenW int) {
 
 	col := BotColor(b.Type())
 	vector.DrawFilledRect(screen, float32(px), float32(py), 10, 10, col, false)
-	ebitenutil.DebugPrintAt(screen, fmt.Sprintf("ID: %d  %s", b.ID(), b.Type()), px+15, py)
+	printColoredAt(screen, fmt.Sprintf("ID: %d  %s", b.ID(), b.Type()), px+15, py, ColorWhite)
 	py += 18
-	ebitenutil.DebugPrintAt(screen, fmt.Sprintf("State: %s", b.GetState()), px, py)
+	printColoredAt(screen, fmt.Sprintf("State: %s", b.GetState()), px, py, ColorWhite)
 	py += 16
-	ebitenutil.DebugPrintAt(screen, fmt.Sprintf("Health: %.0f/%.0f", b.Health(), b.MaxHealth()), px, py)
+	printColoredAt(screen, fmt.Sprintf("Health: %.0f/%.0f", b.Health(), b.MaxHealth()), px, py, ColorWhite)
 	py += 16
-	ebitenutil.DebugPrintAt(screen, fmt.Sprintf("Energy: %.0f/100", b.GetEnergy()), px, py)
+	printColoredAt(screen, fmt.Sprintf("Energy: %.0f/100", b.GetEnergy()), px, py, ColorWhite)
 	py += 16
-	ebitenutil.DebugPrintAt(screen, fmt.Sprintf("Pos: (%.0f, %.0f)", b.Position().X, b.Position().Y), px, py)
+	printColoredAt(screen, fmt.Sprintf("Pos: (%.0f, %.0f)", b.Position().X, b.Position().Y), px, py, ColorWhite)
 	py += 16
-	ebitenutil.DebugPrintAt(screen, fmt.Sprintf("Speed: %.1f", b.Velocity().Len()), px, py)
+	printColoredAt(screen, fmt.Sprintf("Speed: %.1f", b.Velocity().Len()), px, py, ColorWhite)
 	py += 16
-	ebitenutil.DebugPrintAt(screen, fmt.Sprintf("Fitness: %.0f  Inv: %d", b.GetBase().Fitness(), len(b.GetInventory())), px, py)
+	printColoredAt(screen, fmt.Sprintf("Fitness: %.0f  Inv: %d", b.GetBase().Fitness(), len(b.GetInventory())), px, py, ColorWhite)
 }
 
 func drawGenomeOverlay(screen *ebiten.Image, b bot.Bot, screenW int) {
@@ -199,7 +199,7 @@ func drawGenomeOverlay(screen *ebiten.Image, b bot.Bot, screenW int) {
 	vector.DrawFilledRect(screen, float32(px-5), float32(py-5), 195, 130, ColorGenomeBg, false)
 	vector.StrokeRect(screen, float32(px-5), float32(py-5), 195, 130, 1, color.RGBA{100, 100, 100, 255}, false)
 
-	ebitenutil.DebugPrintAt(screen, "Genome:", px, py)
+	printColoredAt(screen, "Genome:", px, py, ColorWhite)
 	py += 14
 
 	genome := b.GetGenome()
@@ -207,7 +207,7 @@ func drawGenomeOverlay(screen *ebiten.Image, b bot.Bot, screenW int) {
 	values := genome.Values()
 
 	for i := 0; i < 7; i++ {
-		ebitenutil.DebugPrintAt(screen, labels[i], px, py+i*15)
+		printColoredAt(screen, labels[i], px, py+i*15, ColorWhite)
 		bx := float32(px + 50)
 		by := float32(py + i*15 + 2)
 		vector.DrawFilledRect(screen, bx, by, 100, 10, color.RGBA{40, 40, 40, 255}, false)
@@ -224,7 +224,7 @@ func drawFitnessGraph(screen *ebiten.Image, s *simulation.Simulation, sw, sh int
 
 	vector.DrawFilledRect(screen, float32(gx), float32(gy), float32(graphW), float32(graphH), ColorFitnessBg, false)
 	vector.StrokeRect(screen, float32(gx), float32(gy), float32(graphW), float32(graphH), 1, color.RGBA{60, 60, 60, 255}, false)
-	ebitenutil.DebugPrintAt(screen, "Avg Fitness", gx+2, gy+2)
+	printColoredAt(screen, "Avg Fitness", gx+2, gy+2, ColorWhite)
 
 	hist := s.FitnessHistory
 	n := len(hist)
@@ -268,7 +268,7 @@ func drawWaveHUD(screen *ebiten.Image, s *simulation.Simulation, sw int) {
 	}
 
 	// Large centered score
-	scoreText := fmt.Sprintf("Score: %d", s.Score)
+	scoreText := fmt.Sprintf("Score: %s", fmtNum(s.Score))
 	scoreImg := cachedTextImage(scoreText)
 	textW := scoreImg.Bounds().Dx()
 
@@ -281,8 +281,8 @@ func drawWaveHUD(screen *ebiten.Image, s *simulation.Simulation, sw int) {
 
 	// Wave info line below score
 	waveInfo := fmt.Sprintf("Welle %d  |  Naechste Welle in: %d Ticks", s.WaveNumber, s.WaveTicksLeft)
-	waveW := len(waveInfo) * 6
-	ebitenutil.DebugPrintAt(screen, waveInfo, sw/2-waveW/2, 75)
+	waveW := runeLen(waveInfo) * 6
+	printColoredAt(screen, waveInfo, sw/2-waveW/2, 75, ColorWhite)
 }
 
 func drawScenarioTitle(screen *ebiten.Image, title string, sw, sh, timer int) {
@@ -320,5 +320,5 @@ func DrawStepModeIndicator(screen *ebiten.Image) {
 	vector.DrawFilledRect(screen, float32(sw/2-80), 2, 160, 16,
 		color.RGBA{180, 50, 50, 200}, false)
 	printColoredAt(screen, "EINZELSCHRITT (Q=Tick, Space=weiter)", sw/2-78, 3,
-		color.RGBA{255, 255, 255, 255})
+		ColorWhite)
 }

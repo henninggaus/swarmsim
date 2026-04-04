@@ -23,7 +23,7 @@ const (
 	woaSpeedMult      = 5.0   // movement speed multiplier (7.5 px/tick)
 	woaGridRescanRate = 200   // periodic grid rescan every N ticks
 	woaGridRescanSize = 16    // grid resolution (16×16 = 256 samples)
-	woaGridInjectTop  = 10    // inject top N grid positions into worst bots
+	woaGridInjectTop  = AlgoGridInjectTop // inject top N grid positions into worst bots
 	woaDirectMaxProb  = 0.70  // max probability of direct-to-best at end
 	woaDirectStartProg = 0.20 // progress threshold to start direct-to-best
 	woaGBWeightMin    = 0.05  // global-best attraction weight at start
@@ -270,9 +270,6 @@ func woaGridRescan(ss *SwarmState, st *WOAState) {
 	usableH := ss.ArenaH - 2*margin
 	n := len(ss.Bots)
 
-	type gridPt struct {
-		x, y, f float64
-	}
 	gridPts := make([]gridPt, 0, woaGridRescanSize*woaGridRescanSize)
 	for gx := 0; gx < woaGridRescanSize; gx++ {
 		for gy := 0; gy < woaGridRescanSize; gy++ {
@@ -302,10 +299,6 @@ func woaGridRescan(ss *SwarmState, st *WOAState) {
 	}
 
 	// Find worst bots by fitness
-	type idxFit struct {
-		idx int
-		f   float64
-	}
 	agents := make([]idxFit, n)
 	for i := range ss.Bots {
 		agents[i] = idxFit{i, st.Fitness[i]}

@@ -1,6 +1,9 @@
 package swarm
 
-import "math"
+import (
+	"math"
+	"sort"
+)
 
 // Teaching-Learning-Based Optimization (TLBO): A parameter-free population-based
 // metaheuristic inspired by the teaching-learning process in a classroom.
@@ -315,9 +318,6 @@ func tlboGridRescan(ss *SwarmState, st *TLBOState) {
 	usableH := ss.ArenaH - 2*margin
 	n := len(ss.Bots)
 
-	type gridPt struct {
-		x, y, f float64
-	}
 	gridPts := make([]gridPt, 0, tlboGridRescanSize*tlboGridRescanSize)
 	for gx := 0; gx < tlboGridRescanSize; gx++ {
 		for gy := 0; gy < tlboGridRescanSize; gy++ {
@@ -332,13 +332,7 @@ func tlboGridRescan(ss *SwarmState, st *TLBOState) {
 	}
 
 	// Sort grid points by fitness descending
-	for i := 0; i < len(gridPts)-1; i++ {
-		for j := i + 1; j < len(gridPts); j++ {
-			if gridPts[j].f > gridPts[i].f {
-				gridPts[i], gridPts[j] = gridPts[j], gridPts[i]
-			}
-		}
-	}
+	sort.Slice(gridPts, func(i, j int) bool { return gridPts[i].f > gridPts[j].f })
 
 	// Update GlobalBest from grid findings
 	if len(gridPts) > 0 && gridPts[0].f > st.GlobalBestF {
@@ -348,22 +342,12 @@ func tlboGridRescan(ss *SwarmState, st *TLBOState) {
 	}
 
 	// Find worst bots by fitness
-	type idxFit struct {
-		idx int
-		f   float64
-	}
 	worstBots := make([]idxFit, n)
 	for i := 0; i < n; i++ {
 		worstBots[i] = idxFit{i, st.Fitness[i]}
 	}
 	// Sort ascending (worst first)
-	for i := 0; i < len(worstBots)-1; i++ {
-		for j := i + 1; j < len(worstBots); j++ {
-			if worstBots[j].f < worstBots[i].f {
-				worstBots[i], worstBots[j] = worstBots[j], worstBots[i]
-			}
-		}
-	}
+	sort.Slice(worstBots, func(i, j int) bool { return worstBots[i].f < worstBots[j].f })
 
 	// Teleport worst bots to best grid positions
 	topK := tlboGridRescanTopK

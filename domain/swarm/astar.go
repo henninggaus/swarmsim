@@ -267,12 +267,7 @@ func updatePathSensors(bot *SwarmBot, st *AStarState, botIdx int) {
 	absAngle := math.Atan2(dy, dx)
 	relAngle := absAngle - bot.Angle
 	// Normalize to [-PI, PI]
-	for relAngle > math.Pi {
-		relAngle -= 2 * math.Pi
-	}
-	for relAngle < -math.Pi {
-		relAngle += 2 * math.Pi
-	}
+	relAngle = WrapAngle(relAngle)
 	bot.PathAngle = int(relAngle * 180 / math.Pi)
 }
 

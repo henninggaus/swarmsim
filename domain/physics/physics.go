@@ -188,6 +188,22 @@ func (s *SpatialHash) Query(x, y, radius float64) []int {
 	return s.queryBuf
 }
 
+// Stats returns the number of non-empty cells and the average bots per non-empty cell.
+func (s *SpatialHash) Stats() (int, float64) {
+	nonEmpty := 0
+	totalBots := 0
+	for _, cell := range s.cells {
+		if len(cell) > 0 {
+			nonEmpty++
+			totalBots += len(cell)
+		}
+	}
+	if nonEmpty == 0 {
+		return 0, 0
+	}
+	return nonEmpty, float64(totalBots) / float64(nonEmpty)
+}
+
 func (s *SpatialHash) cellIndex(x, y float64) int {
 	cx := int(x / s.CellSize)
 	cy := int(y / s.CellSize)

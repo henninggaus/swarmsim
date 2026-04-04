@@ -1,3 +1,5 @@
+// Package swarm provides simulation logic for bot swarms.
+// This file handles saving and loading parameter presets.
 package swarm
 
 import (
@@ -7,22 +9,25 @@ import (
 	"swarmsim/logger"
 )
 
+// presetsFile is the name of the JSON file where presets are stored.
 const presetsFile = "swarmsim_presets.json"
 
-// ParamPreset stores a named set of parameter values.
+// ParamPreset stores a named set of parameter values for bots.
+// It includes the parameter values, which parameters are used,
+// and optionally the program source code.
 type ParamPreset struct {
-	Name       string       `json:"name"`
-	Params     [26]float64  `json:"params"`
-	UsedParams [26]bool     `json:"used_params"`
-	ProgramSrc string       `json:"program_src,omitempty"`
+	Name       string       `json:"name"`       // Name of the preset (e.g., "default", "aggressive")
+	Params     [26]float64  `json:"params"`     // Array of 26 parameter values
+	UsedParams [26]bool     `json:"used_params"` // Boolean flags indicating which parameters are active
+	ProgramSrc string       `json:"program_src,omitempty"` // Source code of the program (optional)
 }
 
-// PresetStore holds all saved presets.
+// PresetStore holds all saved presets in the system.
 type PresetStore struct {
-	Presets []ParamPreset `json:"presets"`
+	Presets []ParamPreset `json:"presets"` // List of all saved presets
 }
 
-// SavePreset saves current params as a named preset.
+// SavePreset saves the current swarm parameters as a named preset.
 func SavePreset(ss *SwarmState, name string) {
 	store := loadPresetStore()
 

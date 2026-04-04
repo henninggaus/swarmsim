@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"math/rand"
+	"os"
 	"strings"
 	"swarmsim/domain/physics"
 	"swarmsim/engine/swarmscript"
@@ -89,26 +90,52 @@ func NewSwarmState(rng *rand.Rand, botCount int) *SwarmState {
 		{"GP: Seeded Start", presetGPSeededStart},
 		{"Neuro: Delivery", presetNeuroDelivery},
 		{"Neuro: LKW", presetNeuroTruck},
+		{"Phototaxis", presetPhototaxis},
+		{"Braitenberg 2b", presetBraitenberg2b},
+		{"Stigmergy", presetStigmergy},
 	}
 
-	// Initialize editor with default preset
+	// Initialize editor with default preset (or restored session)
+	initialSource := presetAggregation
+	initialName := "Aggregation"
+	if saved := LoadSession(); saved != "" {
+		// Validate that the saved session parses before using it
+		if _, err := swarmscript.ParseSwarmScript(saved); err == nil {
+			initialSource = saved
+			initialName = "Custom (restored)"
+		}
+	}
+
 	ss.Editor = &EditorState{
-		Lines:      strings.Split(presetAggregation, "\n"),
+		Lines:      strings.Split(initialSource, "\n"),
 		MaxVisible: 34,
 		Focused:    true,
 	}
+	ss.ProgramName = initialName
 
 	// Achievement system (always active)
 	ss.AchievementState = NewAchievementState()
 
+	// Self-Programming Swarm (Collective AI)
+	ss.IssueBoard = &IssueBoardState{
+		MaxIssues:       50,
+		ProvenSolutions: make(map[string]string),
+	}
+
+	// Optional Claude API backend (via ANTHROPIC_API_KEY env var)
+	if key := os.Getenv("ANTHROPIC_API_KEY"); key != "" {
+		EnableClaudeAPI(ss, key)
+		logger.Info("SWARM", "Claude API backend enabled (model: %s)", ss.IssueBoard.ClaudeBackend.Model)
+	}
+
 	// Spawn bots
 	ss.spawnBots(botCount)
 
-	// Auto-deploy the default program
-	prog, err := swarmscript.ParseSwarmScript(presetAggregation)
+	// Auto-deploy the initial program
+	prog, err := swarmscript.ParseSwarmScript(initialSource)
 	if err == nil {
 		ss.Program = prog
-		ss.ProgramText = presetAggregation
+		ss.ProgramText = initialSource
 	}
 
 	return ss
@@ -123,6 +150,8 @@ func (ss *SwarmState) spawnBots(count int) {
 		ss.Bots[i] = NewSwarmBot(x, y, ss.Rng)
 	}
 	ss.BotCount = count
+	// Re-init per-bot chat log for collective AI
+	ss.BotChatLog = make([][]BotChatEntry, count)
 }
 
 // RespawnBots creates a new set of bots with the given count.
@@ -1274,6 +1303,86 @@ var presetNeuroDelivery = `# === NEURO: DELIVERY ===
 # Tipp: Beobachte wie die Fitness ueber Generationen steigt!
 # Am Anfang bewegen sich die Bots zufaellig. Nach einigen
 # Generationen lernen sie Pakete aufzuheben und zu liefern.
+IF true THEN FWD`
+
+var presetPhototaxis = `# === PHOTOTAXIS ===
+# Bots suchen direkt die Lichtquelle (Aktiviere: Lichtquelle ON).
+# Biologisches Vorbild: Phototaktische Einzeller (Euglena).
+# Anders als Orbit: kein Kreisen, sondern direktes Ansteuern.
+# Je naeher am Licht, desto heller leuchtet der Bot (gelb).
+#
+# Tipp: Lichtquelle mit der Maus verschieben und beobachten,
+# wie der ganze Schwarm sofort die neue Position ansteuert!
+#
+# LED-Feedback: hell = nah am Licht, dunkel = weit weg
+IF light > 80 THEN SET_LED 255 200 0
+IF light > 40 AND light <= 80 THEN SET_LED 180 100 0
+IF light <= 40 THEN SET_LED 50 50 50
+# Zur Lichtquelle navigieren
+IF light > 0 THEN TURN_TO_LIGHT
+# Kollisionsvermeidung (sanft)
+IF obs_ahead == 1 THEN AVOID_OBSTACLE
+IF near_dist < 12 THEN TURN_FROM_NEAREST
+IF near_dist < 12 THEN FWD_SLOW
+# Ohne Licht: zufaellig wandern
+IF light == 0 THEN TURN_RANDOM
+IF edge == 1 THEN TURN_RIGHT 180
+IF true THEN FWD`
+
+var presetBraitenberg2b = `# === BRAITENBERG FAHRZEUG 2b (AGGRESSION) ===
+# Valentino Braitenbergs Fahrzeugexperiment (1984):
+# "Vehicles: Experiments in Synthetic Psychology"
+# Typ 2b = gekreuzte Sensor-Aktor-Kopplung -> Aggression.
+# Je heller das Licht, desto schneller rast der Bot darauf zu.
+# Das Fahrzeug "will" die Quelle erreichen und umkreisen.
+#
+# DIREKTES Sensor-Aktor-Prinzip: Kein Planen, kein Denken.
+# Einfache Verdrahtung -> komplexes Verhalten.
+#
+# Benoetigt: Lichtquelle ON
+# Ohne Licht -> chaotisches Wandern (frustration!)
+#
+IF light > 80 THEN SET_LED 255 0 0
+IF light > 50 AND light <= 80 THEN SET_LED 200 80 0
+IF light > 20 AND light <= 50 THEN SET_LED 120 60 0
+IF light <= 20 THEN SET_LED 40 40 40
+IF light > 0 THEN TURN_TO_LIGHT
+# Geschwindigkeit proportional zur Helligkeit (3x FWD fuer helles Licht!)
+IF light > 60 THEN FWD
+IF light > 40 THEN FWD
+IF light > 20 THEN FWD
+IF near_dist < 10 THEN TURN_FROM_NEAREST
+IF obs_ahead == 1 THEN AVOID_OBSTACLE
+IF edge == 1 THEN TURN_RIGHT 180
+# Frustration: ohne Ziel zufaellig wandern
+IF light == 0 AND rnd < 5 THEN TURN_RANDOM
+IF true THEN FWD`
+
+var presetStigmergy = `# === STIGMERGY - INDIREKTE KOORDINATION ===
+# Stigmergy: Koordination OHNE direkte Kommunikation.
+# Biologisches Vorbild: Ameisenkolonien, Termitenbau.
+# Bots markieren die Umgebung implizit (Heatmap-Spur).
+# visited_here: Diese Zelle wurde schon besucht (0/1)
+# visited_ahead: Naechste Zelle bereits erkundet? (0/1)
+#
+# Strategie: Unbekanntes bevorzugen, Bekanntes meiden.
+# Emergentes Ergebnis: Effiziente Flaechenabdeckung
+# ohne eine einzige Nachricht zu senden!
+#
+# AKTIVIERE: Anzeige-Tab -> Heatmap ON, um den
+# Fortschritt der Erkundung zu verfolgen.
+#
+# Gruene Bots erkunden Neuland, blaue Bots weichen aus.
+IF visited_ahead == 0 THEN FWD
+IF visited_ahead == 0 THEN SET_LED 0 220 80
+IF visited_ahead == 1 AND rnd < 25 THEN TURN_LEFT 45
+IF visited_ahead == 1 AND rnd < 25 THEN TURN_RIGHT 45
+IF visited_here == 1 AND rnd < 8 THEN TURN_RANDOM
+IF visited_here == 1 THEN SET_LED 60 80 220
+# Abstandshalten (kein Stau)
+IF near_dist < 18 THEN TURN_FROM_NEAREST
+IF obs_ahead == 1 THEN AVOID_OBSTACLE
+IF edge == 1 THEN TURN_RIGHT 180
 IF true THEN FWD`
 
 var presetNeuroTruck = `# === NEURO: LKW-ENTLADUNG ===

@@ -192,12 +192,7 @@ func replayExperiences(ss *SwarmState, bot *SwarmBot, exps []DreamExperience, ds
 			if dist > 20 {
 				targetAngle := math.Atan2(dy, dx)
 				diff := targetAngle - bot.Angle
-				for diff > math.Pi {
-					diff -= 2 * math.Pi
-				}
-				for diff < -math.Pi {
-					diff += 2 * math.Pi
-				}
+				diff = WrapAngle(diff)
 				bot.Angle += diff * ds.LearnRate * exp.Reward
 			}
 		}
@@ -210,12 +205,7 @@ func replayExperiences(ss *SwarmState, bot *SwarmBot, exps []DreamExperience, ds
 			if dist < 150 && dist > 5 {
 				awayAngle := math.Atan2(-dy, -dx)
 				diff := awayAngle - bot.Angle
-				for diff > math.Pi {
-					diff -= 2 * math.Pi
-				}
-				for diff < -math.Pi {
-					diff += 2 * math.Pi
-				}
+				diff = WrapAngle(diff)
 				bot.Angle += diff * ds.LearnRate * math.Abs(exp.Reward)
 			}
 		}

@@ -1,10 +1,10 @@
 package render
 
 import (
-	"fmt"
 	"image/color"
 	"math"
 	"swarmsim/domain/swarm"
+	"swarmsim/locale"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/vector"
@@ -90,15 +90,15 @@ func DrawReplayOverlay(screen *ebiten.Image, ss *swarm.SwarmState, replayIdx int
 
 	// Cursor
 	cursorX := barX + barW*progress
-	vector.DrawFilledRect(screen, cursorX-2, barY-3, 4, barH+6, color.RGBA{255, 255, 255, 255}, false)
+	vector.DrawFilledRect(screen, cursorX-2, barY-3, 4, barH+6, ColorWhite, false)
 
 	// Labels
-	labelCol := color.RGBA{200, 210, 230, 255}
+	labelCol := ColorTextLight
 	dimCol := color.RGBA{120, 130, 150, 200}
 
-	title := fmt.Sprintf("ZEITREISE  Tick %d  (%d/%d)", snap.Tick, replayIdx+1, rb.Count)
+	title := locale.Tf("replay.title", snap.Tick, replayIdx+1, rb.Count)
 	printColoredAt(screen, title, int(barX), int(barY-18), labelCol)
 
-	hint := "Links/Rechts = scrubben   Shift = schnell   Home/End = Anfang/Ende   ESC/Z = beenden"
+	hint := locale.T("replay.hint")
 	printColoredAt(screen, hint, int(barX), int(barY+barH+4), dimCol)
 }

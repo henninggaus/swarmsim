@@ -86,21 +86,11 @@ func TickMagnetic(ss *SwarmState) {
 			// Check if j is in front of i (head-to-tail)
 			angleToJ := math.Atan2(dy, dx)
 			diffI := angleToJ - st.Dipole[i]
-			for diffI > math.Pi {
-				diffI -= 2 * math.Pi
-			}
-			for diffI < -math.Pi {
-				diffI += 2 * math.Pi
-			}
+			diffI = WrapAngle(diffI)
 
 			// Dipole alignment check
 			dipoleDiff := st.Dipole[j] - st.Dipole[i]
-			for dipoleDiff > math.Pi {
-				dipoleDiff -= 2 * math.Pi
-			}
-			for dipoleDiff < -math.Pi {
-				dipoleDiff += 2 * math.Pi
-			}
+			dipoleDiff = WrapAngle(dipoleDiff)
 
 			if math.Abs(diffI) < math.Pi/3 && math.Abs(dipoleDiff) < math.Pi/3 {
 				if st.ChainNext[i] == -1 && st.ChainPrev[j] == -1 {
@@ -189,12 +179,7 @@ func ApplyMagnetic(bot *SwarmBot, ss *SwarmState, idx int) {
 		// Angle from bot to other
 		angleToOther := math.Atan2(dy, dx)
 		headToTail := angleToOther - st.Dipole[idx]
-		for headToTail > math.Pi {
-			headToTail -= 2 * math.Pi
-		}
-		for headToTail < -math.Pi {
-			headToTail += 2 * math.Pi
-		}
+		headToTail = WrapAngle(headToTail)
 
 		if dist < magRepelRange {
 			// Repulsion at close range
@@ -210,12 +195,7 @@ func ApplyMagnetic(bot *SwarmBot, ss *SwarmState, idx int) {
 		// Dipole alignment torque
 		_ = other
 		dipoleDiff := st.Dipole[j] - st.Dipole[idx]
-		for dipoleDiff > math.Pi {
-			dipoleDiff -= 2 * math.Pi
-		}
-		for dipoleDiff < -math.Pi {
-			dipoleDiff += 2 * math.Pi
-		}
+		dipoleDiff = WrapAngle(dipoleDiff)
 		bot.Angle += dipoleDiff * magAlignStr * 0.1
 	}
 
@@ -224,12 +204,7 @@ func ApplyMagnetic(bot *SwarmBot, ss *SwarmState, idx int) {
 	if steerMag > 0.01 {
 		targetAngle := math.Atan2(steerY, steerX)
 		diff := targetAngle - bot.Angle
-		for diff > math.Pi {
-			diff -= 2 * math.Pi
-		}
-		for diff < -math.Pi {
-			diff += 2 * math.Pi
-		}
+		diff = WrapAngle(diff)
 		if diff > 0.15 {
 			diff = 0.15
 		} else if diff < -0.15 {

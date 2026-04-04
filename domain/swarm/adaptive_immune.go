@@ -303,12 +303,7 @@ func respondToThreats(ss *SwarmState, ai *AdaptiveImmuneState) {
 		if role.Role == ImmuneTCell && role.Activation > 0.3 {
 			targetAngle := math.Atan2(threat.Y-bot.Y, threat.X-bot.X)
 			diff := targetAngle - bot.Angle
-			for diff > math.Pi {
-				diff -= 2 * math.Pi
-			}
-			for diff < -math.Pi {
-				diff += 2 * math.Pi
-			}
+			diff = WrapAngle(diff)
 			bot.Angle += diff * 0.15 * speed
 			bot.Speed *= 1.0 + 0.2*speed
 			threat.Responding++

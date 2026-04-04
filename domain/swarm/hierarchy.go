@@ -306,12 +306,7 @@ func applySquadBehavior(ss *SwarmState, hs *HierarchyState, sq *Squad) {
 		if dist > hs.LeaderRange*0.6 {
 			angle := math.Atan2(dy, dx)
 			diff := angle - bot.Angle
-			for diff > math.Pi {
-				diff -= 2 * math.Pi
-			}
-			for diff < -math.Pi {
-				diff += 2 * math.Pi
-			}
+			diff = WrapAngle(diff)
 			bot.Angle += diff * 0.05 // gentle steering toward leader
 		}
 

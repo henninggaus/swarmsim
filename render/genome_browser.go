@@ -6,6 +6,7 @@ import (
 	"math"
 	"sort"
 	"swarmsim/domain/swarm"
+	"swarmsim/locale"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/vector"
@@ -43,7 +44,7 @@ func DrawGenomeBrowser(screen *ebiten.Image, ss *swarm.SwarmState) {
 	valCol := color.RGBA{200, 200, 220, 255}
 	goldCol := color.RGBA{255, 215, 80, 255}
 	greenCol := color.RGBA{80, 255, 120, 255}
-	redCol := color.RGBA{255, 100, 100, 255}
+	redCol := ColorLightRed
 
 	cx := panelX + 8
 	cy := panelY + 8
@@ -61,13 +62,13 @@ func DrawGenomeBrowser(screen *ebiten.Image, ss *swarm.SwarmState) {
 	} else if ss.NeuroEnabled {
 		genNum = ss.NeuroGeneration
 	}
-	title := fmt.Sprintf("GENOM-BROWSER (%s Gen %d)", modeStr, genNum)
+	title := locale.Tf("genome.title", modeStr, genNum)
 	printColoredAt(screen, title, cx, cy, headerCol)
 	cy += 16
 
 	// Sort mode indicator
-	sortNames := []string{"Fitness", "Alter (Ticks)", "Lieferungen"}
-	sortInfo := fmt.Sprintf("Sortierung: %s  (Tab=wechseln, Mausrad=scrollen)", sortNames[ss.GenomeBrowserSort])
+	sortNames := []string{locale.T("genome.sort_fitness"), locale.T("genome.sort_age"), locale.T("genome.sort_deliveries")}
+	sortInfo := locale.Tf("genome.sort_info", sortNames[ss.GenomeBrowserSort])
 	printColoredAt(screen, sortInfo, cx, cy, dimCol)
 	cy += 14
 
@@ -75,15 +76,15 @@ func DrawGenomeBrowser(screen *ebiten.Image, ss *swarm.SwarmState) {
 	headerY := cy
 	printColoredAt(screen, "#", cx, headerY, goldCol)
 	printColoredAt(screen, "Bot", cx+20, headerY, goldCol)
-	printColoredAt(screen, "Fitness", cx+60, headerY, goldCol)
-	printColoredAt(screen, "Alter", cx+120, headerY, goldCol)
-	printColoredAt(screen, "Lief.", cx+170, headerY, goldCol)
-	printColoredAt(screen, "Genom-Info", cx+220, headerY, goldCol)
+	printColoredAt(screen, locale.T("genome.col_fitness"), cx+60, headerY, goldCol)
+	printColoredAt(screen, locale.T("genome.col_age"), cx+120, headerY, goldCol)
+	printColoredAt(screen, locale.T("genome.col_deliv"), cx+170, headerY, goldCol)
+	printColoredAt(screen, locale.T("genome.col_info"), cx+220, headerY, goldCol)
 	cy += 14
 
 	// Separator
 	vector.StrokeLine(screen, float32(cx), float32(cy), float32(panelX+panelW-8), float32(cy),
-		1, color.RGBA{60, 80, 120, 150}, false)
+		1, ColorDimOverlay, false)
 	cy += 4
 
 	// Sort bots by selected criterion
@@ -199,7 +200,7 @@ func DrawGenomeBrowser(screen *ebiten.Image, ss *swarm.SwarmState) {
 
 	// Footer
 	footerY := panelY + panelH - 16
-	footerStr := fmt.Sprintf("%d Bots | G=Schliessen | Tab=Sortierung", n)
+	footerStr := locale.Tf("genome.footer", n)
 	printColoredAt(screen, footerStr, cx, footerY, dimCol)
 }
 

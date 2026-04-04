@@ -4,6 +4,7 @@ import (
 	"image/color"
 	"math"
 	"math/rand"
+	"swarmsim/locale"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/vector"
@@ -112,7 +113,7 @@ func (r *Renderer) DrawWelcomeScreen(screen *ebiten.Image, tick int) {
 	screen.DrawImage(titleImg, op)
 
 	// Subtitle
-	subtitle := "Schwarm-Robotik-Simulator"
+	subtitle := locale.T("welcome.subtitle")
 	subImg := cachedTextImage(subtitle)
 	subW := subImg.Bounds().Dx()
 	subScale := 1.5
@@ -124,13 +125,13 @@ func (r *Renderer) DrawWelcomeScreen(screen *ebiten.Image, tick int) {
 	screen.DrawImage(subImg, op2)
 
 	// Tagline
-	tagline := "Emergentes Verhalten durch einfache Regeln"
-	tagW := len(tagline) * charW
+	tagline := locale.T("welcome.tagline")
+	tagW := runeLen(tagline) * charW
 	printColoredAt(screen, tagline, sw/2-tagW/2, 190, color.RGBA{100, 100, 130, 255})
 
 	// Description
-	desc := "Programmiere autonome Bots mit lokalen Sensoren — kein Masterplan, nur Schwarm-Intelligenz."
-	descW := len(desc) * charW
+	desc := locale.T("welcome.description")
+	descW := runeLen(desc) * charW
 	printColoredAt(screen, desc, sw/2-descW/2, 210, color.RGBA{80, 80, 100, 255})
 
 	// Separator line
@@ -157,11 +158,11 @@ func (r *Renderer) DrawWelcomeScreen(screen *ebiten.Image, tick int) {
 	vector.StrokeRect(screen, float32(btnX), float32(modeY), float32(btnW), float32(btnH),
 		2, color.RGBA{136, 204, 255, uint8(float64(120) * pulse)}, false)
 
-	labTitle := "Swarm Lab — Editor (empfohlen)"
-	labTitleW := len(labTitle) * charW
-	printColoredAt(screen, labTitle, sw/2-labTitleW/2, modeY+6, color.RGBA{255, 255, 255, 255})
-	labDesc := "IF...THEN Regeln, 20 Presets, Evolution, GP"
-	labDescW := len(labDesc) * charW
+	labTitle := locale.T("welcome.btn_swarm_lab")
+	labTitleW := runeLen(labTitle) * charW
+	printColoredAt(screen, labTitle, sw/2-labTitleW/2, modeY+6, ColorWhite)
+	labDesc := locale.T("welcome.desc_swarm_lab")
+	labDescW := runeLen(labDesc) * charW
 	printColoredAt(screen, labDesc, sw/2-labDescW/2, modeY+22, dimCol)
 	// Store hit zone ID
 	r.WelcomeBtn1 = [4]int{btnX, modeY, btnW, btnH}
@@ -177,11 +178,11 @@ func (r *Renderer) DrawWelcomeScreen(screen *ebiten.Image, tick int) {
 	vector.StrokeRect(screen, float32(btnX), float32(tutY), float32(btnW), float32(btnH),
 		2, color.RGBA{120, 200, 80, uint8(float64(100) * pulse3)}, false)
 
-	tutTitle := "Tutorial starten"
-	tutTitleW := len(tutTitle) * charW
+	tutTitle := locale.T("welcome.btn_tutorial")
+	tutTitleW := runeLen(tutTitle) * charW
 	printColoredAt(screen, tutTitle, sw/2-tutTitleW/2, tutY+6, color.RGBA{220, 255, 220, 255})
-	tutDesc := "15 Schritte von der ersten Regel bis zur Evolution"
-	tutDescW := len(tutDesc) * charW
+	tutDesc := locale.T("welcome.desc_tutorial")
+	tutDescW := runeLen(tutDesc) * charW
 	printColoredAt(screen, tutDesc, sw/2-tutDescW/2, tutY+22, dimCol)
 	r.WelcomeBtn2 = [4]int{btnX, tutY, btnW, btnH}
 
@@ -196,26 +197,45 @@ func (r *Renderer) DrawWelcomeScreen(screen *ebiten.Image, tick int) {
 	vector.StrokeRect(screen, float32(btnX), float32(algoY), float32(btnW), float32(btnH),
 		2, color.RGBA{200, 150, 50, uint8(float64(100) * pulse4)}, false)
 
-	algoTitle := "Algo-Labor — Optimierungsalgorithmen (F4)"
-	algoTitleW := len(algoTitle) * charW
+	algoTitle := locale.T("welcome.btn_algo_labor")
+	algoTitleW := runeLen(algoTitle) * charW
 	printColoredAt(screen, algoTitle, sw/2-algoTitleW/2, algoY+6, color.RGBA{255, 220, 150, 255})
-	algoDesc := "20 Algorithmen vergleichen: Woelfe, Wale, Bienen & mehr"
-	algoDescW := len(algoDesc) * charW
+	algoDesc := locale.T("welcome.desc_algo_labor")
+	algoDescW := runeLen(algoDesc) * charW
 	printColoredAt(screen, algoDesc, sw/2-algoDescW/2, algoY+22, dimCol)
 	r.WelcomeBtn4 = [4]int{btnX, algoY, btnW, btnH}
 
+	// ---- Button 5: Factory Mode (industrial accent) ----
+	factoryY := algoY + btnH + 10
+	pulse5 := 0.7 + 0.3*math.Sin(float64(tick)*0.05+3.0)
+	glowAlpha5 := uint8(float64(30) * pulse5)
+	vector.DrawFilledRect(screen, float32(btnX), float32(factoryY), float32(btnW), float32(btnH),
+		color.RGBA{40, 40, 20, 200}, false)
+	vector.DrawFilledRect(screen, float32(btnX), float32(factoryY), float32(btnW), float32(btnH),
+		color.RGBA{80, 80, 30, glowAlpha5}, false)
+	vector.StrokeRect(screen, float32(btnX), float32(factoryY), float32(btnW), float32(btnH),
+		2, color.RGBA{180, 160, 50, uint8(float64(100) * pulse5)}, false)
+
+	facTitle := locale.T("welcome.btn_factory")
+	facTitleW := runeLen(facTitle) * charW
+	printColoredAt(screen, facTitle, sw/2-facTitleW/2, factoryY+6, color.RGBA{255, 220, 100, 255})
+	facDesc := locale.T("welcome.desc_factory")
+	facDescW := runeLen(facDesc) * charW
+	printColoredAt(screen, facDesc, sw/2-facDescW/2, factoryY+22, dimCol)
+	r.WelcomeBtn5 = [4]int{btnX, factoryY, btnW, btnH}
+
 	// ---- Button 4: Classic Mode (dezent) ----
-	classicY := algoY + btnH + 10
+	classicY := factoryY + btnH + 10
 	vector.DrawFilledRect(screen, float32(btnX), float32(classicY), float32(btnW), 38,
 		color.RGBA{30, 30, 45, 180}, false)
 	vector.StrokeRect(screen, float32(btnX), float32(classicY), float32(btnW), 38,
 		1, btnBorderCol, false)
 
-	classTitle := "Classic Mode"
-	classTitleW := len(classTitle) * charW
+	classTitle := locale.T("welcome.btn_classic")
+	classTitleW := runeLen(classTitle) * charW
 	printColoredAt(screen, classTitle, sw/2-classTitleW/2, classicY+4, color.RGBA{180, 200, 220, 255})
-	classDesc := "5 Bot-Typen, Genom-Evolution, Pheromone"
-	classDescW := len(classDesc) * charW
+	classDesc := locale.T("welcome.desc_classic")
+	classDescW := runeLen(classDesc) * charW
 	printColoredAt(screen, classDesc, sw/2-classDescW/2, classicY+20, dimCol)
 	r.WelcomeBtn3 = [4]int{btnX, classicY, btnW, 38}
 
@@ -232,12 +252,12 @@ func (r *Renderer) DrawWelcomeScreen(screen *ebiten.Image, tick int) {
 		icon string
 		text string
 	}{
-		{"Schwarm", "20-500 autonome Bots, jeder sieht nur 120px — kein GPS!"},
-		{"Script", "IF nearest_dist < 40 THEN TURN_FROM_NEAREST — so einfach"},
-		{"Evolve", "GA optimiert Parameter, GP evolviert ganze Programme"},
-		{"Neuro", "Neuronale Netze pro Bot — lernt durch Evolution!"},
-		{"Logist", "Pakete abholen & liefern, LKW entladen, Maze loesen"},
-		{"Battle", "Blau vs Rot: wessen Programm liefert mehr Pakete?"},
+		{locale.T("welcome.feat_swarm_icon"), locale.T("welcome.feat_swarm")},
+		{locale.T("welcome.feat_script_icon"), locale.T("welcome.feat_script")},
+		{locale.T("welcome.feat_evolve_icon"), locale.T("welcome.feat_evolve")},
+		{locale.T("welcome.feat_neuro_icon"), locale.T("welcome.feat_neuro")},
+		{locale.T("welcome.feat_logist_icon"), locale.T("welcome.feat_logist")},
+		{locale.T("welcome.feat_battle_icon"), locale.T("welcome.feat_battle")},
 	}
 
 	for i, f := range features {
@@ -249,12 +269,12 @@ func (r *Renderer) DrawWelcomeScreen(screen *ebiten.Image, tick int) {
 	// Hint text (blinking)
 	hintY := featureY + len(features)*(lineH+4) + 14
 	hintAlpha := uint8(120 + int(80*math.Sin(float64(tick)*0.08)))
-	hint := "Klicke auf einen Button oben oder druecke F1 / F2 / F3 / F4"
-	hintW := len(hint) * charW
+	hint := locale.T("welcome.hint")
+	hintW := runeLen(hint) * charW
 	printColoredAt(screen, hint, sw/2-hintW/2, hintY,
 		color.RGBA{180, 180, 200, hintAlpha})
 
 	// Version
-	version := "v2.0"
-	printColoredAt(screen, version, sw-len(version)*charW-15, sh-20, color.RGBA{60, 60, 70, 255})
+	version := "v2.1"
+	printColoredAt(screen, version, sw-runeLen(version)*charW-15, sh-20, color.RGBA{60, 60, 70, 255})
 }

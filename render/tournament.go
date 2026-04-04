@@ -5,6 +5,7 @@ import (
 	"image/color"
 	"sort"
 	"swarmsim/domain/swarm"
+	"swarmsim/locale"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/vector"
@@ -23,7 +24,7 @@ func DrawTournamentOverlay(screen *ebiten.Image, ss *swarm.SwarmState) {
 	valCol := color.RGBA{200, 200, 220, 255}
 	dimCol := color.RGBA{120, 120, 140, 255}
 	greenCol := color.RGBA{80, 255, 120, 255}
-	redCol := color.RGBA{255, 100, 100, 255}
+	redCol := ColorLightRed
 	activeCol := color.RGBA{100, 200, 255, 255}
 
 	// Background
@@ -39,15 +40,15 @@ func DrawTournamentOverlay(screen *ebiten.Image, ss *swarm.SwarmState) {
 
 	switch ss.TournamentPhase {
 	case 0: // Idle — show roster
-		printColoredAt(screen, "TURNIER-MODUS", cx, cy, headerCol)
+		printColoredAt(screen, locale.T("tournament.title"), cx, cy, headerCol)
 		cy += 16
-		printColoredAt(screen, "U=Programm hinzufuegen | Enter=Start | Esc=Beenden", cx, cy, dimCol)
+		printColoredAt(screen, locale.T("tournament.controls"), cx, cy, dimCol)
 		cy += 18
 
 		if len(ss.TournamentEntries) == 0 {
-			printColoredAt(screen, "Keine Programme. Lade ein Preset und druecke U.", cx, cy, dimCol)
+			printColoredAt(screen, locale.T("tournament.empty"), cx, cy, dimCol)
 		} else {
-			printColoredAt(screen, fmt.Sprintf("Programme (%d):", len(ss.TournamentEntries)), cx, cy, valCol)
+			printColoredAt(screen, locale.Tf("tournament.programs_count", len(ss.TournamentEntries)), cx, cy, valCol)
 			cy += 14
 			for i, e := range ss.TournamentEntries {
 				marker := fmt.Sprintf("  %d. %s", i+1, e.Name)
@@ -62,20 +63,20 @@ func DrawTournamentOverlay(screen *ebiten.Image, ss *swarm.SwarmState) {
 
 		if len(ss.TournamentEntries) >= 2 {
 			cy = panelY + panelH - 20
-			printColoredAt(screen, "Enter = Turnier starten!", cx, cy, greenCol)
+			printColoredAt(screen, locale.T("tournament.start_hint"), cx, cy, greenCol)
 		}
 
 	case 1: // Running
 		entry := &ss.TournamentEntries[ss.TournamentRound]
-		printColoredAt(screen, "TURNIER LAEUFT", cx, cy, headerCol)
+		printColoredAt(screen, locale.T("tournament.running"), cx, cy, headerCol)
 		cy += 16
 
-		roundInfo := fmt.Sprintf("Runde %d/%d: %s", ss.TournamentRound+1,
+		roundInfo := locale.Tf("tournament.round_info", ss.TournamentRound+1,
 			len(ss.TournamentEntries), entry.Name)
 		printColoredAt(screen, roundInfo, cx, cy, activeCol)
 		cy += 14
 
-		timerInfo := fmt.Sprintf("Verbleibend: %d Ticks", ss.TournamentTimer)
+		timerInfo := locale.Tf("tournament.remaining", ss.TournamentTimer)
 		printColoredAt(screen, timerInfo, cx, cy, valCol)
 		cy += 14
 
@@ -91,14 +92,14 @@ func DrawTournamentOverlay(screen *ebiten.Image, ss *swarm.SwarmState) {
 
 		// Current stats
 		ds := &ss.DeliveryStats
-		statsInfo := fmt.Sprintf("Lieferungen: %d | Richtig: %d | Falsch: %d",
+		statsInfo := locale.Tf("tournament.delivery_stats",
 			ds.TotalDelivered, ds.CorrectDelivered, ds.WrongDelivered)
 		printColoredAt(screen, statsInfo, cx, cy, valCol)
 		cy += 18
 
 		// Previous rounds
 		if ss.TournamentRound > 0 {
-			printColoredAt(screen, "Bisherige Ergebnisse:", cx, cy, dimCol)
+			printColoredAt(screen, locale.T("tournament.previous_results"), cx, cy, dimCol)
 			cy += 14
 			for i := 0; i < ss.TournamentRound && i < len(ss.TournamentResults); i++ {
 				r := &ss.TournamentResults[i]
@@ -116,7 +117,7 @@ func DrawTournamentOverlay(screen *ebiten.Image, ss *swarm.SwarmState) {
 		}
 
 	case 2: // Results
-		printColoredAt(screen, "TURNIER-ERGEBNISSE", cx, cy, headerCol)
+		printColoredAt(screen, locale.T("tournament.results_title"), cx, cy, headerCol)
 		cy += 18
 
 		// Sort by score descending
@@ -128,13 +129,13 @@ func DrawTournamentOverlay(screen *ebiten.Image, ss *swarm.SwarmState) {
 
 		// Column headers
 		printColoredAt(screen, "#", cx, cy, headerCol)
-		printColoredAt(screen, "Programm", cx+20, cy, headerCol)
-		printColoredAt(screen, "Score", cx+200, cy, headerCol)
-		printColoredAt(screen, "Richtig", cx+260, cy, headerCol)
-		printColoredAt(screen, "Falsch", cx+320, cy, headerCol)
+		printColoredAt(screen, locale.T("tournament.col_program"), cx+20, cy, headerCol)
+		printColoredAt(screen, locale.T("tournament.col_score"), cx+200, cy, headerCol)
+		printColoredAt(screen, locale.T("tournament.col_correct"), cx+260, cy, headerCol)
+		printColoredAt(screen, locale.T("tournament.col_wrong"), cx+320, cy, headerCol)
 		cy += 14
 		vector.StrokeLine(screen, float32(cx), float32(cy), float32(panelX+panelW-10), float32(cy),
-			1, color.RGBA{60, 80, 120, 150}, false)
+			1, ColorDimOverlay, false)
 		cy += 4
 
 		for i, r := range sorted {
@@ -162,6 +163,6 @@ func DrawTournamentOverlay(screen *ebiten.Image, ss *swarm.SwarmState) {
 		}
 
 		cy = panelY + panelH - 20
-		printColoredAt(screen, "U=Neues Turnier | Esc=Beenden", cx, cy, dimCol)
+		printColoredAt(screen, locale.T("tournament.footer"), cx, cy, dimCol)
 	}
 }

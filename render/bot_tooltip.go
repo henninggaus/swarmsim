@@ -5,6 +5,7 @@ import (
 	"image/color"
 	"math"
 	"swarmsim/domain/swarm"
+	"swarmsim/locale"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/vector"
@@ -21,10 +22,10 @@ func DrawBotTooltip(screen *ebiten.Image, ss *swarm.SwarmState, mx, my int) {
 	lines := []string{
 		fmt.Sprintf("Bot #%d", ss.HoveredBot),
 		fmt.Sprintf("Pos: (%.0f, %.0f)", bot.X, bot.Y),
-		fmt.Sprintf("Winkel: %.0f°  Speed: %.1f", bot.Angle*180/math.Pi, bot.Speed),
+		locale.Tf("tooltip.angle_speed", bot.Angle*180/math.Pi, bot.Speed),
 		fmt.Sprintf("State: %d  Counter: %d", bot.State, bot.Counter),
 		fmt.Sprintf("LED: (%d,%d,%d)", bot.LEDColor[0], bot.LEDColor[1], bot.LEDColor[2]),
-		fmt.Sprintf("Nachbarn: %d  Naechster: %.0fpx", bot.NeighborCount, bot.NearestDist),
+		locale.Tf("tooltip.neighbors", bot.NeighborCount, bot.NearestDist),
 	}
 
 	// Fitness/age
@@ -32,38 +33,37 @@ func DrawBotTooltip(screen *ebiten.Image, ss *swarm.SwarmState, mx, my int) {
 
 	// Delivery info
 	if ss.DeliveryOn {
-		carryStr := "Nein"
+		carryStr := locale.T("tooltip.carry_no")
 		if bot.CarryingPkg >= 0 {
-			carryStr = fmt.Sprintf("Paket #%d", bot.CarryingPkg)
+			carryStr = locale.Tf("tooltip.carry_pkg", bot.CarryingPkg)
 		}
-		lines = append(lines, fmt.Sprintf("Traegt: %s", carryStr))
-		lines = append(lines, fmt.Sprintf("Lief: %d (%d richtig, %d falsch)",
+		lines = append(lines, locale.Tf("tooltip.carrying", carryStr))
+		lines = append(lines, locale.Tf("tooltip.deliveries",
 			bot.Stats.TotalDeliveries, bot.Stats.CorrectDeliveries, bot.Stats.WrongDeliveries))
 	}
 
 	// Energy (only show when energy system is active)
 	if ss.EnergyEnabled {
-		lines = append(lines, fmt.Sprintf("Energie: %.0f%%", bot.Energy))
+		lines = append(lines, locale.Tf("bot.energy", bot.Energy))
 	}
 
 	// Sensors
-	sensorLine := fmt.Sprintf("Licht:%d  Msg:%d  Obs:%v",
+	sensorLine := locale.Tf("bot.sensors",
 		bot.LightValue, bot.ReceivedMsg, bot.ObstacleAhead)
 	lines = append(lines, sensorLine)
 
 	// Cooperative sensors
 	if bot.NeighborCount > 0 {
-		lines = append(lines, fmt.Sprintf("Gruppe: %d Bots  %d%% tragen  Spd:%d",
-			bot.GroupSize, bot.GroupCarry, bot.GroupSpeed))
+		lines = append(lines, locale.Tf("tooltip.group", bot.GroupSize, bot.GroupCarry, bot.GroupSpeed))
 	}
 
 	// Mode-specific info
 	if ss.NeuroEnabled && bot.Brain != nil {
-		lines = append(lines, "Modus: NEURO")
+		lines = append(lines, locale.T("tooltip.mode_neuro"))
 	} else if ss.GPEnabled && bot.OwnProgram != nil {
-		lines = append(lines, fmt.Sprintf("Modus: GP (%d Regeln)", len(bot.OwnProgram.Rules)))
+		lines = append(lines, locale.Tf("tooltip.mode_gp", len(bot.OwnProgram.Rules)))
 	} else if ss.EvolutionOn {
-		lines = append(lines, "Modus: EVOLUTION")
+		lines = append(lines, locale.T("tooltip.mode_evolution"))
 	}
 
 	// Calculate panel dimensions
@@ -98,9 +98,9 @@ func DrawBotTooltip(screen *ebiten.Image, ss *swarm.SwarmState, mx, my int) {
 
 	// Draw lines
 	for i, line := range lines {
-		col := color.RGBA{200, 210, 230, 255}
+		col := ColorTextLight
 		if i == 0 {
-			col = color.RGBA{100, 180, 255, 255} // header color
+			col = ColorBrightBlue // header color
 		}
 		printColoredAt(screen, line, tx+6, ty+4+i*lineH, col)
 	}

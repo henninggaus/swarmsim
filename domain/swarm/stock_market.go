@@ -2,6 +2,7 @@ package swarm
 
 import (
 	"math"
+	"swarmsim/locale"
 	"swarmsim/logger"
 )
 
@@ -55,11 +56,28 @@ type MarketOrder struct {
 }
 
 var strategyStocks = []StrategyStock{
-	{Name: "Aggressiv", Price: 10.0},
-	{Name: "Defensiv", Price: 10.0},
+	{Name: "Aggressive", Price: 10.0},
+	{Name: "Defensive", Price: 10.0},
 	{Name: "Explorer", Price: 10.0},
-	{Name: "Kooperativ", Price: 10.0},
-	{Name: "Spezialist", Price: 10.0},
+	{Name: "Cooperative", Price: 10.0},
+	{Name: "Specialist", Price: 10.0},
+}
+
+// stockLocaleKeys maps internal strategy stock names to locale keys.
+var stockLocaleKeys = map[string]string{
+	"Aggressive":  "stock.aggressive",
+	"Defensive":   "stock.defensive",
+	"Explorer":    "stock.explorer",
+	"Cooperative": "stock.cooperative",
+	"Specialist":  "stock.specialist",
+}
+
+// StockDisplayName returns the localized display name for a StrategyStock.
+func StockDisplayName(s *StrategyStock) string {
+	if key, ok := stockLocaleKeys[s.Name]; ok {
+		return locale.T(key)
+	}
+	return s.Name
 }
 
 // InitStockMarket sets up the strategy stock market.

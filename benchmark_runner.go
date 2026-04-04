@@ -125,9 +125,9 @@ func runBenchmark() {
 
 	totalElapsed := time.Since(benchStart)
 	fmt.Println()
-	fmt.Printf("Ergebnisse: benchmark_results.json (%d Eintraege, %d Runs gemittelt)\n",
+	fmt.Printf("Results: benchmark_results.json (%d entries, %d runs averaged)\n",
 		len(results), benchmarkRunsPerCombo)
-	fmt.Printf("Gesamtzeit: %s\n", totalElapsed.Round(time.Second))
+	fmt.Printf("Total time: %s\n", totalElapsed.Round(time.Second))
 	fmt.Println()
 
 	// Print summary table with stddev
@@ -182,9 +182,9 @@ func benchmarkLandscapes() []swarm.FitnessLandscapeType {
 
 // printBenchmarkSummaryMulti prints a table with mean ± stddev.
 func printBenchmarkSummaryMulti(results []comboResult) {
-	fmt.Println("=== Zusammenfassung (Mittelwert ± Stddev) ===")
+	fmt.Println("=== Summary (Mean ± Stddev) ===")
 	fmt.Printf("%-28s %-16s %14s %14s\n",
-		"Algorithmus", "Landschaft", "Best", "Avg")
+		"Algorithm", "Landscape", "Best", "Avg")
 	fmt.Println("--------------------------------------------------------------------------")
 	for _, cr := range results {
 		algoName := swarm.SwarmAlgorithmName(cr.algo)
@@ -197,8 +197,8 @@ func printBenchmarkSummaryMulti(results []comboResult) {
 
 	// Per-algorithm summary
 	fmt.Println()
-	fmt.Println("=== Gesamt pro Algorithmus ===")
-	fmt.Printf("%-30s %8s %8s\n", "Algorithmus", "Avg", "Stddev")
+	fmt.Println("=== Total per Algorithm ===")
+	fmt.Printf("%-30s %8s %8s\n", "Algorithm", "Avg", "Stddev")
 	fmt.Println("------------------------------------------------")
 
 	type algoSummary struct {

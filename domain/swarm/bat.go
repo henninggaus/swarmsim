@@ -1,6 +1,9 @@
 package swarm
 
-import "math"
+import (
+	"math"
+	"sort"
+)
 
 // Bat Algorithm (BA): Meta-heuristic inspired by the echolocation behavior
 // of microbats. Each bat emits ultrasonic pulses and listens for echoes to
@@ -29,7 +32,7 @@ const (
 
 	batGridRescanRate = 300 // periodic grid rescan every N ticks
 	batGridRescanSize = 14  // grid resolution (14×14 = 196 samples)
-	batGridInjectTop  = 10  // top grid points injected into worst bats
+	batGridInjectTop  = AlgoGridInjectTop // top grid points injected into worst bats
 	batDirectToBestStart = 0.3 // progress threshold to start direct-to-best
 	batDirectToBestMax   = 0.55 // max probability of direct-to-best
 )
@@ -323,9 +326,6 @@ func batGridRescan(ss *SwarmState, st *BatState) {
 	usableH := ss.ArenaH - 2*margin
 	n := len(ss.Bots)
 
-	type gridPt struct {
-		x, y, f float64
-	}
 	gridPts := make([]gridPt, 0, batGridRescanSize*batGridRescanSize)
 	for gx := 0; gx < batGridRescanSize; gx++ {
 		for gy := 0; gy < batGridRescanSize; gy++ {
@@ -340,13 +340,7 @@ func batGridRescan(ss *SwarmState, st *BatState) {
 	}
 
 	// Sort grid points by fitness descending
-	for i := 0; i < len(gridPts)-1; i++ {
-		for j := i + 1; j < len(gridPts); j++ {
-			if gridPts[j].f > gridPts[i].f {
-				gridPts[i], gridPts[j] = gridPts[j], gridPts[i]
-			}
-		}
-	}
+	sort.Slice(gridPts, func(i, j int) bool { return gridPts[i].f > gridPts[j].f })
 
 	// Update GlobalBest from grid findings
 	if len(gridPts) > 0 && gridPts[0].f > st.GlobalBestF {
@@ -356,22 +350,12 @@ func batGridRescan(ss *SwarmState, st *BatState) {
 	}
 
 	// Find worst bats by fitness
-	type idxFit struct {
-		idx int
-		f   float64
-	}
 	bats := make([]idxFit, n)
 	for i := range ss.Bots {
 		bats[i] = idxFit{i, st.Fitness[i]}
 	}
 	// Sort ascending by fitness (worst first)
-	for i := 0; i < len(bats)-1; i++ {
-		for j := i + 1; j < len(bats); j++ {
-			if bats[j].f < bats[i].f {
-				bats[i], bats[j] = bats[j], bats[i]
-			}
-		}
-	}
+	sort.Slice(bats, func(i, j int) bool { return bats[i].f < bats[j].f })
 
 	// Teleport worst bats to best grid points
 	inject := batGridInjectTop

@@ -206,12 +206,7 @@ func ApplyDivision(bot *SwarmBot, ss *SwarmState, idx int) {
 	if steerMag > 0.01 {
 		targetAngle := math.Atan2(steerY, steerX)
 		diff := targetAngle - bot.Angle
-		for diff > math.Pi {
-			diff -= 2 * math.Pi
-		}
-		for diff < -math.Pi {
-			diff += 2 * math.Pi
-		}
+		diff = WrapAngle(diff)
 		if diff > 0.2 {
 			diff = 0.2
 		} else if diff < -0.2 {

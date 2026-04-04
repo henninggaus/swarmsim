@@ -13,6 +13,39 @@ package render
 import "image/color"
 
 // ═══════════════════════════════════════════════════════
+// SHARED UI COLORS — used across many render files
+// ═══════════════════════════════════════════════════════
+var (
+	ColorWhite       = color.RGBA{255, 255, 255, 255} // general-purpose white text
+	ColorLightRed    = color.RGBA{255, 100, 100, 255} // errors, warnings, negative values
+	ColorBrightBlue  = color.RGBA{100, 180, 255, 255} // panel headers, links
+	ColorToggleBlue  = color.RGBA{80, 140, 220, 255}  // toggle/dashboard buttons
+	ColorSectionGold = color.RGBA{255, 200, 80, 255}  // section headers, highlights
+	ColorTextLight   = color.RGBA{200, 210, 230, 255} // secondary text, list items
+	ColorHeaderBlue  = color.RGBA{180, 200, 255, 255} // section headers in algo labor
+)
+
+// ═══════════════════════════════════════════════════════
+// STANDARD PANEL COLORS — consistent dark-panel styling
+// ═══════════════════════════════════════════════════════
+var (
+	ColorPanelBg     = color.RGBA{10, 12, 22, 235}   // standard dark panel background
+	ColorPanelBorder = color.RGBA{60, 80, 140, 200}   // standard panel border
+	ColorPanelHeader = color.RGBA{255, 200, 100, 255}  // standard panel header text (gold)
+)
+
+// ═══════════════════════════════════════════════════════
+// FREQUENTLY USED COLORS — deduplicated literals
+// ═══════════════════════════════════════════════════════
+var (
+	ColorWhiteFaded = color.RGBA{255, 255, 255, 200}
+	ColorGoldFaded  = color.RGBA{255, 215, 0, 200}
+	ColorInfoCyan   = color.RGBA{136, 204, 255, 220}
+	ColorDimOverlay = color.RGBA{60, 80, 120, 150}
+	ColorMediumGray = color.RGBA{180, 180, 180, 255}
+)
+
+// ═══════════════════════════════════════════════════════
 // CLASSIC MODE — Bot types & world elements
 // ═══════════════════════════════════════════════════════
 //

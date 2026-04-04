@@ -51,12 +51,7 @@ func computeVortexSensors(ss *SwarmState, idx int) {
 		tangAngle := vecAngle + math.Pi/2 // perpendicular (CCW)
 		// How much does the neighbor's heading align with the tangent?
 		alignDiff := nb.Angle - tangAngle
-		for alignDiff > math.Pi {
-			alignDiff -= 2 * math.Pi
-		}
-		for alignDiff < -math.Pi {
-			alignDiff += 2 * math.Pi
-		}
+		alignDiff = WrapAngle(alignDiff)
 		sinSum += math.Sin(alignDiff)
 		cosSum += math.Cos(alignDiff)
 		n++
@@ -133,12 +128,7 @@ func ApplyVortex(bot *SwarmBot, ss *SwarmState, idx int) {
 	// Apply clamped steering
 	desired := math.Atan2(steerY, steerX)
 	diff := desired - bot.Angle
-	for diff > math.Pi {
-		diff -= 2 * math.Pi
-	}
-	for diff < -math.Pi {
-		diff += 2 * math.Pi
-	}
+	diff = WrapAngle(diff)
 	if diff > vortexSteerRate {
 		diff = vortexSteerRate
 	} else if diff < -vortexSteerRate {

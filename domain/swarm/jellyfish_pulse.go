@@ -157,12 +157,7 @@ func ApplyJellyfishPulse(bot *SwarmBot, ss *SwarmState, idx int) {
 
 	// Apply steering
 	diff := targetAngle - bot.Angle
-	for diff > math.Pi {
-		diff -= 2 * math.Pi
-	}
-	for diff < -math.Pi {
-		diff += 2 * math.Pi
-	}
+	diff = WrapAngle(diff)
 	if diff > force {
 		diff = force
 	} else if diff < -force {

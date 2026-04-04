@@ -19,7 +19,7 @@ const (
 
 	psoGridRescanRate = 400 // periodic grid rescan every N ticks
 	psoGridRescanSize = 14  // grid resolution for periodic rescan (14×14 = 196 samples)
-	psoGridInjectTop  = 10  // number of top grid points to inject into worst particles
+	psoGridInjectTop  = AlgoGridInjectTop // number of top grid points to inject into worst particles
 )
 
 // PSOState holds per-bot PSO optimization state.
@@ -196,9 +196,6 @@ func psoGridRescan(ss *SwarmState, st *PSOState) {
 	usableH := ss.ArenaH - 2*margin
 	n := len(ss.Bots)
 
-	type gridPt struct {
-		x, y, f float64
-	}
 	gridPts := make([]gridPt, 0, psoGridRescanSize*psoGridRescanSize)
 	for gx := 0; gx < psoGridRescanSize; gx++ {
 		for gy := 0; gy < psoGridRescanSize; gy++ {
@@ -222,15 +219,11 @@ func psoGridRescan(ss *SwarmState, st *PSOState) {
 	sort.Slice(gridPts, func(i, j int) bool { return gridPts[i].f > gridPts[j].f })
 
 	// Find worst particles by personal best fitness
-	type idxFit struct {
-		idx int
-		fit float64
-	}
 	worst := make([]idxFit, n)
 	for i := 0; i < n; i++ {
 		worst[i] = idxFit{i, st.BestFit[i]}
 	}
-	sort.Slice(worst, func(i, j int) bool { return worst[i].fit < worst[j].fit })
+	sort.Slice(worst, func(i, j int) bool { return worst[i].f < worst[j].f })
 
 	// Inject top grid points into worst particles
 	injectCount := psoGridInjectTop
