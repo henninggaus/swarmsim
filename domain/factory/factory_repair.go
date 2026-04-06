@@ -6,7 +6,7 @@ import (
 )
 
 const (
-	MalfunctionChance    = 0.0001 // per tick per bot
+	MalfunctionChance    = 0.000005 // per tick per bot (~1 malfunction per 1000 bots every 200 ticks)
 	MalfunctionSpeedMult = 0.5
 	WorkshopRepairTime   = 200
 )

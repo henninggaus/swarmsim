@@ -124,12 +124,12 @@
     "algo_type": 13,
     "fitness_func": "Gaussian Peaks",
     "fit_func_type": 0,
-    "best_fitness": 142.99023452190863,
-    "avg_fitness": 140.21952968622816,
+    "best_fitness": 142.9902322378851,
+    "avg_fitness": 142.87312874486446,
     "convergence_speed": 300,
-    "final_diversity": 0.041327880911130516,
+    "final_diversity": 0.04475840261469925,
     "iterations": 300,
-    "perturbations": 5
+    "perturbations": 2
   },
   {
     "algorithm": "Salp Swarm (SSA)",
@@ -161,9 +161,9 @@
     "fitness_func": "Gaussian Peaks",
     "fit_func_type": 0,
     "best_fitness": 158.541576351289,
-    "avg_fitness": 158.31050963509867,
+    "avg_fitness": 158.3105096351083,
     "convergence_speed": 8,
-    "final_diversity": 0.049412042192548966,
+    "final_diversity": 0.04941204219291883,
     "iterations": 300,
     "perturbations": 5
   },
@@ -245,9 +245,9 @@
     "fitness_func": "Gaussian Peaks",
     "fit_func_type": 0,
     "best_fitness": 158.54157635129505,
-    "avg_fitness": 158.26727892270418,
+    "avg_fitness": 158.18958764849714,
     "convergence_speed": 1,
-    "final_diversity": 0.05626070979750193,
+    "final_diversity": 0.058867984388091286,
     "iterations": 300,
     "perturbations": 5
   },
@@ -388,12 +388,12 @@
     "algo_type": 13,
     "fitness_func": "Rastrigin",
     "fit_func_type": 1,
-    "best_fitness": 99.99999999936585,
-    "avg_fitness": 99.50580289464935,
+    "best_fitness": 99.99997261526332,
+    "avg_fitness": 99.18678340166949,
     "convergence_speed": 300,
-    "final_diversity": 0.08647790098252293,
+    "final_diversity": 0.06942537003962207,
     "iterations": 300,
-    "perturbations": 4
+    "perturbations": 2
   },
   {
     "algorithm": "Salp Swarm (SSA)",
@@ -652,12 +652,12 @@
     "algo_type": 13,
     "fitness_func": "Ackley",
     "fit_func_type": 2,
-    "best_fitness": 99.99999995051613,
-    "avg_fitness": 99.57674770715292,
-    "convergence_speed": 2,
-    "final_diversity": 0.045357260205650264,
+    "best_fitness": 99.99505192123482,
+    "avg_fitness": 98.8577468458066,
+    "convergence_speed": 300,
+    "final_diversity": 0.04166670346796123,
     "iterations": 300,
-    "perturbations": 4
+    "perturbations": 3
   },
   {
     "algorithm": "Salp Swarm (SSA)",
@@ -916,12 +916,12 @@
     "algo_type": 13,
     "fitness_func": "Rosenbrock",
     "fit_func_type": 3,
-    "best_fitness": 99.99999999999984,
-    "avg_fitness": 99.99783980361647,
+    "best_fitness": 99.9999999836929,
+    "avg_fitness": 99.99685109623675,
     "convergence_speed": 300,
-    "final_diversity": 0.10062055245439172,
+    "final_diversity": 0.12708088851954874,
     "iterations": 300,
-    "perturbations": 4
+    "perturbations": 2
   },
   {
     "algorithm": "Salp Swarm (SSA)",
@@ -1037,9 +1037,9 @@
     "fitness_func": "Rosenbrock",
     "fit_func_type": 3,
     "best_fitness": 99.99999999996614,
-    "avg_fitness": 99.99615822708259,
+    "avg_fitness": 99.9974347824091,
     "convergence_speed": 300,
-    "final_diversity": 0.12524748861053875,
+    "final_diversity": 0.11591927759774627,
     "iterations": 300,
     "perturbations": 4
   },
@@ -1180,12 +1180,12 @@
     "algo_type": 13,
     "fitness_func": "Schwefel",
     "fit_func_type": 4,
-    "best_fitness": 99.99999848115074,
-    "avg_fitness": 89.76885908927507,
+    "best_fitness": 99.999974011456,
+    "avg_fitness": 99.71112278178035,
     "convergence_speed": 300,
-    "final_diversity": 0.26991045613533987,
+    "final_diversity": 0.2961072776793097,
     "iterations": 300,
-    "perturbations": 5
+    "perturbations": 3
   },
   {
     "algorithm": "Salp Swarm (SSA)",
@@ -1301,9 +1301,9 @@
     "fitness_func": "Schwefel",
     "fit_func_type": 4,
     "best_fitness": 99.99999848023823,
-    "avg_fitness": 96.48363206711448,
+    "avg_fitness": 96.48363208461632,
     "convergence_speed": 300,
-    "final_diversity": 0.2750366503285021,
+    "final_diversity": 0.27503665042279174,
     "iterations": 300,
     "perturbations": 5
   },
@@ -1444,12 +1444,12 @@
     "algo_type": 13,
     "fitness_func": "Griewank",
     "fit_func_type": 5,
-    "best_fitness": 99.99993170731442,
-    "avg_fitness": 99.53010643670908,
+    "best_fitness": 99.99970735860337,
+    "avg_fitness": 99.50547306549538,
     "convergence_speed": 300,
-    "final_diversity": 0.04195557958182387,
+    "final_diversity": 0.04106769312308699,
     "iterations": 300,
-    "perturbations": 2
+    "perturbations": 4
   },
   {
     "algorithm": "Salp Swarm (SSA)",
@@ -1564,10 +1564,10 @@
     "algo_type": 23,
     "fitness_func": "Griewank",
     "fit_func_type": 5,
-    "best_fitness": 99.9999999995378,
-    "avg_fitness": 99.60157352961546,
+    "best_fitness": 99.9999999995381,
+    "avg_fitness": 99.60157352992613,
     "convergence_speed": 300,
-    "final_diversity": 0.04006454895512835,
+    "final_diversity": 0.04006454895422399,
     "iterations": 300,
     "perturbations": 5
   },
@@ -1708,12 +1708,12 @@
     "algo_type": 13,
     "fitness_func": "Lévy",
     "fit_func_type": 6,
-    "best_fitness": 99.99999999998859,
-    "avg_fitness": 99.982907142361,
+    "best_fitness": 99.99999948498512,
+    "avg_fitness": 99.98903655458113,
     "convergence_speed": 300,
-    "final_diversity": 0.0560935010996109,
+    "final_diversity": 0.0465221992879121,
     "iterations": 300,
-    "perturbations": 5
+    "perturbations": 4
   },
   {
     "algorithm": "Salp Swarm (SSA)",

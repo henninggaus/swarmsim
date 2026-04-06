@@ -20,44 +20,48 @@ import (
 //            Nature Inspired Cooperative Strategies for Optimization (NICSO).
 
 const (
-	batFMin      = 0.0   // minimum frequency
-	batFMax      = 2.0   // maximum frequency
-	batAlpha     = 0.95  // loudness decay rate (0 < alpha < 1)
-	batGamma     = 0.9   // pulse rate increase coefficient
-	batSteerRate = 0.25  // max steering change per tick (radians)
-	batMaxSpeed  = 2.5   // max bot speed under BA
-	batLocalStep = 15.0  // local random walk step size
-	batSpeedMult = 5.0   // movement speed multiplier for eigenbewegung (was 3.0)
-	batMaxTicks  = 3000  // full benchmark length
+	batFMin      = 0.0  // minimum frequency
+	batFMax      = 2.0  // maximum frequency
+	batAlpha     = 0.95 // loudness decay rate (0 < alpha < 1)
+	batGamma     = 0.9  // pulse rate increase coefficient
+	batSteerRate = 0.25 // max steering change per tick (radians)
+	batMaxSpeed  = 2.5  // max bot speed under BA
+	batLocalStep = 15.0 // local random walk step size
+	batSpeedMult = 5.0  // movement speed multiplier for eigenbewegung (was 3.0)
+	batMaxTicks  = 3000 // full benchmark length
 
-	batGridRescanRate = 300 // periodic grid rescan every N ticks
-	batGridRescanSize = 14  // grid resolution (14×14 = 196 samples)
-	batGridInjectTop  = AlgoGridInjectTop // top grid points injected into worst bats
-	batDirectToBestStart = 0.3 // progress threshold to start direct-to-best
-	batDirectToBestMax   = 0.55 // max probability of direct-to-best
+	batGridRescanRate    = 150  // periodic grid rescan every N ticks (was 300)
+	batGridRescanSize    = 20   // grid resolution (20×20 = 400 samples, was 14)
+	batGridInjectTop     = 15   // top grid points injected into worst bats (was 10)
+	batGridJitter        = 0.15 // grid jitter as fraction of cell width (was 0.02)
+	batLocalRefineN      = 10   // local refinement grid side (10×10=100 points)
+	batLocalRefineR      = 60.0 // local refinement radius around best grid point
+	batDirectToBestStart = 0.10 // progress threshold to start direct-to-best (was 0.3)
+	batDirectToBestMax   = 0.85 // max probability of direct-to-best (was 0.55)
+	batGBEndW            = 0.80 // max global-best attraction weight (was 0.55)
 )
 
 // BatState holds per-bot echolocation state for the Bat Algorithm.
 type BatState struct {
-	Freq     []float64 // frequency per bat
-	Vel      [2][]float64 // velocity components [0]=X, [1]=Y
-	Loud     []float64 // loudness per bat (decreases over time)
-	Pulse    []float64 // pulse emission rate per bat (increases over time)
-	Fitness  []float64 // fitness per bat
-	BestX    float64   // current tick best position X
-	BestY    float64   // current tick best position Y
-	BestF    float64   // current tick best fitness
-	BestIdx  int       // index of best bat
-	Tick     int       // iteration counter
-	AvgLoud  float64   // precomputed average loudness (avoids O(n²) in ApplyBat)
+	Freq    []float64    // frequency per bat
+	Vel     [2][]float64 // velocity components [0]=X, [1]=Y
+	Loud    []float64    // loudness per bat (decreases over time)
+	Pulse   []float64    // pulse emission rate per bat (increases over time)
+	Fitness []float64    // fitness per bat
+	BestX   float64      // current tick best position X
+	BestY   float64      // current tick best position Y
+	BestF   float64      // current tick best fitness
+	BestIdx int          // index of best bat
+	Tick    int          // iteration counter
+	AvgLoud float64      // precomputed average loudness (avoids O(n²) in ApplyBat)
 	// Persistent global best (never reset)
 	GlobalBestF float64
 	GlobalBestX float64
 	GlobalBestY float64
 	// Personal best tracking: each bat remembers its own best position.
-	PBestX   []float64
-	PBestY   []float64
-	PBestF   []float64
+	PBestX []float64
+	PBestY []float64
+	PBestF []float64
 	// Stagnation tracking for grid rescan triggering
 	StagnCounter int
 	LastBestF    float64
@@ -67,14 +71,14 @@ type BatState struct {
 func InitBat(ss *SwarmState) {
 	n := len(ss.Bots)
 	st := &BatState{
-		Freq:    make([]float64, n),
-		Vel:     [2][]float64{make([]float64, n), make([]float64, n)},
-		Loud:    make([]float64, n),
-		Pulse:   make([]float64, n),
-		Fitness: make([]float64, n),
-		PBestX:  make([]float64, n),
-		PBestY:  make([]float64, n),
-		PBestF:  make([]float64, n),
+		Freq:        make([]float64, n),
+		Vel:         [2][]float64{make([]float64, n), make([]float64, n)},
+		Loud:        make([]float64, n),
+		Pulse:       make([]float64, n),
+		Fitness:     make([]float64, n),
+		PBestX:      make([]float64, n),
+		PBestY:      make([]float64, n),
+		PBestF:      make([]float64, n),
 		BestF:       -1e18,
 		BestIdx:     -1,
 		AvgLoud:     1.0,
@@ -158,10 +162,16 @@ func TickBat(ss *SwarmState) {
 		st.StagnCounter++
 	}
 
+	// Initial grid scan at tick 1: find the global optimum early
+	// before bats fixate on local optima.
+	n := len(ss.Bots)
+	if st.Tick == 1 && n > 0 {
+		batGridRescan(ss, st)
+	}
+
 	// Periodic grid rescan: systematically sample the arena to find the
 	// global optimum on deceptive landscapes like Schwefel.
-	n := len(ss.Bots)
-	if st.Tick > 0 && st.Tick%batGridRescanRate == 0 && n > 0 {
+	if st.Tick > 1 && st.Tick%batGridRescanRate == 0 && n > 0 {
 		batGridRescan(ss, st)
 	}
 
@@ -217,10 +227,18 @@ func ApplyBat(bot *SwarmBot, ss *SwarmState, idx int) {
 			tX := st.GlobalBestX + (ss.Rng.Float64()*2-1)*jitter
 			tY := st.GlobalBestY + (ss.Rng.Float64()*2-1)*jitter
 			// Clamp
-			if tX < SwarmBotRadius { tX = SwarmBotRadius }
-			if tX > ss.ArenaW-SwarmBotRadius { tX = ss.ArenaW - SwarmBotRadius }
-			if tY < SwarmBotRadius { tY = SwarmBotRadius }
-			if tY > ss.ArenaH-SwarmBotRadius { tY = ss.ArenaH - SwarmBotRadius }
+			if tX < SwarmBotRadius {
+				tX = SwarmBotRadius
+			}
+			if tX > ss.ArenaW-SwarmBotRadius {
+				tX = ss.ArenaW - SwarmBotRadius
+			}
+			if tY < SwarmBotRadius {
+				tY = SwarmBotRadius
+			}
+			if tY > ss.ArenaH-SwarmBotRadius {
+				tY = ss.ArenaH - SwarmBotRadius
+			}
 			// Evaluate and accept if better
 			f := distanceFitnessPt(ss, tX, tY)
 			if f > st.GlobalBestF {
@@ -264,9 +282,9 @@ func ApplyBat(bot *SwarmBot, ss *SwarmState, idx int) {
 	}
 
 	// Adaptive global-best attraction: shift target toward global best
-	// Weight increases from 5% to 55% over batMaxTicks (was 5%→25%)
+	// Weight increases from 5% to 80% over batMaxTicks (was 5%→55%)
 	if st.GlobalBestF > -1e18 {
-		gbWeight := 0.05 + 0.50*progress
+		gbWeight := 0.05 + (batGBEndW-0.05)*progress
 		newX = newX*(1-gbWeight) + st.GlobalBestX*gbWeight
 		newY = newY*(1-gbWeight) + st.GlobalBestY*gbWeight
 	}
@@ -305,6 +323,53 @@ func ApplyBat(bot *SwarmBot, ss *SwarmState, idx int) {
 		bot.Speed = 0
 	}
 
+	// Best-bot local walk: the bat nearest to GlobalBest explores locally
+	// around the global best for fine-grained exploitation (radius 40px).
+	if st.GlobalBestF > -1e18 {
+		// Find if this bot is closest to GlobalBest
+		dxGB := bot.X - st.GlobalBestX
+		dyGB := bot.Y - st.GlobalBestY
+		myDist := dxGB*dxGB + dyGB*dyGB
+		isBestBot := true
+		for j := range ss.Bots {
+			if j == idx {
+				continue
+			}
+			djx := ss.Bots[j].X - st.GlobalBestX
+			djy := ss.Bots[j].Y - st.GlobalBestY
+			if djx*djx+djy*djy < myDist {
+				isBestBot = false
+				break
+			}
+		}
+		if isBestBot {
+			lwR := 40.0
+			lwX := st.GlobalBestX + (ss.Rng.Float64()*2-1)*lwR
+			lwY := st.GlobalBestY + (ss.Rng.Float64()*2-1)*lwR
+			if lwX < SwarmBotRadius {
+				lwX = SwarmBotRadius
+			}
+			if lwX > ss.ArenaW-SwarmBotRadius {
+				lwX = ss.ArenaW - SwarmBotRadius
+			}
+			if lwY < SwarmBotRadius {
+				lwY = SwarmBotRadius
+			}
+			if lwY > ss.ArenaH-SwarmBotRadius {
+				lwY = ss.ArenaH - SwarmBotRadius
+			}
+			lwF := distanceFitnessPt(ss, lwX, lwY)
+			if lwF > st.GlobalBestF {
+				st.GlobalBestF = lwF
+				st.GlobalBestX = lwX
+				st.GlobalBestY = lwY
+			}
+			algoMovBot(bot, lwX, lwY, ss.ArenaW, ss.ArenaH, batSpeedMult)
+			bot.LEDColor = [3]uint8{0, 255, 255} // cyan for best-bot
+			return
+		}
+	}
+
 	// LED color: pulse rate as blue intensity, loudness as red intensity
 	r := uint8(st.Loud[idx] * 255)
 	b := uint8(st.Pulse[idx] * 255)
@@ -326,14 +391,17 @@ func batGridRescan(ss *SwarmState, st *BatState) {
 	usableH := ss.ArenaH - 2*margin
 	n := len(ss.Bots)
 
+	cellW := usableW / float64(batGridRescanSize)
+	cellH := usableH / float64(batGridRescanSize)
+
 	gridPts := make([]gridPt, 0, batGridRescanSize*batGridRescanSize)
 	for gx := 0; gx < batGridRescanSize; gx++ {
 		for gy := 0; gy < batGridRescanSize; gy++ {
 			x := margin + usableW*(float64(gx)+0.5)/float64(batGridRescanSize)
 			y := margin + usableH*(float64(gy)+0.5)/float64(batGridRescanSize)
-			// Small jitter
-			x += (ss.Rng.Float64()*2.0 - 1.0) * usableW * 0.02
-			y += (ss.Rng.Float64()*2.0 - 1.0) * usableH * 0.02
+			// 15% jitter (was 2%) — evaluates different positions each rescan
+			x += (ss.Rng.Float64()*2.0 - 1.0) * cellW * batGridJitter
+			y += (ss.Rng.Float64()*2.0 - 1.0) * cellH * batGridJitter
 			f := distanceFitnessPt(ss, x, y)
 			gridPts = append(gridPts, gridPt{x, y, f})
 		}
@@ -347,6 +415,36 @@ func batGridRescan(ss *SwarmState, st *BatState) {
 		st.GlobalBestF = gridPts[0].f
 		st.GlobalBestX = gridPts[0].x
 		st.GlobalBestY = gridPts[0].y
+	}
+
+	// Local refinement: fine 10×10 grid around best grid point (radius 60px)
+	// Finds precise peaks in overlapping zones (critical for Gaussian Peaks).
+	if len(gridPts) > 0 {
+		cX, cY := gridPts[0].x, gridPts[0].y
+		for rx := 0; rx < batLocalRefineN; rx++ {
+			for ry := 0; ry < batLocalRefineN; ry++ {
+				lx := cX + (float64(rx)/float64(batLocalRefineN-1)*2-1)*batLocalRefineR
+				ly := cY + (float64(ry)/float64(batLocalRefineN-1)*2-1)*batLocalRefineR
+				if lx < SwarmBotRadius {
+					lx = SwarmBotRadius
+				}
+				if lx > ss.ArenaW-SwarmBotRadius {
+					lx = ss.ArenaW - SwarmBotRadius
+				}
+				if ly < SwarmBotRadius {
+					ly = SwarmBotRadius
+				}
+				if ly > ss.ArenaH-SwarmBotRadius {
+					ly = ss.ArenaH - SwarmBotRadius
+				}
+				lf := distanceFitnessPt(ss, lx, ly)
+				if lf > st.GlobalBestF {
+					st.GlobalBestF = lf
+					st.GlobalBestX = lx
+					st.GlobalBestY = ly
+				}
+			}
+		}
 	}
 
 	// Find worst bats by fitness
